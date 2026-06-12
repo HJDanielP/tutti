@@ -512,6 +512,11 @@ export const en = {
       usageLimitsLabel: "Limits",
       usageCompactAction: "Compact",
       usageCompactTooltip: "Compact the conversation context (/compact)",
+      usageAlertWarnMessage:
+        "Context is {{percent}}% full. Consider compacting the conversation.",
+      usageAlertCriticalMessage:
+        "Context is {{percent}}% full. Compact now to keep the session going.",
+      usageAlertDismiss: "Dismiss",
       noRunningResponse: "No running response to stop.",
       promptTipsPrefix: "Tips: ",
       promptTips: {

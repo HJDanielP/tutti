@@ -25,6 +25,7 @@ const mockCreateConversation = vi.fn();
 const mockSelectConversation = vi.fn();
 const mockSubmitPrompt = vi.fn();
 const mockSubmitCompact = vi.fn();
+const mockDismissUsageAlert = vi.fn();
 const mockShowPromptImagesUnsupported = vi.fn();
 const mockSubmitApprovalOption = vi.fn();
 const mockSubmitInteractivePrompt = vi.fn();
@@ -584,6 +585,7 @@ vi.mock("./controller/useAgentGUINodeController", () => ({
       selectConversation: mockSelectConversation,
       submitPrompt: mockSubmitPrompt,
       submitCompact: mockSubmitCompact,
+      dismissUsageAlert: mockDismissUsageAlert,
       showPromptImagesUnsupported: mockShowPromptImagesUnsupported,
       submitApprovalOption: mockSubmitApprovalOption,
       submitInteractivePrompt: mockSubmitInteractivePrompt,
@@ -616,6 +618,7 @@ describe("AgentGUINode", () => {
     mockSelectConversation.mockClear();
     mockSubmitPrompt.mockClear();
     mockSubmitCompact.mockClear();
+    mockDismissUsageAlert.mockClear();
     mockShowPromptImagesUnsupported.mockClear();
     mockSubmitApprovalOption.mockClear();
     mockSubmitInteractivePrompt.mockClear();
@@ -6233,6 +6236,7 @@ function createViewModel(
     promptImagesSupported: true,
     compactSupported: null,
     usage: null,
+    usageAlert: null,
     isDeletingConversation: false,
     isDeletingProjectConversations: false,
     pendingDeleteConversation: null,

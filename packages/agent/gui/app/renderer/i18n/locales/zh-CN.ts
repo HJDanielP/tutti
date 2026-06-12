@@ -470,6 +470,10 @@ export const zhCN = {
       usageLimitsLabel: "限额",
       usageCompactAction: "压缩",
       usageCompactTooltip: "压缩会话上下文（/compact）",
+      usageAlertWarnMessage: "上下文已使用 {{percent}}%，建议压缩会话。",
+      usageAlertCriticalMessage:
+        "上下文已使用 {{percent}}%，请立即压缩以继续会话。",
+      usageAlertDismiss: "关闭提醒",
       noRunningResponse: "当前没有正在运行的回复。",
       promptTipsPrefix: "Tips：",
       promptTips: {

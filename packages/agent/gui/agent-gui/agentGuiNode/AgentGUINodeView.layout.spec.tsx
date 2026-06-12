@@ -875,6 +875,100 @@ describe("AgentGUINodeView compact action", () => {
   });
 });
 
+describe("AgentGUINodeView usage alert banner", () => {
+  afterEach(() => {
+    conversationFlowMock.calls = [];
+    composerMock.calls = [];
+    statusDotMock.calls = [];
+  });
+
+  function alertViewModel({
+    usageAlert,
+    percentUsed = 85,
+    compactSupported = null
+  }: {
+    usageAlert: AgentGUINodeViewModel["usageAlert"];
+    percentUsed?: number;
+    compactSupported?: boolean | null;
+  }): AgentGUINodeViewModel {
+    const activeConversation = createConversationSummary("session-1");
+    return {
+      ...createViewModel(),
+      conversations: [activeConversation],
+      activeConversation,
+      activeConversationId: activeConversation.id,
+      conversationDetail: createConversationDetail(),
+      usage: {
+        usedTokens: Math.round((percentUsed / 100) * 200_000),
+        totalTokens: 200_000,
+        percentUsed,
+        quotas: []
+      },
+      usageAlert,
+      compactSupported
+    };
+  }
+
+  it("does not render the banner when there is no usage alert", () => {
+    renderAgentGUINodeView({ viewModel: alertViewModel({ usageAlert: null }) });
+
+    expect(screen.queryByTestId("agent-gui-usage-alert")).toBeNull();
+  });
+
+  it("renders the warn banner without a compact action", () => {
+    renderAgentGUINodeView({
+      viewModel: alertViewModel({ usageAlert: "warn", percentUsed: 85 })
+    });
+
+    const banner = screen.getByTestId("agent-gui-usage-alert");
+    expect(banner).toHaveAttribute("data-usage-alert-tier", "warn");
+    expect(banner).toHaveTextContent("usageAlertWarn:85");
+    expect(screen.queryByTestId("agent-gui-usage-alert-compact")).toBeNull();
+  });
+
+  it("renders the critical banner with a compact action that submits and dismisses", () => {
+    const actions = createActions();
+    renderAgentGUINodeView({
+      viewModel: alertViewModel({ usageAlert: "critical", percentUsed: 97 }),
+      actions
+    });
+
+    const banner = screen.getByTestId("agent-gui-usage-alert");
+    expect(banner).toHaveAttribute("data-usage-alert-tier", "critical");
+    expect(banner).toHaveTextContent("usageAlertCritical:97");
+
+    fireEvent.click(screen.getByTestId("agent-gui-usage-alert-compact"));
+
+    expect(actions.submitCompact).toHaveBeenCalledTimes(1);
+    expect(actions.dismissUsageAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the compact action on the critical banner when compact is unsupported", () => {
+    renderAgentGUINodeView({
+      viewModel: alertViewModel({
+        usageAlert: "critical",
+        compactSupported: false
+      })
+    });
+
+    expect(screen.getByTestId("agent-gui-usage-alert")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-gui-usage-alert-compact")).toBeNull();
+  });
+
+  it("dismisses the banner through the dismiss button", () => {
+    const actions = createActions();
+    renderAgentGUINodeView({
+      viewModel: alertViewModel({ usageAlert: "warn" }),
+      actions
+    });
+
+    fireEvent.click(screen.getByTestId("agent-gui-usage-alert-dismiss"));
+
+    expect(actions.dismissUsageAlert).toHaveBeenCalledTimes(1);
+    expect(actions.submitCompact).not.toHaveBeenCalled();
+  });
+});
+
 interface RenderAgentGUINodeViewOptions {
   conversationRailCollapsed?: boolean;
   conversationRailWidthPx?: number;
@@ -921,6 +1015,7 @@ function createActions(): AgentGUINodeViewProps["actions"] {
     selectConversation: vi.fn(),
     submitPrompt: vi.fn(),
     submitCompact: vi.fn(),
+    dismissUsageAlert: vi.fn(),
     showPromptImagesUnsupported: vi.fn(),
     submitApprovalOption: vi.fn(),
     submitInteractivePrompt: vi.fn(),
@@ -966,6 +1061,7 @@ function createViewModel(): AgentGUINodeViewModel {
     promptImagesSupported: true,
     compactSupported: null,
     usage: null,
+    usageAlert: null,
     listError: null,
     isDeletingConversation: false,
     isDeletingProjectConversations: false,
@@ -1223,6 +1319,9 @@ function createLabels(): AgentGUIViewLabels {
     usageLimitsLabel: "usageLimitsLabel",
     usageCompactAction: "usageCompactAction",
     usageCompactTooltip: "usageCompactTooltip",
+    usageAlertWarnMessage: ({ percent }) => `usageAlertWarn:${percent}`,
+    usageAlertCriticalMessage: ({ percent }) => `usageAlertCritical:${percent}`,
+    usageAlertDismiss: "usageAlertDismiss",
     fileMentionPalette: "fileMentionPalette",
     fileMentionLoading: "fileMentionLoading",
     fileMentionEmpty: "fileMentionEmpty",

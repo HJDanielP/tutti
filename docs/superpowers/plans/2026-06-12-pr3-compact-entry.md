@@ -55,7 +55,7 @@ export function nextUsageAlert(
 
 語義:percent >= USAGE_CRITICAL_PERCENT 且未 criticaled → fire critical 並置兩位 true;否則 >= USAGE_WARN_PERCENT 且未 warned → fire warn;percent < USAGE_WARN_PERCENT → 全部重置 false;null → 原樣。
 
-- [ ] **Step 1: 失敗測試** → **Step 2: 確認失敗** → **Step 3: 實現** → **Step 4: 驗證（vitest + typecheck + check:i18n）** → **Step 5: Commit** `feat(agent-gui): usage threshold compact reminders`
+- [x] **Step 1: 失敗測試** → **Step 2: 確認失敗** → **Step 3: 實現** → **Step 4: 驗證（vitest + typecheck + check:i18n）** → **Step 5: Commit** `feat(agent-gui): usage threshold compact reminders`
 
 ### Task C: 收尾
 

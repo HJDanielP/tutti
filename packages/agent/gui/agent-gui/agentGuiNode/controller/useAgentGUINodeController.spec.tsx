@@ -1000,6 +1000,97 @@ describe("useAgentGUINodeController", () => {
     });
   });
 
+  it("fires usage threshold reminders once per tier and resets on falloff", async () => {
+    const usageRuntimeContext = (usedTokens: number) => ({
+      usage: {
+        contextWindow: { usedTokens, totalTokens: 100_000 }
+      }
+    });
+    let activityListener:
+      | ((event: AgentHostAgentActivityStreamEvent) => void)
+      | undefined;
+    const getState = vi.fn(async () =>
+      agentSessionState("session-1", {
+        runtimeContext: {
+          cwd: "/workspace",
+          ...usageRuntimeContext(10_000)
+        }
+      })
+    );
+    installAgentHostApi({
+      list: vi.fn(async () => snapshotWithSession("session-1")),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn((_payload, listener) => {
+        activityListener = listener;
+        return vi.fn();
+      }),
+      getState
+    });
+
+    const { result } = renderHook(() =>
+      useAgentGUINodeController({
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: agentGuiData("session-1"),
+        onDataChange: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(activityListener).toBeDefined();
+      expect(result.current.viewModel.usage?.percentUsed).toBe(10);
+    });
+    expect(result.current.viewModel.usageAlert).toBeNull();
+
+    const patchUsage = (usedTokens: number, occurredAtUnixMs: number) => {
+      act(() => {
+        activityListener?.({
+          eventType: "state_patch",
+          data: {
+            agentSessionId: "session-1",
+            runtimeContext: usageRuntimeContext(usedTokens),
+            occurredAtUnixMs
+          }
+        });
+      });
+    };
+
+    patchUsage(85_000, 20);
+    await waitFor(() => {
+      expect(result.current.viewModel.usage?.percentUsed).toBe(85);
+      expect(result.current.viewModel.usageAlert).toBe("warn");
+    });
+
+    act(() => {
+      result.current.actions.dismissUsageAlert();
+    });
+    expect(result.current.viewModel.usageAlert).toBeNull();
+
+    patchUsage(86_000, 30);
+    await waitFor(() => {
+      expect(result.current.viewModel.usage?.percentUsed).toBe(86);
+    });
+    expect(result.current.viewModel.usageAlert).toBeNull();
+
+    patchUsage(96_000, 40);
+    await waitFor(() => {
+      expect(result.current.viewModel.usageAlert).toBe("critical");
+    });
+
+    patchUsage(40_000, 50);
+    await waitFor(() => {
+      expect(result.current.viewModel.usage?.percentUsed).toBe(40);
+    });
+    expect(result.current.viewModel.usageAlert).toBeNull();
+
+    patchUsage(85_000, 60);
+    await waitFor(() => {
+      expect(result.current.viewModel.usageAlert).toBe("warn");
+    });
+  });
+
   it("selects an externally requested active conversation on an already-open panel", async () => {
     installAgentHostApi({
       list: vi.fn(async () => ({

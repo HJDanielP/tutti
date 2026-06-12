@@ -118,6 +118,12 @@ import {
   normalizeAgentSessionMentionTitle
 } from "../agentRichText/agentFileMentionExtension";
 import { resolveAgentGUIExplicitConversationTitle } from "../model/agentGuiProviderIdentity";
+import {
+  INITIAL_USAGE_ALERT_STATE,
+  nextUsageAlert,
+  type UsageAlertState,
+  type UsageAlertTier
+} from "../model/agentUsageAlerts";
 
 const EMPTY_AGENT_GUI_MESSAGES: readonly WorkspaceAgentActivityMessage[] = [];
 const EMPTY_AGENT_GUI_AVAILABLE_COMMANDS: AgentSessionCommand[] = [];
@@ -1999,6 +2005,59 @@ export function useAgentGUINodeController({
       }),
     [activeSessionRuntimeContext]
   );
+  const usageAlertStateBySessionIdRef = useRef<Record<string, UsageAlertState>>(
+    {}
+  );
+  const [usageAlertBySessionId, setUsageAlertBySessionId] = useState<
+    Record<string, UsageAlertTier>
+  >({});
+  const usagePercentUsed = usage?.percentUsed ?? null;
+  useEffect(() => {
+    const agentSessionId = activeConversationId;
+    if (!agentSessionId) {
+      return;
+    }
+    const previousState =
+      usageAlertStateBySessionIdRef.current[agentSessionId] ??
+      INITIAL_USAGE_ALERT_STATE;
+    const { fire, state } = nextUsageAlert(usagePercentUsed, previousState);
+    usageAlertStateBySessionIdRef.current[agentSessionId] = state;
+    if (fire) {
+      setUsageAlertBySessionId((current) =>
+        current[agentSessionId] === fire
+          ? current
+          : { ...current, [agentSessionId]: fire }
+      );
+      return;
+    }
+    if (!state.warned && !state.criticaled) {
+      setUsageAlertBySessionId((current) => {
+        if (!(agentSessionId in current)) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[agentSessionId];
+        return next;
+      });
+    }
+  }, [activeConversationId, usagePercentUsed]);
+  const usageAlert = activeConversationId
+    ? (usageAlertBySessionId[activeConversationId] ?? null)
+    : null;
+  const dismissUsageAlert = useCallback(() => {
+    const agentSessionId = activeConversationId;
+    if (!agentSessionId) {
+      return;
+    }
+    setUsageAlertBySessionId((current) => {
+      if (!(agentSessionId in current)) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[agentSessionId];
+      return next;
+    });
+  }, [activeConversationId]);
   const stableRuntimeSyncStateBySessionIdRef = useRef<
     Record<string, WorkspaceAgentActivitySyncState | undefined>
   >({});
@@ -6538,6 +6597,7 @@ export function useAgentGUINodeController({
         promptImagesSupported,
         compactSupported,
         usage,
+        usageAlert,
         listError,
         isDeletingConversation,
         isDeletingProjectConversations,
@@ -6573,6 +6633,7 @@ export function useAgentGUINodeController({
         selectConversation,
         submitPrompt,
         submitCompact,
+        dismissUsageAlert,
         showPromptImagesUnsupported,
         submitApprovalOption,
         submitInteractivePrompt,
@@ -6620,6 +6681,8 @@ export function useAgentGUINodeController({
       promptImagesSupported,
       compactSupported,
       usage,
+      usageAlert,
+      dismissUsageAlert,
       isInterrupting,
       isLoadingConversations,
       isLoadingMessages,
