@@ -180,7 +180,7 @@ export function WorkbenchHostDock({
       canScrollForward: false,
       hasOverflow: false
     }));
-  const [dockStateRevision, setDockStateRevision] = useState(0);
+  const [, setDockStateRevision] = useState(0);
   const [externalStateRevision, setExternalStateRevision] = useState(0);
   const [
     collapsingMinimizedLaunchAnchorKeys,
@@ -318,14 +318,10 @@ export function WorkbenchHostDock({
     });
   }, [dockStateSource]);
 
-  const renderedDockEntries = useMemo(
-    () =>
-      dockEntries.map((entry) => {
-        const dynamicState = dockStateSource?.getEntryState(entry.id);
-        return dynamicState ? { ...entry, ...dynamicState } : entry;
-      }),
-    [dockEntries, dockStateRevision, dockStateSource]
-  );
+  const renderedDockEntries = dockEntries.map((entry) => {
+    const dynamicState = dockStateSource?.getEntryState(entry.id);
+    return dynamicState ? { ...entry, ...dynamicState } : entry;
+  });
   const resolvedEntries = useMemo(
     () =>
       resolveWorkbenchDockEntries({
