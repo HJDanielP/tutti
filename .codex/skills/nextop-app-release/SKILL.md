@@ -41,10 +41,12 @@ apps/<appId>/latest.json
 By default, `<version>` is:
 
 ```text
-<manifest.version>+<short git sha>
+<bumped manifest.version>
 ```
 
-For example, manifest version `0.1.0` at commit `abcdef123456...` becomes `0.1.0+abcdef123456`.
+For example, manifest version `0.1.0` becomes `0.1.1` with the default
+`version_bump: patch`. If `auto_bump_version` is disabled, the fallback version
+is `<manifest.version>+<short git sha>`, such as `0.1.0+abcdef123456`.
 
 ## Caller Workflow
 
@@ -57,7 +59,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -67,11 +69,34 @@ jobs:
       app_id: your-app-id
       package_command: pnpm build:nextop-app
       package_dir: dist/nextop-app/your-app-id
+      auto_bump_version: true
+      version_bump: patch
+      publish_catalog: true
       aws_region: us-east-1
       aws_role_arn: ${{ vars.NEXTOP_APP_RELEASE_AWS_ROLE_ARN }}
       s3_bucket: ${{ vars.NEXTOP_APP_RELEASE_S3_BUCKET }}
       s3_prefix: nextop-app-releases-staging
       release_assets_base_url: https://cdn.example.com/nextop-app-releases-staging
+```
+
+Important trigger guidance for generated app repositories:
+
+- Use only `workflow_dispatch` when releases should be manual.
+- Add a `push` trigger for `main` only when merging to the main branch should
+  automatically publish a new app release.
+- Do not add both staging and production `push` triggers to the same branch
+  unless every main-branch merge is intended to publish both environments.
+- Be explicit in generated workflow comments because app repositories are often
+  AI-generated and may otherwise publish on every merge unintentionally.
+
+Example automatic production trigger:
+
+```yaml
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 ```
 
 Use a pinned ref instead of `@main` when the caller needs release reproducibility:
@@ -83,17 +108,23 @@ uses: tutti-os/tutti/.github/workflows/publish-nextop-app-release.yml@<tag-or-co
 ## Required Inputs
 
 - `app_id`: App id for the release. Must match `nextop.app.json` `appId`.
-- `package_command`: Shell command that builds or copies the final app package.
-- `package_dir`: Directory produced by `package_command`; must contain the complete app package.
 - `aws_region`: AWS region used by the release bucket.
 - `aws_role_arn`: IAM role assumed through GitHub OIDC.
 - `s3_bucket`: Bucket receiving release files.
-- `release_assets_base_url`: Public HTTP(S) base URL corresponding to the S3 root plus prefix.
 
 Optional inputs:
 
+- `package_command`: Shell command that builds or copies the final app package. Required unless `catalog_only` is true.
+- `package_dir`: Directory produced by `package_command`; must contain the complete app package. Required unless `catalog_only` is true.
+- `release_assets_base_url`: Public HTTP(S) base URL corresponding to the S3 root plus prefix. Required unless `catalog_only` is true.
 - `icon_path`: Override icon file path when the manifest icon asset should not be used.
-- `release_version`: Explicit release version. Use sparingly; default commit-derived versions avoid overwriting immutable releases.
+- `auto_bump_version`: Whether the workflow should update and commit the app manifest version before publishing. Defaults to `true`.
+- `version_bump`: Semver bump applied when `auto_bump_version` is true. Defaults to `patch`; supported values are `major`, `minor`, and `patch`.
+- `release_version`: Explicit release version. Use sparingly because it bypasses automatic version bumping.
+- `version_manifest_path`: Manifest file to bump before packaging. Defaults to `nextop.app.json`.
+- `publish_catalog`: Whether to merge this app release into the shared catalog after release upload. Defaults to `false`.
+- `catalog_only`: Whether to skip app packaging/release upload and only merge the existing `apps/<appId>/latest.json` into `catalog.json`. Defaults to `false`.
+- `catalog_cloudfront_distribution_id`: Optional CloudFront distribution id to invalidate after automatic catalog upload.
 - `runner`: GitHub runner label. Default is `ubuntu-latest`.
 - `node_version`: Default is `24`.
 - `pnpm_version`: Default is `10.11.0`.
@@ -124,6 +155,22 @@ Do not publish staging app releases into the production prefix. The shared catal
 
 After an app release is uploaded, App Center sees it only after the shared catalog includes that app id.
 
+Set `publish_catalog: true` on the release workflow to automatically merge the
+released app into `catalog.json` after upload. Automatic catalog publishing uses
+the same S3 bucket and prefix as the app release, serializes jobs by bucket and
+prefix to avoid concurrent merge overwrites, verifies the merged catalog, and
+optionally invalidates `catalog.json` when `catalog_cloudfront_distribution_id`
+is provided.
+
+Set `catalog_only: true` to skip packaging and release upload, then merge the
+existing `apps/<appId>/latest.json` from S3 into `catalog.json`. Use this for
+repairing or refreshing catalog state after an app release already exists.
+
+Retrying an existing release version is allowed only when the existing
+immutable `release.json` matches the newly generated release metadata. Matching
+retries repair mutable state such as `latest.json`, catalog metadata, and
+CloudFront invalidation without re-uploading immutable artifacts.
+
 The Nextop repository owns catalog publication workflows:
 
 - Production catalog: `.github/workflows/publish-nextop-app-catalog.yml`
@@ -151,6 +198,10 @@ These workflows are run from the Nextop repository, not from each external app r
 5. Build `nextop.app.catalog.v1`; merge mode preserves existing apps, replace mode publishes only selected apps.
 6. Upload `catalog.json` to the same S3 prefix.
 7. Optionally invalidate the CloudFront `catalog.json` path.
+
+Use the manual catalog workflows for repair, refresh, or deliberate replace
+operations. For normal app release publication, prefer `publish_catalog: true`
+on the app release workflow.
 
 Production catalog inputs:
 
@@ -197,13 +248,27 @@ s3://<s3_bucket>/<s3_prefix>/apps/<appId>/<version>/*
 s3://<s3_bucket>/<s3_prefix>/apps/<appId>/latest.json
 ```
 
+When `publish_catalog` is enabled, the role must also allow reading and writing:
+
+```text
+s3://<s3_bucket>/<s3_prefix>/catalog.json
+```
+
+When `catalog_cloudfront_distribution_id` is set, the role must allow creating
+invalidations for that CloudFront distribution.
+
 The caller workflow must grant:
 
 ```yaml
 permissions:
-  contents: read
+  contents: write
   id-token: write
 ```
+
+`contents: write` is required for the default automatic version bump commit. A
+caller that disables `auto_bump_version` and manages versions elsewhere may use
+`contents: read`, but release uploads still refuse to overwrite an existing
+immutable version.
 
 Store non-secret configuration such as role ARN and bucket name in GitHub Actions variables when possible. Use secrets only for values that are actually secret. OIDC-based AWS auth should not require long-lived AWS access keys.
 
@@ -250,18 +315,19 @@ Expected output:
 Before finishing a setup or review:
 
 - The external workflow uses `tutti-os/tutti/.github/workflows/publish-nextop-app-release.yml`.
-- The workflow has `contents: read` and `id-token: write` permissions.
+- The workflow has `contents: write` and `id-token: write` permissions when automatic version bumps are enabled.
 - The caller repository commits `pnpm-lock.yaml`.
-- `package_command` produces `package_dir`.
-- `package_dir/nextop.app.json` exists and is valid JSON.
-- Manifest `appId` matches workflow `app_id`.
-- Manifest icon `src` points to an existing package-local asset, or `icon_path` is provided.
-- `bootstrap.sh` and `AGENTS.md` exist in `package_dir`.
+- Unless `catalog_only` is enabled, `package_command` produces `package_dir`.
+- Unless `catalog_only` is enabled, `package_dir/nextop.app.json` exists and is valid JSON.
+- Unless `catalog_only` is enabled, manifest `appId` matches workflow `app_id`.
+- Unless `catalog_only` is enabled, manifest icon `src` points to an existing package-local asset, or `icon_path` is provided.
+- Unless `catalog_only` is enabled, `bootstrap.sh` and `AGENTS.md` exist in `package_dir`.
 - `s3_prefix` and `release_assets_base_url` describe the same public release root.
 - Staging releases use a staging prefix and production releases use a production prefix.
 - The IAM role can write immutable version files and mutable `latest.json`.
-- The matching Nextop catalog workflow will usually run in merge mode with the released remote app id included in `app_ids`.
-- The catalog workflow reads the same S3 bucket and prefix where the app release wrote `latest.json`.
+- If `publish_catalog` is enabled, the release workflow can write `catalog.json` in the same S3 bucket and prefix, and optional CloudFront invalidation uses the matching distribution id.
+- If `publish_catalog` is disabled, the matching Nextop catalog workflow will usually run in merge mode with the released remote app id included in `app_ids`.
+- If `catalog_only` is enabled, `apps/<appId>/latest.json` already exists in the target S3 bucket and prefix.
 
 ## Common Failures
 

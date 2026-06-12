@@ -80,12 +80,46 @@ Workspace app packages do not declare runtime kind or bundle Python/Node. Manage
 External app repositories should call `.github/workflows/publish-nextop-app-release.yml` from this repository. The reusable workflow:
 
 1. Checks out the app repository.
-2. Runs the app repository package command.
-3. Runs `@tutti-os/app-release-tools`.
-4. Generates a zip, immutable `release.json`, and mutable `latest.json`.
-5. Uploads the release directory and `latest.json` to S3.
+2. Serializes releases per app and branch.
+3. Automatically bumps the app manifest version and commits the bump unless
+   `release_version` is provided or `auto_bump_version` is disabled.
+4. Runs the app repository package command.
+5. Runs `@tutti-os/app-release-tools`.
+6. Generates a zip, immutable `release.json`, and mutable `latest.json`.
+7. Refuses to overwrite an existing immutable release version.
+8. Uploads the release directory and `latest.json` to S3.
+9. Optionally merges the app into `catalog.json` when `publish_catalog` is
+   enabled.
 
-The default release version is `manifest.version+<short git sha>`. Callers can pass `release_version` to override it.
+When automatic bumping is enabled, the default release version is the bumped
+manifest version. When automatic bumping is disabled, the default release
+version remains `manifest.version+<short git sha>`. Callers can pass
+`release_version` to override it.
+
+Callers that use the default automatic bump must grant `contents: write` and
+`id-token: write` permissions so the workflow can push the version bump commit
+and assume the release upload role.
+
+When `publish_catalog` is enabled, releases targeting the same S3 bucket and
+prefix are serialized so concurrent app releases cannot overwrite each other's
+catalog merge. The release workflow reads the existing catalog from the same S3
+prefix when it exists, merges the newly published app `latest.json`, verifies
+the merged catalog artifact metadata, uploads `catalog.json`, and optionally
+invalidates the catalog path when `catalog_cloudfront_distribution_id` is set.
+The release upload role must be allowed to read and write that `catalog.json`
+object, and must have CloudFront invalidation permissions when invalidation is
+enabled.
+
+The release workflow also supports `catalog_only: true` for catalog repair and
+refresh operations. In catalog-only mode it skips package build, version bump,
+release metadata generation, and immutable artifact upload, then merges the
+existing `apps/<appId>/latest.json` from the target S3 prefix into
+`catalog.json`.
+
+Retrying a release version is allowed only when the existing immutable
+`release.json` matches the newly generated release metadata. In that case the
+workflow repairs mutable state such as `latest.json`, catalog metadata, and
+CloudFront invalidation without re-uploading immutable artifacts.
 
 Each app uploads under:
 
@@ -95,6 +129,10 @@ apps/<appId>/latest.json
 ```
 
 The Tutti repository owns `.github/workflows/publish-nextop-app-catalog.yml`. That workflow reads selected `apps/<appId>/latest.json` files from S3 and publishes one shared `catalog.json`. It defaults to merge mode, which preserves existing catalog apps and updates only selected app ids. Replace mode publishes only the selected app ids and should be used only for deliberate full catalog replacement.
+
+Automatic catalog publishing from the release workflow is the preferred path
+for app repositories that want publish-to-App-Center behavior. Keep the manual
+catalog workflows for repair, refresh, and deliberate replace operations.
 
 Production and staging release metadata must stay on separate S3 prefixes:
 
