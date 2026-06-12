@@ -28,6 +28,7 @@ import {
   cn
 } from "@tutti-os/ui-system";
 import { WorkspaceUserProjectSelect } from "@tutti-os/workspace-user-project/ui";
+import type { WorkspaceUserProjectI18nRuntime } from "@tutti-os/workspace-user-project/i18n";
 import { BareIconButton, ScrollArea } from "@tutti-os/ui-system/components";
 import { Button } from "../../app/renderer/components/ui/button";
 import {
@@ -278,26 +279,8 @@ export interface AgentGUIViewLabels {
   removeMention: string;
   addReference: string;
   referenceWorkspaceFiles: string;
-  projectLabel: string;
-  noProject: string;
-  addProject: string;
-  createProjectCancel: string;
-  createProjectConfirm: string;
-  createProjectDocumentsUnavailable: string;
-  createProjectFailed: string;
-  createProjectNameConflict: string;
-  createProjectNameInvalid: string;
-  createProjectNameLabel: string;
-  createProjectNamePlaceholder: string;
-  createProjectNameRequired: string;
-  createProjectPermissionDenied: string;
-  createProjectTitle: string;
-  linkExistingProject: string;
   projectLocked: string;
   projectMissingDescription: string;
-  projectMissingTitle: string;
-  loadingProjects: string;
-  projectUnavailable: string;
   syncPending: string;
   syncSynced: string;
   syncFailed: string;
@@ -368,6 +351,7 @@ interface AgentGUINodeViewProps {
   ) => void | Promise<void>;
   onConversationRailWidthChanged: (widthPx: number) => void;
   labels: AgentGUIViewLabels;
+  workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
   workspaceFileReferenceAdapter?: WorkspaceFileReferenceAdapter | null;
   workspaceFileReferenceCopy?: WorkspaceFileReferenceCopy | null;
   richTextAtProviders?: readonly AgentRichTextAtProvider[];
@@ -665,6 +649,7 @@ export function AgentGUINodeView({
   onWorkspaceFileReferencesAdded,
   onConversationRailWidthChanged,
   labels,
+  workspaceUserProjectI18n,
   workspaceFileReferenceAdapter = null,
   workspaceFileReferenceCopy = null,
   richTextAtProviders,
@@ -856,6 +841,7 @@ export function AgentGUINodeView({
               viewModel.isDeletingProjectConversations
             }
             labels={labels}
+            workspaceUserProjectI18n={workspaceUserProjectI18n}
             uiLanguage={uiLanguage}
             createConversationDisabled={createConversationDisabled}
             openclawGateway={openclawGateway}
@@ -917,6 +903,7 @@ export function AgentGUINodeView({
             onRequestWorkspaceReferences={requestWorkspaceReferences}
             richTextAtProviders={richTextAtProviders}
             workspaceAppIcons={effectiveWorkspaceAppIcons}
+            workspaceUserProjectI18n={workspaceUserProjectI18n}
           />
         </section>
       </div>
@@ -937,6 +924,7 @@ interface AgentGUIDetailPaneProps {
   viewModel: AgentGUINodeViewModel;
   actions: AgentGUINodeViewProps["actions"];
   labels: AgentGUIViewLabels;
+  workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
   uiLanguage: UiLanguage;
   isActive: boolean;
   composerFocusRequestSequence: number | null;
@@ -1022,6 +1010,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
   viewModel,
   actions,
   labels,
+  workspaceUserProjectI18n,
   uiLanguage,
   isActive,
   composerFocusRequestSequence,
@@ -1317,27 +1306,8 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       removeMention: labels.removeMention,
       addReference: labels.addReference,
       referenceWorkspaceFiles: labels.referenceWorkspaceFiles,
-      projectLabel: labels.projectLabel,
-      noProject: labels.noProject,
-      addProject: labels.addProject,
-      createProjectCancel: labels.createProjectCancel,
-      createProjectConfirm: labels.createProjectConfirm,
-      createProjectDocumentsUnavailable:
-        labels.createProjectDocumentsUnavailable,
-      createProjectFailed: labels.createProjectFailed,
-      createProjectNameConflict: labels.createProjectNameConflict,
-      createProjectNameInvalid: labels.createProjectNameInvalid,
-      createProjectNameLabel: labels.createProjectNameLabel,
-      createProjectNamePlaceholder: labels.createProjectNamePlaceholder,
-      createProjectNameRequired: labels.createProjectNameRequired,
-      createProjectPermissionDenied: labels.createProjectPermissionDenied,
-      createProjectTitle: labels.createProjectTitle,
-      linkExistingProject: labels.linkExistingProject,
       projectLocked: labels.projectLocked,
       projectMissingDescription: labels.projectMissingDescription,
-      projectMissingTitle: labels.projectMissingTitle,
-      loadingProjects: labels.loadingProjects,
-      projectUnavailable: labels.projectUnavailable,
       promptTipsPrefix: labels.promptTipsPrefix,
       ...interactivePromptLabels
     }),
@@ -1357,21 +1327,6 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       labels.modelLabel,
       labels.modelDescriptions,
       labels.modelSelectionLabel,
-      labels.addProject,
-      labels.createProjectCancel,
-      labels.createProjectConfirm,
-      labels.createProjectDocumentsUnavailable,
-      labels.createProjectFailed,
-      labels.createProjectNameConflict,
-      labels.createProjectNameInvalid,
-      labels.createProjectNameLabel,
-      labels.createProjectNamePlaceholder,
-      labels.createProjectNameRequired,
-      labels.createProjectPermissionDenied,
-      labels.createProjectTitle,
-      labels.linkExistingProject,
-      labels.loadingProjects,
-      labels.noProject,
       labels.permissionLabel,
       labels.permissionModeAuto,
       labels.permissionModeFullAccess,
@@ -1380,11 +1335,8 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       labels.planModeOffLabel,
       labels.planModeOnLabel,
       labels.planUnavailable,
-      labels.projectLabel,
       labels.projectLocked,
       labels.projectMissingDescription,
-      labels.projectMissingTitle,
-      labels.projectUnavailable,
       labels.promptTipsPrefix,
       labels.queuedLabel,
       labels.queuedPromptMoreActions,
@@ -1626,6 +1578,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
               isSendingTurn: isComposerSending,
               isSubmittingPrompt: viewModel.isRespondingApproval,
               labels: composerLabels,
+              workspaceUserProjectI18n,
               onDraftChange: actions.updateDraftPrompt,
               onProjectPathChange: actions.updateSelectedProjectPath,
               onSettingsChange: actions.updateComposerSettings,
@@ -1697,6 +1650,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
             isSendingTurn: isComposerSending,
             isSubmittingPrompt: viewModel.isRespondingApproval,
             labels: composerLabels,
+            workspaceUserProjectI18n,
             onDraftChange: actions.updateDraftPrompt,
             onProjectPathChange: actions.updateSelectedProjectPath,
             onSettingsChange: actions.updateComposerSettings,
@@ -2036,6 +1990,7 @@ interface AgentGUIConversationRailPaneProps {
   isDeletingConversation: boolean;
   isDeletingProjectConversations: boolean;
   labels: AgentGUIViewLabels;
+  workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
   uiLanguage: UiLanguage;
   createConversationDisabled: boolean;
   openclawGateway: OpenclawGatewayViewModel | null;
@@ -2091,6 +2046,7 @@ const AgentGUIConversationRailPane = memo(
     isDeletingConversation,
     isDeletingProjectConversations,
     labels,
+    workspaceUserProjectI18n,
     uiLanguage,
     createConversationDisabled,
     openclawGateway,
@@ -2277,7 +2233,10 @@ const AgentGUIConversationRailPane = memo(
               return (
                 <Fragment key={section.id}>
                   {showProjectRailHeader ? (
-                    <AgentGUIProjectRailHeader labels={labels} />
+                    <AgentGUIProjectRailHeader
+                      labels={labels}
+                      workspaceUserProjectI18n={workspaceUserProjectI18n}
+                    />
                   ) : null}
                   <section
                     className={styles.conversationSection}
@@ -2581,30 +2540,14 @@ const AgentGUIConversationRailPane = memo(
 );
 
 function AgentGUIProjectRailHeader({
-  labels
+  labels,
+  workspaceUserProjectI18n
 }: {
   labels: Pick<
     AgentGUIViewLabels,
-    | "addProject"
-    | "createProjectCancel"
-    | "createProjectConfirm"
-    | "createProjectDocumentsUnavailable"
-    | "createProjectFailed"
-    | "createProjectNameConflict"
-    | "createProjectNameInvalid"
-    | "createProjectNameLabel"
-    | "createProjectNamePlaceholder"
-    | "createProjectNameRequired"
-    | "createProjectPermissionDenied"
-    | "loadingProjects"
-    | "noProject"
-    | "projectLabel"
-    | "projectLocked"
-    | "projectRailCreateProject"
-    | "projectRailLinkExistingProject"
-    | "projectMissingTitle"
-    | "projectUnavailable"
+    "projectRailCreateProject" | "projectRailLinkExistingProject"
   >;
+  workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
 }): React.JSX.Element {
   "use memo";
   const agentHostApi = useAgentHostApi();
@@ -2622,7 +2565,9 @@ function AgentGUIProjectRailHeader({
   return (
     <div className={styles.projectRailHeader}>
       <div className={styles.projectRailTitle}>
-        <span>{labels.projectLabel}</span>
+        <span>
+          {workspaceUserProjectI18n.tFirst(["projectSelect.projectLabel"])}
+        </span>
       </div>
       <div className={styles.projectRailAddProject}>
         <WorkspaceUserProjectSelect
@@ -2644,27 +2589,14 @@ function AgentGUIProjectRailHeader({
           contentAlign="end"
           contentSide="bottom"
           contentSideOffset={6}
+          i18n={workspaceUserProjectI18n}
           labels={{
             addProject: labels.projectRailCreateProject,
-            createProjectCancel: labels.createProjectCancel,
-            createProjectConfirm: labels.createProjectConfirm,
-            createProjectDocumentsUnavailable:
-              labels.createProjectDocumentsUnavailable,
-            createProjectFailed: labels.createProjectFailed,
-            createProjectNameConflict: labels.createProjectNameConflict,
-            createProjectNameInvalid: labels.createProjectNameInvalid,
-            createProjectNameLabel: labels.createProjectNameLabel,
-            createProjectNamePlaceholder: labels.createProjectNamePlaceholder,
-            createProjectNameRequired: labels.createProjectNameRequired,
-            createProjectPermissionDenied: labels.createProjectPermissionDenied,
             createProjectTitle: labels.projectRailCreateProject,
             linkExistingProject: labels.projectRailLinkExistingProject,
-            loadingProjects: labels.loadingProjects,
-            noProject: labels.noProject,
-            projectLabel: labels.addProject,
-            projectLocked: labels.projectLocked,
-            projectMissingTitle: labels.projectMissingTitle,
-            projectUnavailable: labels.projectUnavailable
+            projectLabel: workspaceUserProjectI18n.tFirst([
+              "projectSelect.addProject"
+            ])
           }}
           renderAddProjectIcon={() => (
             <NewWorkspaceLinedIcon

@@ -39,6 +39,7 @@ import {
 } from "@tutti-os/ui-system";
 import { ListChecks, X } from "lucide-react";
 import type { WorkspaceFileReference } from "@tutti-os/workspace-file-reference/contracts";
+import type { WorkspaceUserProjectI18nRuntime } from "@tutti-os/workspace-user-project/i18n";
 import {
   clampSlashCommandHighlight,
   filterSlashCommands,
@@ -211,28 +212,11 @@ interface AgentComposerProps {
     removeMention: string;
     addReference: string;
     referenceWorkspaceFiles: string;
-    projectLabel: string;
-    noProject: string;
-    addProject: string;
-    createProjectCancel: string;
-    createProjectConfirm: string;
-    createProjectDocumentsUnavailable: string;
-    createProjectFailed: string;
-    createProjectNameConflict: string;
-    createProjectNameInvalid: string;
-    createProjectNameLabel: string;
-    createProjectNamePlaceholder: string;
-    createProjectNameRequired: string;
-    createProjectPermissionDenied: string;
-    createProjectTitle: string;
-    linkExistingProject: string;
     projectLocked: string;
     projectMissingDescription: string;
-    projectMissingTitle: string;
-    loadingProjects: string;
-    projectUnavailable: string;
     promptTipsPrefix: string;
   };
+  workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
   onDraftChange: (prompt: string) => void;
   onProjectPathChange?: (
     path: string | null,
@@ -559,6 +543,7 @@ export function AgentComposer({
   composerFocusRequestSequence = null,
   layoutMode = "dock",
   labels,
+  workspaceUserProjectI18n,
   onDraftChange,
   onProjectPathChange = () => {},
   onSettingsChange,
@@ -1843,7 +1828,9 @@ export function AgentComposer({
             tone="danger"
             role="alert"
             testId="agent-gui-missing-project-notice"
-            title={labels.projectMissingTitle}
+            title={workspaceUserProjectI18n.tFirst([
+              "projectSelect.projectMissingTitle"
+            ])}
             description={labels.projectMissingDescription}
           />
         ) : null}
@@ -2188,30 +2175,10 @@ export function AgentComposer({
           >
             <AgentProjectDropdown
               composerSettings={composerSettings}
+              i18n={workspaceUserProjectI18n}
               labels={{
-                addProject: labels.addProject,
-                createProjectCancel: labels.createProjectCancel,
-                createProjectConfirm: labels.createProjectConfirm,
-                createProjectDocumentsUnavailable:
-                  labels.createProjectDocumentsUnavailable,
-                createProjectFailed: labels.createProjectFailed,
-                createProjectNameConflict: labels.createProjectNameConflict,
-                createProjectNameInvalid: labels.createProjectNameInvalid,
-                createProjectNameLabel: labels.createProjectNameLabel,
-                createProjectNamePlaceholder:
-                  labels.createProjectNamePlaceholder,
-                createProjectNameRequired: labels.createProjectNameRequired,
-                createProjectPermissionDenied:
-                  labels.createProjectPermissionDenied,
-                createProjectTitle: labels.createProjectTitle,
-                linkExistingProject: labels.linkExistingProject,
-                loadingProjects: labels.loadingProjects,
-                noProject: labels.noProject,
-                projectLabel: labels.projectLabel,
                 projectLocked: labels.projectLocked,
-                projectMissingDescription: labels.projectMissingDescription,
-                projectMissingTitle: labels.projectMissingTitle,
-                projectUnavailable: labels.projectUnavailable
+                projectMissingDescription: labels.projectMissingDescription
               }}
               onProjectMissingChange={setIsSelectedProjectMissing}
               onProjectPathChange={onProjectPathChange}

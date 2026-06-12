@@ -8,6 +8,11 @@ import {
   within
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createI18nRuntime } from "@tutti-os/ui-i18n-runtime";
+import {
+  createWorkspaceUserProjectI18nRuntime,
+  workspaceUserProjectI18nResources
+} from "@tutti-os/workspace-user-project/i18n";
 import { AgentComposer } from "./AgentComposer";
 import type {
   AgentGUIComposerSettingsVM,
@@ -24,6 +29,12 @@ const { mockProjectMissingState } = vi.hoisted(() => ({
 afterEach(() => {
   mockProjectMissingState.current = false;
 });
+
+const workspaceUserProjectI18n = createWorkspaceUserProjectI18nRuntime(
+  createI18nRuntime({
+    dictionaries: [workspaceUserProjectI18nResources["zh-CN"]]
+  })
+);
 
 function createImageDataTransfer(file: File): DataTransfer {
   return {
@@ -182,6 +193,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -221,6 +233,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -270,6 +283,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
@@ -323,6 +337,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
@@ -372,6 +387,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={onDraftChange}
         onSettingsChange={onSettingsChange}
         onSubmit={onSubmit}
@@ -413,6 +429,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={onDraftChange}
         onSettingsChange={onSettingsChange}
         onSubmit={onSubmit}
@@ -473,6 +490,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -531,6 +549,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -576,6 +595,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -624,6 +644,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -675,6 +696,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -711,6 +733,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -748,6 +771,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -787,6 +811,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -857,6 +882,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -900,6 +926,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
@@ -918,7 +945,7 @@ describe("AgentComposer", () => {
     const missingProjectNotice = await screen.findByTestId(
       "agent-gui-missing-project-notice"
     );
-    expect(missingProjectNotice).toHaveTextContent("当前工作目录缺失");
+    expect(missingProjectNotice).toHaveTextContent("当前工作目录不存在");
     expect(missingProjectNotice).toHaveClass("agent-gui-chrome__card--danger");
     expect(
       missingProjectNotice.closest(".agent-gui-chrome__session-chrome")
@@ -963,6 +990,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         layoutMode="hero"
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
@@ -1058,6 +1086,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         layoutMode="hero"
         onDraftChange={onDraftChange}
         onSettingsChange={vi.fn()}
@@ -1127,6 +1156,7 @@ describe("AgentComposer", () => {
           isSendingTurn={false}
           isSubmittingPrompt={false}
           labels={createLabels()}
+          workspaceUserProjectI18n={workspaceUserProjectI18n}
           layoutMode="hero"
           onDraftChange={vi.fn()}
           onSettingsChange={vi.fn()}
@@ -1172,6 +1202,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -1209,6 +1240,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -1261,6 +1293,7 @@ describe("AgentComposer", () => {
           isSendingTurn={false}
           isSubmittingPrompt={false}
           labels={createLabels()}
+          workspaceUserProjectI18n={workspaceUserProjectI18n}
           onDraftChange={vi.fn()}
           onSettingsChange={vi.fn()}
           onSubmit={vi.fn()}
@@ -1313,6 +1346,7 @@ describe("AgentComposer", () => {
         isSendingTurn={true}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -1354,6 +1388,7 @@ describe("AgentComposer", () => {
         isSendingTurn={true}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
@@ -1396,6 +1431,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
@@ -1446,6 +1482,7 @@ describe("AgentComposer", () => {
         isSendingTurn={false}
         isSubmittingPrompt={true}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
@@ -1494,6 +1531,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         promptImagesSupported={false}
         labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
         onDraftChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
@@ -1594,27 +1632,8 @@ function createLabels(): Parameters<typeof AgentComposer>[0]["labels"] {
     approvalLead: "审批",
     planLead: "计划",
     planModes: [],
-    projectLabel: "项目",
-    noProject: "不使用项目",
-    addProject: "添加新项目",
-    createProjectCancel: "取消",
-    createProjectConfirm: "创建",
-    createProjectDocumentsUnavailable: "无法访问 Documents，请改用已有项目。",
-    createProjectFailed: "无法创建项目。",
-    createProjectNameConflict: "已存在同名项目，请换一个名称。",
-    createProjectNameInvalid: "项目名称不能为空，也不能包含路径分隔符。",
-    createProjectNameLabel:
-      "输入项目名称，将在 Documents/nextop 下创建文件夹。",
-    createProjectNamePlaceholder: "项目名称",
-    createProjectNameRequired: "请输入项目名称。",
-    createProjectPermissionDenied: "Nextop 没有权限在 Documents 下创建文件夹。",
-    createProjectTitle: "添加新项目",
-    linkExistingProject: "使用已有项目",
     projectLocked: "项目已锁定",
     projectMissingDescription: "此对话的工作目录已不存在",
-    projectMissingTitle: "当前工作目录缺失",
-    loadingProjects: "加载项目中",
-    projectUnavailable: "项目不可用",
     promptTipsPrefix: "Tips：",
     stayInPlan: "保持计划模式",
     sendFeedback: "发送反馈",

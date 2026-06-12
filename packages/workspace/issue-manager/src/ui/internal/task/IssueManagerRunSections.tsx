@@ -220,16 +220,7 @@ export function IssueManagerExecutionDirectoryTrigger({
       }}
       contentAlign="end"
       disabled={disabled}
-      labels={{
-        linkExistingProject: controller.copy.t(
-          "actions.linkExistingExecutionDirectory"
-        ),
-        loadingProjects: controller.copy.t(
-          "labels.loadingExecutionDirectories"
-        ),
-        noProject: controller.copy.t("labels.noProject"),
-        projectLabel: controller.copy.t("actions.selectExecutionDirectory")
-      }}
+      i18n={controller.workspaceUserProjectI18n}
       service={controller.executionDirectoryProjectService}
       selectedProjectPath={controller.nodeState.selectedExecutionDirectory}
       unlistedProjectLabel={controller.copy.t(
