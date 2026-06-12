@@ -150,6 +150,9 @@ function createFileManagerServiceStub(
     getSnapshotState() {
       return snapshotState;
     },
+    async resolveEntryIconUrl() {
+      return null;
+    },
     setCanvasFilePreviewLauncher() {},
     subscribe(_workspaceID, listener) {
       listeners.add(listener);
