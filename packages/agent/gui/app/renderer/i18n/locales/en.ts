@@ -517,6 +517,9 @@ export const en = {
       usageAlertCriticalMessage:
         "Context is {{percent}}% full. Compact now to keep the session going.",
       usageAlertDismiss: "Dismiss",
+      planImplementationLead: "Plan ready — implement it?",
+      planImplementationConfirm: "Implement the plan",
+      planImplementationDismiss: "Stay in Plan Mode",
       noRunningResponse: "No running response to stop.",
       promptTipsPrefix: "Tips: ",
       promptTips: {

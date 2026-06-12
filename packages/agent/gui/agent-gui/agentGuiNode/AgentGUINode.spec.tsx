@@ -32,6 +32,8 @@ const mockSubmitInteractivePrompt = vi.fn();
 const mockInterruptCurrentTurn = vi.fn();
 const mockUpdateDraftPrompt = vi.fn();
 const mockUpdateComposerSettings = vi.fn();
+const mockImplementPlan = vi.fn();
+const mockDismissPlanImplementation = vi.fn();
 const mockSendQueuedPromptNext = vi.fn();
 const mockRemoveQueuedPrompt = vi.fn();
 const mockEditQueuedPrompt = vi.fn();
@@ -586,6 +588,8 @@ vi.mock("./controller/useAgentGUINodeController", () => ({
       submitPrompt: mockSubmitPrompt,
       submitCompact: mockSubmitCompact,
       dismissUsageAlert: mockDismissUsageAlert,
+      implementPlan: mockImplementPlan,
+      dismissPlanImplementation: mockDismissPlanImplementation,
       showPromptImagesUnsupported: mockShowPromptImagesUnsupported,
       submitApprovalOption: mockSubmitApprovalOption,
       submitInteractivePrompt: mockSubmitInteractivePrompt,
@@ -625,6 +629,8 @@ describe("AgentGUINode", () => {
     mockInterruptCurrentTurn.mockClear();
     mockUpdateDraftPrompt.mockClear();
     mockUpdateComposerSettings.mockClear();
+    mockImplementPlan.mockClear();
+    mockDismissPlanImplementation.mockClear();
     mockSendQueuedPromptNext.mockClear();
     mockRemoveQueuedPrompt.mockClear();
     mockEditQueuedPrompt.mockClear();
@@ -2390,6 +2396,38 @@ describe("AgentGUINode", () => {
       permissionModeId: "default",
       planMode: false
     });
+  });
+
+  it("offers the codex plan implementation banner and wires its actions", () => {
+    mockViewModel = createViewModel({
+      activeConversationId: "session-1",
+      planImplementationPrompt: true
+    });
+    renderAgentGUINode();
+
+    expect(
+      screen.getByTestId("agent-gui-plan-implementation")
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByTestId("agent-gui-plan-implementation-confirm")
+    );
+    expect(mockImplementPlan).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      screen.getByTestId("agent-gui-plan-implementation-dismiss")
+    );
+    expect(mockDismissPlanImplementation).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the plan implementation banner when not offered", () => {
+    mockViewModel = createViewModel({
+      activeConversationId: "session-1",
+      planImplementationPrompt: false
+    });
+    renderAgentGUINode();
+
+    expect(screen.queryByTestId("agent-gui-plan-implementation")).toBeNull();
   });
 
   it("omits the plan mode option when the provider lacks the capability", async () => {
@@ -6459,6 +6497,7 @@ function createViewModel(
     compactSupported: null,
     usage: null,
     usageAlert: null,
+    planImplementationPrompt: false,
     isDeletingConversation: false,
     isDeletingProjectConversations: false,
     pendingDeleteConversation: null,

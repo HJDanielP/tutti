@@ -717,6 +717,13 @@ export const AgentGUINode = memo(function AgentGUINode({
           percent: input.percent
         }),
       usageAlertDismiss: t("agentHost.agentGui.usageAlertDismiss"),
+      planImplementationLead: t("agentHost.agentGui.planImplementationLead"),
+      planImplementationConfirm: t(
+        "agentHost.agentGui.planImplementationConfirm"
+      ),
+      planImplementationDismiss: t(
+        "agentHost.agentGui.planImplementationDismiss"
+      ),
       noRunningResponse: t("agentHost.agentGui.noRunningResponse"),
       empty: t("agentHost.agentGui.empty", { provider: displayProviderLabel }),
       emptyProvider: displayProviderLabel,

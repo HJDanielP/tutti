@@ -119,6 +119,10 @@ import {
 import { resolveAgentGUIExplicitConversationTitle } from "../model/agentGuiProviderIdentity";
 import { composerSettingsSupportFromOptions } from "../model/composerSettingsSupport";
 import {
+  PLAN_IMPLEMENTATION_PROMPT,
+  shouldOfferPlanImplementation
+} from "../model/planImplementation";
+import {
   INITIAL_USAGE_ALERT_STATE,
   nextUsageAlert,
   type UsageAlertState,
@@ -1998,6 +2002,12 @@ export function useAgentGUINodeController({
   const [usageAlertBySessionId, setUsageAlertBySessionId] = useState<
     Record<string, UsageAlertTier>
   >({});
+  const [planImplementationSessionIds, setPlanImplementationSessionIds] =
+    useState<Record<string, true>>({});
+  const previousConversationStatusRef = useRef<{
+    id: string | null;
+    status: string | null;
+  }>({ id: null, status: null });
   const usagePercentUsed = usage?.percentUsed ?? null;
   useEffect(() => {
     const agentSessionId = activeConversationId;
@@ -2045,6 +2055,20 @@ export function useAgentGUINodeController({
       return next;
     });
   }, [activeConversationId]);
+  const dismissPlanImplementation = useCallback(() => {
+    const agentSessionId = activeConversationIdRef.current;
+    if (!agentSessionId) {
+      return;
+    }
+    setPlanImplementationSessionIds((current) => {
+      if (!(agentSessionId in current)) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[agentSessionId];
+      return next;
+    });
+  }, []);
   const stableRuntimeSyncStateBySessionIdRef = useRef<
     Record<string, WorkspaceAgentActivitySyncState | undefined>
   >({});
@@ -5288,6 +5312,38 @@ export function useAgentGUINodeController({
   );
   updateComposerSettingsRef.current = updateComposerSettings;
 
+  const implementPlan = useCallback(() => {
+    const agentSessionId = activeConversationIdRef.current;
+    if (!agentSessionId) {
+      return;
+    }
+    dismissPlanImplementation();
+    // Turn plan mode off on the daemon first so the coding turn starts
+    // without the plan collaboration mode, then mirror the setting locally
+    // and submit the same literal message as the codex TUI.
+    void Promise.resolve(
+      agentActivityRuntime.updateSessionSettings({
+        workspaceId,
+        agentSessionId,
+        settings: { planMode: false }
+      })
+    )
+      .catch(() => undefined)
+      .then(() => {
+        if (!isCurrentConversation(agentSessionId)) {
+          return;
+        }
+        updateComposerSettingsRef.current({ planMode: false });
+        submitPrompt(textPromptContent(PLAN_IMPLEMENTATION_PROMPT));
+      });
+  }, [
+    agentActivityRuntime,
+    dismissPlanImplementation,
+    isCurrentConversation,
+    submitPrompt,
+    workspaceId
+  ]);
+
   useEffect(() => {
     if (!activeConversationId) {
       return;
@@ -6323,6 +6379,49 @@ export function useAgentGUINodeController({
   const draftReasoningEffort = normalizeOptionalText(
     draftSettings.reasoningEffort
   ) as AgentSessionReasoningEffort | null;
+  useEffect(() => {
+    const id = activeConversation?.id ?? null;
+    const status = activeConversation?.status ?? null;
+    const previous = previousConversationStatusRef.current;
+    previousConversationStatusRef.current = { id, status };
+    if (!id || previous.id !== id) {
+      return;
+    }
+    if (status === "working") {
+      // A new turn started: any stale offer for this session is obsolete.
+      setPlanImplementationSessionIds((current) => {
+        if (!(id in current)) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    if (
+      shouldOfferPlanImplementation({
+        provider: dataRef.current.provider,
+        previousStatus: previous.status,
+        status,
+        planModeActive: composerSupport.plan && Boolean(draftSettings.planMode)
+      })
+    ) {
+      setPlanImplementationSessionIds((current) =>
+        id in current ? current : { ...current, [id]: true }
+      );
+    }
+  }, [
+    activeConversation?.id,
+    activeConversation?.status,
+    composerSupport.plan,
+    draftSettings.planMode
+  ]);
+  const planImplementationPrompt =
+    activeConversationId !== null &&
+    Boolean(planImplementationSessionIds[activeConversationId]) &&
+    composerSupport.plan &&
+    Boolean(draftSettings.planMode);
   const activeRuntimeSession =
     runtimeSessionsBySessionId.get(activeConversationId ?? "") ?? null;
   const activeConversationBusy =
@@ -6567,6 +6666,7 @@ export function useAgentGUINodeController({
         compactSupported,
         usage,
         usageAlert,
+        planImplementationPrompt,
         listError,
         isDeletingConversation,
         isDeletingProjectConversations,
@@ -6603,6 +6703,8 @@ export function useAgentGUINodeController({
         submitPrompt,
         submitCompact,
         dismissUsageAlert,
+        implementPlan,
+        dismissPlanImplementation,
         showPromptImagesUnsupported,
         submitApprovalOption,
         submitInteractivePrompt,
@@ -6651,6 +6753,9 @@ export function useAgentGUINodeController({
       compactSupported,
       usage,
       usageAlert,
+      planImplementationPrompt,
+      implementPlan,
+      dismissPlanImplementation,
       dismissUsageAlert,
       isInterrupting,
       isLoadingConversations,

@@ -286,6 +286,9 @@ export interface AgentGUIViewLabels {
   usageAlertWarnMessage: (input: { percent: number }) => string;
   usageAlertCriticalMessage: (input: { percent: number }) => string;
   usageAlertDismiss: string;
+  planImplementationLead: string;
+  planImplementationConfirm: string;
+  planImplementationDismiss: string;
   fileMentionPalette: string;
   fileMentionLoading: string;
   fileMentionEmpty: string;
@@ -344,6 +347,8 @@ interface AgentGUINodeViewProps {
     selectConversation: (agentSessionId: string) => void;
     submitPrompt: (content: AgentPromptContentBlock[]) => void;
     submitCompact: () => void;
+    implementPlan: () => void;
+    dismissPlanImplementation: () => void;
     dismissUsageAlert: () => void;
     showPromptImagesUnsupported: () => void;
     submitApprovalOption: (requestId: string, optionId: string) => void;
@@ -1686,6 +1691,10 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
           usageAlertLabels={labels}
           onUsageAlertCompact={handleUsageAlertCompact}
           onUsageAlertDismiss={actions.dismissUsageAlert}
+          planImplementationPrompt={viewModel.planImplementationPrompt}
+          planImplementationLabels={labels}
+          onPlanImplement={actions.implementPlan}
+          onPlanImplementationDismiss={actions.dismissPlanImplementation}
           composerProps={{
             workspaceId: viewModel.workspaceId,
             workspacePath: viewModel.workspacePath,
@@ -2209,6 +2218,60 @@ function AgentUsageAlertBanner({
   );
 }
 
+type AgentPlanImplementationLabels = Pick<
+  AgentGUIViewLabels,
+  | "planImplementationLead"
+  | "planImplementationConfirm"
+  | "planImplementationDismiss"
+>;
+
+// Codex has no provider-driven exit-plan approval; this mirrors the codex
+// TUI's local "implement this plan?" prompt after a plan-mode turn.
+function AgentPlanImplementationBanner({
+  labels,
+  onImplement,
+  onDismiss
+}: {
+  labels: AgentPlanImplementationLabels;
+  onImplement: () => void;
+  onDismiss: () => void;
+}): React.JSX.Element {
+  "use memo";
+
+  return (
+    <div
+      className={styles.usageAlertBanner}
+      data-testid="agent-gui-plan-implementation"
+      role="status"
+    >
+      <span className={styles.usageAlertMessage}>
+        {labels.planImplementationLead}
+      </span>
+      <span className={styles.usageAlertActions}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          data-testid="agent-gui-plan-implementation-confirm"
+          onClick={onImplement}
+        >
+          {labels.planImplementationConfirm}
+        </Button>
+        <button
+          type="button"
+          className={styles.usageAlertDismiss}
+          data-testid="agent-gui-plan-implementation-dismiss"
+          aria-label={labels.planImplementationDismiss}
+          title={labels.planImplementationDismiss}
+          onClick={onDismiss}
+        >
+          <X size={14} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </span>
+    </div>
+  );
+}
+
 interface AgentGUIBottomDockPaneProps {
   bottomDockRef: React.RefObject<HTMLDivElement | null>;
   activePrompt:
@@ -2227,6 +2290,10 @@ interface AgentGUIBottomDockPaneProps {
   usageAlertLabels: AgentUsageAlertBannerLabels;
   onUsageAlertCompact: () => void;
   onUsageAlertDismiss: () => void;
+  planImplementationPrompt: boolean;
+  planImplementationLabels: AgentPlanImplementationLabels;
+  onPlanImplement: () => void;
+  onPlanImplementationDismiss: () => void;
   composerProps: AgentComposerProps;
   chromeLabels: ChromeLabels;
   promptLabels: InteractivePromptLabels;
@@ -2250,6 +2317,10 @@ const AgentGUIBottomDockPane = memo(function AgentGUIBottomDockPane({
   usageAlertLabels,
   onUsageAlertCompact,
   onUsageAlertDismiss,
+  planImplementationPrompt,
+  planImplementationLabels,
+  onPlanImplement,
+  onPlanImplementationDismiss,
   composerProps,
   chromeLabels,
   promptLabels,
@@ -2291,6 +2362,13 @@ const AgentGUIBottomDockPane = memo(function AgentGUIBottomDockPane({
           labels={usageAlertLabels}
           onCompact={onUsageAlertCompact}
           onDismiss={onUsageAlertDismiss}
+        />
+      ) : null}
+      {planImplementationPrompt ? (
+        <AgentPlanImplementationBanner
+          labels={planImplementationLabels}
+          onImplement={onPlanImplement}
+          onDismiss={onPlanImplementationDismiss}
         />
       ) : null}
       {inlineNoticeChrome ? (

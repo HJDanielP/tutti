@@ -8392,6 +8392,61 @@ describe("useAgentGUINodeController", () => {
     });
   });
 
+  it("implements a codex plan by leaving plan mode then submitting the literal prompt", async () => {
+    const exec = vi.fn(async () => ({ events: [] }));
+    const updateSettings = vi.fn(async ({ settings }) => ({ settings }));
+    installAgentHostApi({
+      list: vi.fn(async () => snapshotWithSession("session-1")),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn(() => vi.fn()),
+      getState: vi.fn(async () =>
+        agentSessionState("session-1", {
+          provider: "codex",
+          settings: {
+            planMode: true,
+            permissionModeId: "auto"
+          }
+        })
+      ),
+      exec,
+      updateSettings
+    });
+
+    const { result } = renderHook(() =>
+      useAgentGUINodeController({
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: agentGuiData("session-1", "codex"),
+        onDataChange: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.viewModel.activeConversationId).toBe("session-1");
+    });
+
+    act(() => {
+      result.current.actions.implementPlan();
+    });
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({ planMode: false })
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(exec).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: [{ type: "text", text: "Implement the plan." }]
+        })
+      );
+    });
+  });
+
   it("keeps plan mode after rejecting an exit-plan prompt", async () => {
     const submitInteractive = vi.fn(async () => ({
       agentSessionId: "session-1",
