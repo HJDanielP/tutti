@@ -99,6 +99,7 @@ func (s *Service) GetComposerOptions(ctx context.Context, input ComposerOptionsI
 	permissionConfig := composerPermissionConfig(provider, effectiveSettings.PermissionModeID, locale)
 	modelOptions := composerSelectedModelOptions(effectiveSettings.Model)
 	runtimeContext := map[string]any{
+		"capabilities":       composerProviderCapabilities(provider),
 		"configOptions":      composerConfigOptions(provider, effectiveSettings, modelOptions),
 		"model":              nullableString(effectiveSettings.Model),
 		"permissionModeId":   nullableString(effectiveSettings.PermissionModeID),
@@ -123,6 +124,23 @@ func (s *Service) GetComposerOptions(ctx context.Context, input ComposerOptionsI
 		RuntimeContext:    runtimeContext,
 		Skills:            skills,
 	}, nil
+}
+
+// composerProviderCapabilities is the conservative static default used to
+// render the composer before a session exists. Once a session is live the
+// adapter-reported runtimeContext.capabilities takes precedence (GUI-side
+// resolution). Keys mirror packages/agent/daemon/runtime/capabilities.go.
+func composerProviderCapabilities(provider string) []string {
+	switch agentprovider.Normalize(provider) {
+	case agentprovider.ClaudeCode:
+		return []string{"imageInput", "skills", "compact", "tokenUsage", "rateLimits", "planMode", "interrupt"}
+	case agentprovider.Codex:
+		return []string{"imageInput", "skills", "compact", "tokenUsage", "rateLimits", "interrupt"}
+	case agentprovider.Gemini, agentprovider.Hermes, agentprovider.Nexight:
+		return []string{"interrupt"}
+	default:
+		return nil
+	}
 }
 
 func composerPromptCapabilities(provider string) map[string]any {

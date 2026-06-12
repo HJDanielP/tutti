@@ -256,7 +256,7 @@ git commit -m "feat(agent): standard ACP adapters report runtime capabilities"
 - Modify: `services/nextopd/service/agent/composer_options.go`（`GetComposerOptions` runtimeContext 構造處 :101-107、`composerPromptCapabilities` :128 下方追加）
 - Test: `services/nextopd/service/agent/composer_options_test.go`（若不存在則新建；先 `ls services/nextopd/service/agent/*_test.go` 確認）
 
-- [ ] **Step 1: 寫失敗測試**
+- [x] **Step 1: 寫失敗測試**
 
 ```go
 func TestComposerProviderCapabilitiesDefaults(t *testing.T) {
@@ -285,12 +285,12 @@ func TestComposerProviderCapabilitiesDefaults(t *testing.T) {
 
 （import `slices`；包名與測試風格先看同目錄既有 `*_test.go`。）
 
-- [ ] **Step 2: 跑測試確認失敗**
+- [x] **Step 2: 跑測試確認失敗**
 
 Run: `cd services/nextopd && go test ./service/agent/ -run TestComposerProviderCapabilitiesDefaults -count=1`
 Expected: FAIL（undefined）
 
-- [ ] **Step 3: 實現靜態預設表並接入 runtimeContext**
+- [x] **Step 3: 實現靜態預設表並接入 runtimeContext**
 
 `composer_options.go` 追加（緊鄰 `composerPromptCapabilities`）：
 
@@ -321,12 +321,12 @@ func composerProviderCapabilities(provider string) []string {
 "capabilities": composerProviderCapabilities(provider),
 ```
 
-- [ ] **Step 4: 跑包內測試**
+- [x] **Step 4: 跑包內測試**
 
 Run: `go test ./service/agent/ -count=1`
 Expected: 全 PASS（若有既有測試斷言 runtimeContext 的完整 key 集合，同步加入 `capabilities`）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/nextopd/service/agent/
