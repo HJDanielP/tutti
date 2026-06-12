@@ -57,6 +57,7 @@ describe("composerSettingsSupportFromOptions", () => {
         "compact",
         "tokenUsage",
         "rateLimits",
+        "planMode",
         "interrupt"
       ]
     },
@@ -86,7 +87,9 @@ describe("composerSettingsSupportFromOptions", () => {
       expect(support.model).toBe(legacyTable[provider]!.model);
       expect(support.reasoning).toBe(legacyTable[provider]!.reasoning);
       expect(support.permission).toBe(legacyTable[provider]!.permission);
-      expect(support.plan).toBe(provider === "claude-code");
+      expect(support.plan).toBe(
+        provider === "claude-code" || provider === "codex"
+      );
     });
   }
 

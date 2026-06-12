@@ -52,15 +52,16 @@ type scriptedAppServerConnection struct {
 	sent [][]byte
 	recv chan ProcessFrame
 
-	requiresAuth     bool
-	accountReadError bool
-	turnStatus       string // completed (default) | failed | interrupted
-	turnError        map[string]any
-	holdTurn         bool // do not finish the turn until released
-	commandApproval  bool
-	userInputRequest bool
-	approvalResponse map[string]any
-	closeOnce        sync.Once
+	requiresAuth                 bool
+	collaborationModeUnsupported bool
+	accountReadError             bool
+	turnStatus                   string // completed (default) | failed | interrupted
+	turnError                    map[string]any
+	holdTurn                     bool // do not finish the turn until released
+	commandApproval              bool
+	userInputRequest             bool
+	approvalResponse             map[string]any
+	closeOnce                    sync.Once
 }
 
 func (c *scriptedAppServerConnection) sendJSON(value map[string]any) {
@@ -165,6 +166,31 @@ func (c *scriptedAppServerConnection) Send(data []byte) error {
 						"planType": "pro",
 					},
 					"requiresOpenaiAuth": false,
+				},
+			})
+		case appServerMethodCollaborationModeList:
+			if c.collaborationModeUnsupported {
+				c.sendJSON(map[string]any{
+					"id":    message.ID,
+					"error": map[string]any{"code": -32601, "message": "method not found"},
+				})
+				continue
+			}
+			c.sendJSON(map[string]any{
+				"id": message.ID,
+				"result": map[string]any{
+					"data": []any{
+						map[string]any{
+							"name":     "Plan",
+							"mode":     "plan",
+							"settings": map[string]any{"reasoning_effort": "medium"},
+						},
+						map[string]any{
+							"name":     "Pair",
+							"mode":     "pair",
+							"settings": map[string]any{},
+						},
+					},
 				},
 			})
 		case appServerMethodModelList:
@@ -1357,5 +1383,67 @@ func TestCodexAppServerAdapterDefaultControllerUsesAppServerForCodex(t *testing.
 		t.Fatalf("nexight adapter missing")
 	} else if _, ok := nexight.(*CodexAdapter); !ok {
 		t.Fatalf("nexight adapter = %T, want ACP family adapter", nexight)
+	}
+}
+
+func TestCodexAppServerAdapterReportsPlanModeCapabilityWhenCollaborationModesAvailable(t *testing.T) {
+	t.Parallel()
+
+	adapter, _, session := startedAppServerAdapter(t)
+	state := adapter.SessionState(session)
+	capabilities, _ := state.RuntimeContext["capabilities"].([]string)
+	if !containsString(capabilities, CapabilityPlanMode) {
+		t.Fatalf("capabilities = %#v, want planMode", capabilities)
+	}
+}
+
+func TestCodexAppServerAdapterOmitsPlanModeCapabilityWithoutCollaborationModes(t *testing.T) {
+	t.Parallel()
+
+	transport := newScriptedAppServerTransport()
+	transport.conn.collaborationModeUnsupported = true
+	adapter := NewCodexAppServerAdapter(transport)
+	session := testAppServerSession()
+	if _, err := adapter.Start(context.Background(), session); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	session.ProviderSessionID = "codex-thread-1"
+	state := adapter.SessionState(session)
+	capabilities, _ := state.RuntimeContext["capabilities"].([]string)
+	if containsString(capabilities, CapabilityPlanMode) {
+		t.Fatalf("capabilities = %#v, want no planMode without collaboration modes", capabilities)
+	}
+}
+
+func TestCodexAppServerAdapterSendsCollaborationModeForPlanTurns(t *testing.T) {
+	t.Parallel()
+
+	adapter, transport, session := startedAppServerAdapter(t)
+	session.Settings = &SessionSettings{PlanMode: true}
+	if _, err := adapter.Exec(context.Background(), session, []PromptContentBlock{{
+		Type: "text", Text: "plan it",
+	}}, "", "turn-plan-1", nil, nil); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	turnStart := appServerRequestParams(t, transport.conn, appServerMethodTurnStart)
+	collaborationMode, _ := turnStart["collaborationMode"].(map[string]any)
+	if asString(collaborationMode["mode"]) != "plan" {
+		t.Fatalf("turn/start collaborationMode = %#v, want plan preset", turnStart["collaborationMode"])
+	}
+	settings, _ := collaborationMode["settings"].(map[string]any)
+	if value, ok := settings["developer_instructions"]; !ok || value != nil {
+		t.Fatalf("collaborationMode settings = %#v, want explicit null developer_instructions", settings)
+	}
+
+	session.Settings = &SessionSettings{PlanMode: false}
+	if _, err := adapter.Exec(context.Background(), session, []PromptContentBlock{{
+		Type: "text", Text: "now build",
+	}}, "", "turn-plan-2", nil, nil); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	turnStarts := appServerRequestParamsList(t, transport.conn, appServerMethodTurnStart)
+	last := turnStarts[len(turnStarts)-1]
+	if _, ok := last["collaborationMode"]; ok {
+		t.Fatalf("turn/start = %#v, want no collaborationMode when plan mode is off", last)
 	}
 }

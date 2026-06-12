@@ -2312,6 +2312,86 @@ describe("AgentGUINode", () => {
     });
   });
 
+  it("cycles composer modes with shift+tab including plan mode", () => {
+    mockViewModel = createViewModel({
+      activeConversationId: "session-1",
+      composerSettings: {
+        sessionSettings: null,
+        draftSettings: {
+          model: "claude-4",
+          reasoningEffort: "high",
+          planMode: false,
+          permissionModeId: "acceptEdits"
+        },
+        effectivePlanMode: false,
+        supportsModel: true,
+        supportsReasoningEffort: true,
+        supportsPermissionMode: true,
+        supportsPlanMode: true,
+        isSettingsLoading: false,
+        modelUnavailable: false,
+        reasoningUnavailable: false,
+        permissionModeUnavailable: false,
+        planUnavailable: false,
+        selectedPermissionModeValue: "acceptEdits",
+        availableModels: [{ value: "claude-4", label: "Claude 4" }],
+        availableReasoningEfforts: [{ value: "high", label: "High" }],
+        availablePermissionModes: [
+          { value: "default", label: "agentHost.agentGui.permissionModeAsk" },
+          { value: "acceptEdits", label: "Accept edits" }
+        ]
+      }
+    });
+    renderAgentGUINode();
+
+    // acceptEdits is the last permission mode, so shift+tab enters plan mode.
+    fireEvent.keyDown(getComposerEditor(), { key: "Tab", shiftKey: true });
+
+    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
+      planMode: true
+    });
+  });
+
+  it("cycles out of plan mode with shift+tab back to the first permission mode", () => {
+    mockViewModel = createViewModel({
+      activeConversationId: "session-1",
+      composerSettings: {
+        sessionSettings: null,
+        draftSettings: {
+          model: "claude-4",
+          reasoningEffort: "high",
+          planMode: true,
+          permissionModeId: "acceptEdits"
+        },
+        effectivePlanMode: true,
+        supportsModel: true,
+        supportsReasoningEffort: true,
+        supportsPermissionMode: true,
+        supportsPlanMode: true,
+        isSettingsLoading: false,
+        modelUnavailable: false,
+        reasoningUnavailable: false,
+        permissionModeUnavailable: false,
+        planUnavailable: false,
+        selectedPermissionModeValue: "acceptEdits",
+        availableModels: [{ value: "claude-4", label: "Claude 4" }],
+        availableReasoningEfforts: [{ value: "high", label: "High" }],
+        availablePermissionModes: [
+          { value: "default", label: "agentHost.agentGui.permissionModeAsk" },
+          { value: "acceptEdits", label: "Accept edits" }
+        ]
+      }
+    });
+    renderAgentGUINode();
+
+    fireEvent.keyDown(getComposerEditor(), { key: "Tab", shiftKey: true });
+
+    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
+      permissionModeId: "default",
+      planMode: false
+    });
+  });
+
   it("omits the plan mode option when the provider lacks the capability", async () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",

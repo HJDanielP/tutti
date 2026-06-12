@@ -27,6 +27,11 @@ import type {
   AgentGUIComposerSettingOption,
   AgentGUIComposerSettingsVM
 } from "./model/agentGuiNodeTypes";
+import {
+  composerModeOptions,
+  composerModeSelectedValue,
+  composerModeSelectionPatch
+} from "./model/composerModeCycle";
 import styles from "./AgentGUINode.styles";
 
 export type AgentComposerSettingsMenuLabels = {
@@ -129,8 +134,6 @@ export function AgentProjectDropdown({
   );
 }
 
-export const PLAN_MODE_PERMISSION_OPTION_VALUE = "plan";
-
 export function AgentPermissionModeDropdown({
   composerSettings,
   disabled = false,
@@ -150,32 +153,28 @@ export function AgentPermissionModeDropdown({
 }): React.JSX.Element {
   "use memo";
   const availableOptions = composerSettings.availablePermissionModes ?? [];
-  const planModeActive =
+  const planModeActive = Boolean(
     composerSettings.supportsPlanMode &&
     (composerSettings.effectivePlanMode ??
-      composerSettings.draftSettings.planMode);
+      composerSettings.draftSettings.planMode)
+  );
   const selectedPermissionValue =
     composerSettings.selectedPermissionModeValue ??
     composerSettings.draftSettings.permissionModeId;
-  const selectedValue = planModeActive
-    ? PLAN_MODE_PERMISSION_OPTION_VALUE
-    : selectedPermissionValue;
-  const permissionOptions = permissionOptionsWithSelectedValue(
-    availableOptions,
-    selectedPermissionValue
-  );
-  // Plan mode rides the permission dropdown (Zed-style): it is a negotiated
-  // capability rather than a backend permission mode, so it is appended here
-  // and mapped onto the planMode setting instead of permissionModeId.
-  const optionsWithPlan = composerSettings.supportsPlanMode
-    ? [
-        ...permissionOptions,
-        {
-          value: PLAN_MODE_PERMISSION_OPTION_VALUE,
-          label: labels.planModeLabel
-        }
-      ]
-    : permissionOptions;
+  const selectedValue = composerModeSelectedValue({
+    planModeActive,
+    selectedPermissionModeValue: selectedPermissionValue
+  });
+  // Plan mode rides the permission dropdown (Zed-style); the option list and
+  // selection mapping are shared with the Shift+Tab cycle.
+  const optionsWithPlan = composerModeOptions({
+    availablePermissionModes: permissionOptionsWithSelectedValue(
+      availableOptions,
+      selectedPermissionValue
+    ),
+    supportsPlanMode: composerSettings.supportsPlanMode,
+    planModeLabel: labels.planModeLabel
+  });
   const selectDisabled =
     disabled ||
     composerSettings.isSettingsLoading ||
@@ -192,14 +191,8 @@ export function AgentPermissionModeDropdown({
     if (selectDisabled) {
       return;
     }
-    if (permissionModeId === PLAN_MODE_PERMISSION_OPTION_VALUE) {
-      onSettingsChange({ planMode: true });
-      return;
-    }
     onSettingsChange(
-      planModeActive
-        ? { permissionModeId, planMode: false }
-        : { permissionModeId }
+      composerModeSelectionPatch(permissionModeId, planModeActive)
     );
   };
   const handleSelectedItemPointerDown = (

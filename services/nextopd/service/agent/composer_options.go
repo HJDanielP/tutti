@@ -134,7 +134,9 @@ func composerProviderCapabilities(provider string) []string {
 	case agentprovider.ClaudeCode:
 		return []string{"imageInput", "skills", "compact", "tokenUsage", "rateLimits", "planMode", "interrupt"}
 	case agentprovider.Codex:
-		return []string{"imageInput", "skills", "compact", "tokenUsage", "rateLimits", "interrupt"}
+		// planMode pre-session optimism: the adapter re-negotiates at session
+		// start (collaborationMode/list) and drops it for older binaries.
+		return []string{"imageInput", "skills", "compact", "tokenUsage", "rateLimits", "planMode", "interrupt"}
 	case agentprovider.Gemini, agentprovider.Hermes, agentprovider.Nexight:
 		return []string{"interrupt"}
 	default:

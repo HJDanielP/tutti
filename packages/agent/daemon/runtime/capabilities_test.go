@@ -7,7 +7,7 @@ import (
 
 func TestCodexAppServerCapabilitiesUseSharedVocabulary(t *testing.T) {
 	t.Parallel()
-	capabilities := codexAppServerCapabilities()
+	capabilities := codexAppServerCapabilities(false)
 	for _, want := range []string{
 		CapabilityImageInput,
 		CapabilitySkills,
@@ -21,7 +21,10 @@ func TestCodexAppServerCapabilitiesUseSharedVocabulary(t *testing.T) {
 		}
 	}
 	if containsString(capabilities, CapabilityPlanMode) {
-		t.Fatalf("codex must not advertise planMode")
+		t.Fatalf("codex must not advertise planMode without negotiated collaboration modes")
+	}
+	if !containsString(codexAppServerCapabilities(true), CapabilityPlanMode) {
+		t.Fatalf("codex must advertise planMode when collaboration modes are negotiated")
 	}
 }
 

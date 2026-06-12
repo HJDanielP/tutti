@@ -126,7 +126,7 @@ func TestServiceCreateClampsPlanModeForProvidersWithoutCapability(t *testing.T) 
 		AgentSessionID: "22222222-2222-4222-8222-222222222222",
 		InitialContent: TextPromptContent("hello"),
 		PlanMode:       &planMode,
-		Provider:       "codex",
+		Provider:       "gemini",
 	})
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
@@ -135,7 +135,7 @@ func TestServiceCreateClampsPlanModeForProvidersWithoutCapability(t *testing.T) 
 		t.Fatalf("start calls = %d, want 1", len(runtime.startCalls))
 	}
 	if runtime.startCalls[0].PlanMode {
-		t.Fatal("runtime start plan mode = true, want clamped to false for codex")
+		t.Fatal("runtime start plan mode = true, want clamped to false for gemini")
 	}
 	if session.Settings == nil || session.Settings.PlanMode {
 		t.Fatalf("session settings = %#v, want plan mode clamped to false", session.Settings)

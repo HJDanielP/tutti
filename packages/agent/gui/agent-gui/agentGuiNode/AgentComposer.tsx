@@ -61,6 +61,12 @@ import {
   type SlashCommandSelectionEffect
 } from "./model/agentSlashCommandProviderPolicy";
 import {
+  composerModeOptions,
+  composerModeSelectedValue,
+  composerModeSelectionPatch,
+  nextComposerModeValue
+} from "./model/composerModeCycle";
+import {
   AgentSlashCommandPalette,
   type AgentSlashPaletteEntry
 } from "./AgentSlashCommandPalette";
@@ -1126,10 +1132,82 @@ export function AgentComposer({
     ]
   );
 
+  // Shift+Tab cycles permission modes plus plan mode (CLI muscle memory),
+  // sharing the option list and selection mapping with the dropdown.
+  const handleModeCycleKeyDown = useCallback(
+    (event: KeyboardEvent): boolean => {
+      if (
+        event.key !== "Tab" ||
+        !event.shiftKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return false;
+      }
+      if (
+        isSendingTurn ||
+        isSubmittingPrompt ||
+        showStopButton ||
+        composerSettings.isSettingsLoading
+      ) {
+        return false;
+      }
+      const planModeActive = Boolean(
+        composerSettings.supportsPlanMode &&
+        (composerSettings.effectivePlanMode ??
+          composerSettings.draftSettings.planMode)
+      );
+      const options = composerModeOptions({
+        availablePermissionModes: composerSettings.supportsPermissionMode
+          ? (composerSettings.availablePermissionModes ?? [])
+          : [],
+        supportsPlanMode: composerSettings.supportsPlanMode,
+        planModeLabel: labels.planModeLabel
+      });
+      const next = nextComposerModeValue(
+        options,
+        composerModeSelectedValue({
+          planModeActive,
+          selectedPermissionModeValue:
+            composerSettings.selectedPermissionModeValue ??
+            composerSettings.draftSettings.permissionModeId
+        })
+      );
+      if (next === null) {
+        return false;
+      }
+      event.preventDefault();
+      onSettingsChange(composerModeSelectionPatch(next, planModeActive));
+      return true;
+    },
+    [
+      composerSettings.availablePermissionModes,
+      composerSettings.draftSettings.permissionModeId,
+      composerSettings.draftSettings.planMode,
+      composerSettings.effectivePlanMode,
+      composerSettings.isSettingsLoading,
+      composerSettings.selectedPermissionModeValue,
+      composerSettings.supportsPermissionMode,
+      composerSettings.supportsPlanMode,
+      labels.planModeLabel,
+      onSettingsChange,
+      isSendingTurn,
+      isSubmittingPrompt,
+      showStopButton
+    ]
+  );
+
   const handlePaletteKeyDown = useCallback(
     (event: KeyboardEvent): boolean =>
-      handleFileMentionKeyDown(event) || handleSlashPaletteKeyDown(event),
-    [handleFileMentionKeyDown, handleSlashPaletteKeyDown]
+      handleFileMentionKeyDown(event) ||
+      handleSlashPaletteKeyDown(event) ||
+      handleModeCycleKeyDown(event),
+    [
+      handleFileMentionKeyDown,
+      handleSlashPaletteKeyDown,
+      handleModeCycleKeyDown
+    ]
   );
 
   useEffect(() => {

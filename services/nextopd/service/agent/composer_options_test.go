@@ -14,8 +14,8 @@ func TestComposerProviderCapabilitiesDefaults(t *testing.T) {
 		}
 	}
 	codex := composerProviderCapabilities("codex")
-	if slices.Contains(codex, "planMode") {
-		t.Fatalf("codex defaults must not include planMode: %v", codex)
+	if !slices.Contains(codex, "planMode") {
+		t.Fatalf("codex defaults must include planMode (re-negotiated at session start): %v", codex)
 	}
 	if !slices.Contains(codex, "compact") || !slices.Contains(codex, "skills") {
 		t.Fatalf("codex defaults = %v", codex)
@@ -45,11 +45,13 @@ func TestNormalizeComposerSettingsClampsByProviderSupport(t *testing.T) {
 		}
 	}
 	// planMode: only providers whose static capabilities include planMode keep it.
-	claude := normalizeComposerSettingsForProvider("claude-code", ComposerSettings{PlanMode: true})
-	if !claude.PlanMode {
-		t.Fatalf("claude-code planMode clamped, want preserved")
+	for _, provider := range []string{"claude-code", "codex"} {
+		got := normalizeComposerSettingsForProvider(provider, ComposerSettings{PlanMode: true})
+		if !got.PlanMode {
+			t.Fatalf("%s planMode clamped, want preserved", provider)
+		}
 	}
-	for _, provider := range []string{"codex", "gemini", "hermes", "nexight", "openclaw"} {
+	for _, provider := range []string{"gemini", "hermes", "nexight", "openclaw"} {
 		got := normalizeComposerSettingsForProvider(provider, ComposerSettings{PlanMode: true})
 		if got.PlanMode {
 			t.Fatalf("%s planMode = true, want clamped to false", provider)

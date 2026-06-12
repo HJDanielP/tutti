@@ -853,11 +853,14 @@ func appServerThreadStartParams(session Session, cwd string) map[string]any {
 	return params
 }
 
-func appServerTurnStartParams(session Session, threadID string, content []PromptContentBlock) map[string]any {
+func appServerTurnStartParams(session Session, threadID string, content []PromptContentBlock, planCollaborationMode map[string]any) map[string]any {
 	settings := session.SettingsValue()
 	params := map[string]any{
 		"threadId": threadID,
 		"input":    appServerUserInput(content),
+	}
+	if settings.PlanMode && planCollaborationMode != nil {
+		params["collaborationMode"] = planCollaborationMode
 	}
 	if model := strings.TrimSpace(settings.Model); model != "" {
 		params["model"] = model
@@ -1074,8 +1077,8 @@ func codexAppServerCommands() []AgentSessionCommand {
 	}
 }
 
-func codexAppServerCapabilities() []string {
-	return []string{
+func codexAppServerCapabilities(planMode bool) []string {
+	capabilities := []string{
 		CapabilityImageInput,
 		CapabilitySkills,
 		CapabilityInterrupt,
@@ -1088,6 +1091,12 @@ func codexAppServerCapabilities() []string {
 		"fork",
 		"perTurnModelOverride",
 	}
+	if planMode {
+		// Negotiated at session start via the experimental
+		// collaborationMode/list probe.
+		capabilities = append(capabilities, CapabilityPlanMode)
+	}
+	return capabilities
 }
 
 func codexAppServerConfigOptionDescriptors(
