@@ -205,7 +205,7 @@ test("dock overflow keeps scroll controls viewport-bound", () => {
   );
   assert.match(
     css,
-    /\.desktop-dock__slot--minimized\[data-presence="entering"\]\s*{[^}]*animation:\s*desktop-dock-minimized-slot-expand 360ms/s
+    /\.desktop-dock__slot--minimized\[data-presence="entering"\]\s*{[^}]*animation:\s*desktop-dock-minimized-slot-expand 720ms/s
   );
   assert.match(
     css,
@@ -217,7 +217,7 @@ test("dock overflow keeps scroll controls viewport-bound", () => {
   );
   assert.match(
     css,
-    /\.desktop-dock__slot--minimized\[data-collapsing="true"\],[\s\S]*?\.desktop-dock__slot--minimized\[data-presence="exiting"\]\s*{[^}]*animation:\s*desktop-dock-minimized-slot-collapse 360ms[^}]*pointer-events:\s*none;/s
+    /\.desktop-dock__slot--minimized\[data-collapsing="true"\],[\s\S]*?\.desktop-dock__slot--minimized\[data-presence="exiting"\]\s*{[^}]*animation:\s*desktop-dock-minimized-slot-collapse 720ms[^}]*pointer-events:\s*none;/s
   );
   assert.match(
     css,

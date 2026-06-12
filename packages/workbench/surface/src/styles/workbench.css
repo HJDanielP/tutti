@@ -1074,13 +1074,13 @@
 
 .desktop-dock__slot[data-presence="entering"],
 .desktop-dock__separator[data-presence="entering"] {
-  animation: desktop-dock-presence-enter 300ms cubic-bezier(0.16, 1, 0.3, 1)
+  animation: desktop-dock-presence-enter 600ms cubic-bezier(0.16, 1, 0.3, 1)
     both;
 }
 
 .desktop-dock__slot--minimized[data-presence="entering"] {
   min-width: 0;
-  animation: desktop-dock-minimized-slot-expand 360ms
+  animation: desktop-dock-minimized-slot-expand 720ms
     cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -1094,7 +1094,7 @@
   .desktop-dock__minimized-preview,
 .desktop-dock__slot--minimized[data-presence="entering"]
   .desktop-dock__minimized-stack-icon {
-  animation: desktop-dock-minimized-icon-appear 320ms
+  animation: desktop-dock-minimized-icon-appear 640ms
     cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -1109,14 +1109,14 @@
 
 .desktop-dock__slot[data-presence="exiting"],
 .desktop-dock__separator[data-presence="exiting"] {
-  animation: desktop-dock-presence-exit 300ms cubic-bezier(0.7, 0, 0.84, 0) both;
+  animation: desktop-dock-presence-exit 600ms cubic-bezier(0.7, 0, 0.84, 0) both;
   pointer-events: none;
 }
 
 .desktop-dock__slot--minimized[data-collapsing="true"],
 .desktop-dock__slot--minimized[data-presence="exiting"] {
   min-width: 0;
-  animation: desktop-dock-minimized-slot-collapse 360ms
+  animation: desktop-dock-minimized-slot-collapse 720ms
     cubic-bezier(0.4, 0, 0.2, 1) both;
   pointer-events: none;
 }
@@ -1142,7 +1142,7 @@
   .desktop-dock__minimized-preview,
 .desktop-dock__slot--minimized[data-presence="exiting"]
   .desktop-dock__minimized-stack-icon {
-  animation: desktop-dock-minimized-icon-disappear 320ms
+  animation: desktop-dock-minimized-icon-disappear 640ms
     cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 

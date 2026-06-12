@@ -78,9 +78,16 @@ function stripDockDescriptionTerminalPunctuation(value: string): string {
 }
 
 function isDockVisualMutationActive(element: HTMLElement | null): boolean {
+  if (!element) {
+    return false;
+  }
+
   return (
-    element?.hasAttribute("data-dock-pointer-active") === true ||
-    element?.hasAttribute("data-dock-hover-panel-open") === true
+    element.hasAttribute("data-dock-pointer-active") ||
+    element.hasAttribute("data-dock-hover-panel-open") ||
+    element.querySelector(
+      '[data-collapsing="true"], [data-presence="entering"], [data-presence="exiting"]'
+    ) !== null
   );
 }
 
@@ -485,9 +492,15 @@ export function WorkbenchHostDock({
       hoverPanelRestTargetRef.current = null;
       clearHoverPanelOpenTimer();
       closeHoverPanelImmediate();
+      pauseDockMagnification();
       triggerDockBounce(anchorKey);
     },
-    [clearHoverPanelOpenTimer, closeHoverPanelImmediate, triggerDockBounce]
+    [
+      clearHoverPanelOpenTimer,
+      closeHoverPanelImmediate,
+      pauseDockMagnification,
+      triggerDockBounce
+    ]
   );
 
   const beginDockMinimizedInteraction = useCallback(
@@ -495,6 +508,7 @@ export function WorkbenchHostDock({
       hoverPanelRestTargetRef.current = null;
       clearHoverPanelOpenTimer();
       closeHoverPanelImmediate();
+      pauseDockMagnification();
 
       if (!anchorKey) {
         return false;
@@ -503,6 +517,7 @@ export function WorkbenchHostDock({
       if (!slotElement) {
         return false;
       }
+      clearSlotMagnification(anchorKey);
       if (slotElement.dataset.collapsing === "true") {
         return true;
       }
@@ -518,7 +533,12 @@ export function WorkbenchHostDock({
       slotElement.dataset.collapsing = "true";
       return true;
     },
-    [clearHoverPanelOpenTimer, closeHoverPanelImmediate]
+    [
+      clearHoverPanelOpenTimer,
+      clearSlotMagnification,
+      closeHoverPanelImmediate,
+      pauseDockMagnification
+    ]
   );
 
   const runDockMinimizedLaunchAfterCollapse = useCallback(
@@ -1966,7 +1986,7 @@ function useDockPresenceItems(
 }
 
 const DOCK_BOUNCE_MS = 600;
-const dockMinimizedSlotCollapseLaunchDelayMs = 260;
+const dockMinimizedSlotCollapseLaunchDelayMs = 520;
 
 function useDockBounce(slotRefs: RefObject<Map<string, HTMLElement>>) {
   const timeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());

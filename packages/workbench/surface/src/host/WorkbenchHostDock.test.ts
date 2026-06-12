@@ -52,6 +52,14 @@ test("dock hover panels survive pointer travel from slot to panel", () => {
   assert.match(source, /const beginDockMinimizedInteraction = useCallback/);
   assert.match(source, /beginDockMinimizedInteraction\(\);/);
   assert.match(source, /beginDockMinimizedInteraction\(slot\.anchorKey\);/);
+  assert.match(
+    source,
+    /const beginDockMinimizedInteraction = useCallback\([\s\S]*?pauseDockMagnification\(\);[\s\S]*?clearSlotMagnification\(anchorKey\);/
+  );
+  assert.match(
+    source,
+    /function isDockVisualMutationActive[\s\S]*?data-presence="entering"[\s\S]*?data-presence="exiting"/
+  );
   assert.match(source, /--desktop-dock-collapse-inline-size/);
   assert.match(source, /--desktop-dock-collapse-block-size/);
   assert.match(source, /slotElement\.dataset\.collapsing = "true";/);
@@ -59,7 +67,7 @@ test("dock hover panels survive pointer travel from slot to panel", () => {
     source,
     /const runDockMinimizedLaunchAfterCollapse = useCallback/
   );
-  assert.match(source, /const dockMinimizedSlotCollapseLaunchDelayMs = 260;/);
+  assert.match(source, /const dockMinimizedSlotCollapseLaunchDelayMs = 520;/);
   assert.match(
     source,
     /runDockMinimizedLaunchAfterCollapse\([\s\S]*?slot\.anchorKey[\s\S]*?context\.genie\.launchNodeFromAnchor/
