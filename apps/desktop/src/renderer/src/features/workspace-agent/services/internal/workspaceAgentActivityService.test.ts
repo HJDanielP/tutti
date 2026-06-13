@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { TuttidClient } from "@tutti-os/client-tuttid-ts";
-import type { DesktopRuntimeApi } from "@preload/types";
 import { WorkspaceAgentActivityService } from "./workspaceAgentActivityService.ts";
 
 function createService(): WorkspaceAgentActivityService {
@@ -9,7 +8,7 @@ function createService(): WorkspaceAgentActivityService {
     tuttidClient: {} as TuttidClient,
     runtimeApi: {
       logTerminalDiagnostic: async () => {}
-    } as Pick<DesktopRuntimeApi, "logTerminalDiagnostic">
+    }
   });
 }
 
