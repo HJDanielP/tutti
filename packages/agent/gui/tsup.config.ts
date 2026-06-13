@@ -11,6 +11,7 @@ export default defineConfig({
     "agent-title-text": "shared/utils/agentTitleText.ts",
     "i18n/index": "i18n/index.ts",
     "mention-file-presentation": "agent-gui/shared/mentionFilePresentation.ts",
+    "plan-decision-ops": "shared/agentConversation/planImplementation.ts",
     "workbench/index": "workbench/index.ts",
     "workbench/contribution": "workbench/contribution.ts",
     "workbench/launch": "workbench/launch.ts",

@@ -95,6 +95,15 @@ export interface IWorkspaceAgentActivityService {
   submitInteractive(
     input: AgentActivitySubmitInteractiveInput
   ): Promise<unknown>;
+  submitPlanDecision(input: {
+    workspaceId: string;
+    agentSessionId: string;
+    promptKind: string;
+    requestId: string;
+    action?: string;
+    optionId?: string;
+    payload?: Record<string, unknown>;
+  }): Promise<void>;
   ensureSessionSynchronized(
     input: WorkspaceAgentActivityEnsureSessionSynchronizedInput
   ): () => void;
