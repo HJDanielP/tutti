@@ -122,7 +122,7 @@ func TestDefaultManagedAppRuntimeResolverFallsBackToLegacyDefaultCatalog(t *test
 		t.Fatalf("fileSHA256AndSize() error = %v", err)
 	}
 	legacyCatalogJSON := `{
-  "schemaVersion": "tutti.app.runtimes.v2",
+  "schemaVersion": "nextop.app.runtimes.v2",
   "runtimes": {
     "` + appRuntimePlatformArch(runtime.GOOS, runtime.GOARCH) + `": {
       "version": "test",

@@ -177,11 +177,11 @@ func TestCatalogFallsBackToLegacyDefaultURL(t *testing.T) {
 		case "/nextop/catalog.json":
 			writer.Header().Set("Content-Type", "application/json")
 			_, _ = writer.Write([]byte(`{
-				"schemaVersion": "tutti.app.catalog.v1",
+				"schemaVersion": "nextop.app.catalog.v1",
 				"apps": [
 					{
 						"manifest": {
-							"schemaVersion": "tutti.app.manifest.v1",
+							"schemaVersion": "nextop.app.manifest.v1",
 							"appId": "legacy-fallback-tool",
 							"version": "1.2.3",
 							"name": "Legacy Fallback Tool",

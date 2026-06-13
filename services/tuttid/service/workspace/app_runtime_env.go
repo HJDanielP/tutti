@@ -21,6 +21,7 @@ const tuttiAppRuntimeRootEnv = "TUTTI_APP_RUNTIME_ROOT"
 const tuttiAppRuntimeCacheRootEnv = "TUTTI_APP_RUNTIME_CACHE_ROOT"
 const tuttiAppRuntimeCatalogEnv = "TUTTI_APP_RUNTIME_CATALOG"
 const appRuntimeCatalogSchemaVersion = "tutti.app.runtimes.v2"
+const legacyAppRuntimeCatalogSchemaVersion = "nextop.app.runtimes.v2"
 const appRuntimeBaselineProfile = "baseline"
 const defaultTuttiAppRuntimeCatalogURL = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-runtimes/catalog.json"
 const legacyDefaultAppRuntimeCatalogURL = "https://d1x7gb6wqsqmnm.cloudfront.net/nextop-app-runtimes/catalog.json"
@@ -165,7 +166,7 @@ func (r DefaultManagedAppRuntimeResolver) loadCatalog(ctx context.Context, sourc
 	if err := json.Unmarshal(data, &catalog); err != nil {
 		return appRuntimeCatalog{}, fmt.Errorf("parse managed app runtime catalog: %w", err)
 	}
-	if strings.TrimSpace(catalog.SchemaVersion) != appRuntimeCatalogSchemaVersion {
+	if !isSupportedAppRuntimeCatalogSchemaVersion(strings.TrimSpace(catalog.SchemaVersion)) {
 		return appRuntimeCatalog{}, fmt.Errorf("unsupported managed app runtime catalog schema version %q", catalog.SchemaVersion)
 	}
 	if len(catalog.Runtimes) == 0 {
@@ -177,6 +178,10 @@ func (r DefaultManagedAppRuntimeResolver) loadCatalog(ctx context.Context, sourc
 		}
 	}
 	return catalog, nil
+}
+
+func isSupportedAppRuntimeCatalogSchemaVersion(schemaVersion string) bool {
+	return schemaVersion == appRuntimeCatalogSchemaVersion || schemaVersion == legacyAppRuntimeCatalogSchemaVersion
 }
 
 func (r DefaultManagedAppRuntimeResolver) loadCatalogWithFallbacks(ctx context.Context, sources []string) (appRuntimeCatalog, error) {

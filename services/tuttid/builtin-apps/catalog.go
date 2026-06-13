@@ -43,13 +43,14 @@ type Distribution struct {
 }
 
 const (
-	remoteCatalogSchemaVersionV1  = "tutti.app.catalog.v1"
-	remoteCatalogFileEnv          = "TUTTI_APP_CATALOG_FILE"
-	remoteCatalogURLEnv           = "TUTTI_APP_CATALOG_URL"
-	defaultRemoteCatalogURL       = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases/catalog.json"
-	legacyDefaultRemoteCatalogURL = "https://d1x7gb6wqsqmnm.cloudfront.net/nextop-app-releases/catalog.json"
-	remoteCatalogFetchTimeout     = 10 * time.Second
-	remoteCatalogFetchAttempts    = 3
+	remoteCatalogSchemaVersionV1       = "tutti.app.catalog.v1"
+	legacyRemoteCatalogSchemaVersionV1 = "nextop.app.catalog.v1"
+	remoteCatalogFileEnv               = "TUTTI_APP_CATALOG_FILE"
+	remoteCatalogURLEnv                = "TUTTI_APP_CATALOG_URL"
+	defaultRemoteCatalogURL            = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases/catalog.json"
+	legacyDefaultRemoteCatalogURL      = "https://d1x7gb6wqsqmnm.cloudfront.net/nextop-app-releases/catalog.json"
+	remoteCatalogFetchTimeout          = 10 * time.Second
+	remoteCatalogFetchAttempts         = 3
 )
 
 type RemoteCatalogLoadStatus string
@@ -460,7 +461,7 @@ func parseRemoteCatalog(data []byte) ([]App, error) {
 	if err := json.Unmarshal(data, &document); err != nil {
 		return nil, fmt.Errorf("parse app catalog json: %w", err)
 	}
-	if strings.TrimSpace(document.SchemaVersion) != remoteCatalogSchemaVersionV1 {
+	if !isSupportedRemoteCatalogSchemaVersion(strings.TrimSpace(document.SchemaVersion)) {
 		return nil, fmt.Errorf("unsupported app catalog schema version %q", document.SchemaVersion)
 	}
 
@@ -486,6 +487,10 @@ func parseRemoteCatalog(data []byte) ([]App, error) {
 		})
 	}
 	return apps, nil
+}
+
+func isSupportedRemoteCatalogSchemaVersion(schemaVersion string) bool {
+	return schemaVersion == remoteCatalogSchemaVersionV1 || schemaVersion == legacyRemoteCatalogSchemaVersionV1
 }
 
 func parseRemoteDistribution(appID string, manifest workspacebiz.AppManifest, distribution remoteDistribution) (Distribution, error) {
