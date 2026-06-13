@@ -108,9 +108,9 @@ export interface WorkspaceUserProjectSelectProps {
   unlistedProjectLabel?: string;
 }
 
-const noProjectOptionValue = "__nextop_no_project__";
-const addProjectOptionValue = "__nextop_add_project__";
-const linkExistingProjectOptionValue = "__nextop_link_existing_project__";
+const noProjectOptionValue = "__tutti_no_project__";
+const addProjectOptionValue = "__tutti_add_project__";
+const linkExistingProjectOptionValue = "__tutti_link_existing_project__";
 const defaultWorkspaceUserProjectSelectI18n =
   createDefaultWorkspaceUserProjectI18nRuntime();
 const emptyWorkspaceUserProjectServiceSnapshot = proxy({

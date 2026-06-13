@@ -2553,7 +2553,7 @@ describe("AgentGUINode", () => {
   });
 
   it("renders queued workspace app mention icons in the bottom dock", () => {
-    const iconUrl = "nextop://workspace-apps/ai-media-canvas/icon.png";
+    const iconUrl = "tutti://workspace-apps/ai-media-canvas/icon.png";
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       activeConversation: {

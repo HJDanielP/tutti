@@ -190,7 +190,7 @@ function installMainWorldOpenInterception({
 
 function installWorkspaceAppMainWorldOpenInterception(): boolean {
   const scope = globalThis.window;
-  const patchKey = "__nextopWorkspaceAppWindowOpenPatched";
+  const patchKey = "__tuttiWorkspaceAppWindowOpenPatched";
   const globalScope = scope as Window & {
     [patchKey]?: boolean;
   };

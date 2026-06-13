@@ -13,7 +13,7 @@ export const issueManagerWorkbenchContributionFactory: DesktopWorkbenchContribut
         hostFilesApi: context.hostFilesApi,
         i18n: context.appI18n,
         eventStreamClient: context.eventStreamClient,
-        nextopdClient: context.nextopdClient,
+        tuttidClient: context.tuttidClient,
         platformApi: context.platformApi,
         reporterService: context.reporterService,
         richTextAtService: context.richTextAtService,

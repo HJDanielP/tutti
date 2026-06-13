@@ -281,8 +281,8 @@ const composerStyles = {
   slashDropdown: "overflow-hidden"
 };
 
-const workspaceReferenceSelectValue = "__nextop_workspace_reference_idle__";
-const workspaceReferenceOptionValue = "__nextop_workspace_reference_add__";
+const workspaceReferenceSelectValue = "__tutti_workspace_reference_idle__";
+const workspaceReferenceOptionValue = "__tutti_workspace_reference_add__";
 const composerPaletteZIndex = "var(--z-popover)";
 const SLASH_PALETTE_HEIGHT_PX = 280;
 const MENTION_PALETTE_MIN_HEIGHT_PX = 280;

@@ -1399,7 +1399,7 @@ test("controller actions share the selected issue and task through the clipboard
     shareAdapter: {
       async createIssueLink(input) {
         shareCalls.push(input);
-        return "nextop://workspace/workspace-1/issues/issue-1/tasks/task-1";
+        return "tutti://workspace/workspace-1/issues/issue-1/tasks/task-1";
       }
     }
   });
@@ -1415,7 +1415,7 @@ test("controller actions share the selected issue and task through the clipboard
   ]);
   assert.equal(
     copiedText,
-    "nextop://workspace/workspace-1/issues/issue-1/tasks/task-1"
+    "tutti://workspace/workspace-1/issues/issue-1/tasks/task-1"
   );
   assert.deepEqual(analyticsEvents, []);
   assert.equal(harness.notificationState.current, null);

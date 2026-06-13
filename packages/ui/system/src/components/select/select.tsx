@@ -101,7 +101,7 @@ function SelectContent({
           <SelectPrimitive.Viewport
             data-position={position}
             className={cn(
-              "flex flex-col gap-0.5 data-[position=popper]:w-full data-[position=popper]:[min-width:var(--nextop-select-content-min-width,var(--radix-select-trigger-width))]"
+              "flex flex-col gap-0.5 data-[position=popper]:w-full data-[position=popper]:[min-width:var(--tutti-select-content-min-width,var(--radix-select-trigger-width))]"
             )}
           >
             {children}

@@ -1,13 +1,13 @@
 # Desktop Visual Language
 
-This document defines the intended visual language for `nextop` desktop renderer surfaces.
+This document defines the intended visual language for `tutti` desktop renderer surfaces.
 
 It captures durable design rules for a disciplined desktop workbench language,
-adapted to `nextop`'s lighter current product shell.
+adapted to `tutti`'s lighter current product shell.
 
 ## Purpose
 
-`nextop` should not feel like a marketing site stitched together from pretty cards.
+`tutti` should not feel like a marketing site stitched together from pretty cards.
 
 It should feel like:
 
@@ -32,11 +32,11 @@ What should not be copied directly:
 
 - a brand-specific dark palette
 - another product's naming or token vocabulary
-- heavy adaptation of a deep-dark shell into places where `nextop` should stay lighter and calmer
+- heavy adaptation of a deep-dark shell into places where `tutti` should stay lighter and calmer
 
 ## Core Posture
 
-The desired `nextop` posture is:
+The desired `tutti` posture is:
 
 - `launcher`: light, breathable, welcoming, slightly editorial
 - `workspace`: sober, structured, workbench-like
@@ -71,7 +71,7 @@ If multiple elements on a screen are all trying to feel "featured", the hierarch
 
 ## Color Strategy
 
-`nextop` should remain light-first for now, but it should keep strong
+`tutti` should remain light-first for now, but it should keep strong
 discipline around color roles.
 
 Guidelines:

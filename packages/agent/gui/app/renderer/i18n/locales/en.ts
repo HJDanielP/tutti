@@ -213,9 +213,9 @@ export const en = {
     loginTitle: "Sign in to continue",
     loginSectionTitle: "Continue with your account",
     loginDescription:
-      "Choose a provider, complete login in the browser, then return to Nextop.",
+      "Choose a provider, complete login in the browser, then return to Tutti.",
     loginBrowserHint:
-      "Choose a provider, complete login in the browser, then return to Nextop.",
+      "Choose a provider, complete login in the browser, then return to Tutti.",
     loginOpeningBrowser: "Opening Browser...",
     loginContinueWithGoogle: "Continue With Google",
     loginContinueWithGitHub: "Continue With GitHub",
@@ -248,14 +248,14 @@ export const en = {
     emailRequired: "Email is required.",
     emailCodeRequired: "Verification code is required.",
     desktopAuthBridgeStale:
-      "Desktop auth bridge is out of date. Restart Nextop and try again.",
+      "Desktop auth bridge is out of date. Restart Tutti and try again.",
     desktopActionErrorGeneric: "Something went wrong. Please try again.",
     desktopActionErrorGenericShort: "Something went wrong",
     desktopActionErrorUnavailable: "This feature is unavailable.",
     desktopActionErrorLoginTimedOut:
-      "Login timed out. Return to Nextop and try again.",
+      "Login timed out. Return to Tutti and try again.",
     desktopActionErrorDesktopApiUnavailable:
-      "Desktop service is still updating. Restart Nextop and try again.",
+      "Desktop service is still updating. Restart Tutti and try again.",
     desktopActionErrorPackageDownloadInterrupted:
       "The agent package download was interrupted. Check your network connection and retry.",
     desktopActionErrorPackageDownloadHTTPStatus:
@@ -264,7 +264,7 @@ export const en = {
       "The downloaded package failed integrity checks. Retry the download.",
     desktopActionErrorPackageDownloadDisk:
       "Unable to write the package cache. Check disk permissions and free space.",
-    productNameCanvas: "Nextop",
+    productNameCanvas: "Tutti",
     applications: {
       eyebrow: "Agent OS apps",
       title: "Applications",
@@ -825,7 +825,7 @@ export const en = {
         requirementStayInWorkspace:
           "1. Work under {{workspaceRoot}}; do not switch to unrelated directories.",
         requirementSummaryOutput:
-          "2. Unless the user specifies another location, write at least docs/nextop/issue_summary_{{issueId}}.md with the result, changes, and conclusion.",
+          "2. Unless the user specifies another location, write at least docs/tutti/issue_summary_{{issueId}}.md with the result, changes, and conclusion.",
         taskContentLabel: "Task content",
         taskTitleLabel: "Task title"
       },
@@ -1033,11 +1033,11 @@ export const en = {
     workspaceParticipantsOverflowAria: "More workspace participants",
     workspaceXagentsCollab: "xagents collaboration",
     workspaceThemeHint: "Theme & appearance",
-    loadingNextop: "Loading Nextop…",
+    loadingTutti: "Loading Tutti…",
     runtimeArtifactStatus: {
       startupTitle: "Preparing the workspace runtime",
       startupDescription:
-        "Nextop is preparing the local workspace runtime before login or workspace entry. This one-time setup may take a few minutes on the first launch.",
+        "Tutti is preparing the local workspace runtime before login or workspace entry. This one-time setup may take a few minutes on the first launch.",
       startupProgressHint:
         "Checking local runtime files and preparing downloads.",
       downloadedOfTotal: "{{downloaded}} of {{total}}",
@@ -1578,7 +1578,7 @@ export const en = {
       requesterFallback: "User",
       agentCodex: "Codex",
       agentClaudeCode: "Claude Code",
-      agentNextop: "Nextop",
+      agentTutti: "Tutti",
       agentHermes: "Hermes",
       agentGemini: "Gemini",
       agentOpenClaw: "OpenClaw",
@@ -1765,7 +1765,7 @@ export const en = {
         agentNotSynced: "Local settings found. Sync now?"
       },
       manageAgentsGuideLead:
-        "Syncing or removing only affects Nextop; agents on your computer are unchanged.",
+        "Syncing or removing only affects Tutti; agents on your computer are unchanged.",
       manageAgentsColumnAgent: "Agent",
       manageAgentsColumnRun: "Runs in",
       manageAgentsColumnInstallStatus: "Status",
@@ -1783,8 +1783,8 @@ export const en = {
       manageAgentActionUninstalling: "Removing...",
       manageAgentActionUninstallWaiting: "Waiting...",
       manageAgentUninstallConfirm:
-        "This only removes {{name}} from Nextop. Apps, sign-in, and settings outside Nextop are not changed.",
-      manageAgentCellRunsLocal: "Nextop local",
+        "This only removes {{name}} from Tutti. Apps, sign-in, and settings outside Tutti are not changed.",
+      manageAgentCellRunsLocal: "Tutti local",
       manageAgentCellInstalled: "Synced",
       manageAgentCellNotInstalled: "Not synced",
       manageAgentUninstallWaiting: "Waiting to remove",
@@ -1796,17 +1796,16 @@ export const en = {
       manageAgentDownloadInstalling: "Installing",
       manageAgentConfigWillUse: "Local settings found",
       manageAgentConfigWillSyncFrom:
-        "After sync, Nextop will use {{agent}} settings from {{device}}",
+        "After sync, Tutti will use {{agent}} settings from {{device}}",
       manageAgentConfigSynced: "Synced · {{time}}",
       manageAgentConfigSyncedNoTime: "Synced",
-      manageAgentConfigSyncedFrom:
-        "Synced from {{device}} to Nextop · {{time}}",
-      manageAgentConfigSyncedFromNoTime: "Synced from {{device}} to Nextop",
+      manageAgentConfigSyncedFrom: "Synced from {{device}} to Tutti · {{time}}",
+      manageAgentConfigSyncedFromNoTime: "Synced from {{device}} to Tutti",
       manageAgentConfigNone: "No settings",
       manageAgentConfigNotDetected: "No local settings found",
       manageAgentMissingHostConfigTooltip:
         "{{agent}} depends on your local installation. Finish local setup before syncing.",
-      manageAgentNextopDefaultConfig: "Nextop default settings",
+      manageAgentTuttiDefaultConfig: "Tutti default settings",
       manageAgentHostDeviceFallback: "this computer",
       manageAgentSyncTimeJustNow: "just now",
       manageAgentSyncTimeMinutesAgo: "{{count}} minutes ago",
@@ -1814,7 +1813,7 @@ export const en = {
       manageAgentSyncTimeDaysAgo: "{{count}} days ago",
       manageAgentsOpenclawHint:
         "To use OpenClaw in rooms, sync OpenClaw from Manage Agents.",
-      kicker: "Nextop · Desktop",
+      kicker: "Tutti · Desktop",
       promoBadge:
         "You currently have {{count}} available agents, you can use them inside rooms.",
       promoBadgeNavigateAria:
@@ -1831,7 +1830,7 @@ export const en = {
         "The update package is downloading in the background.",
       updateCardDownloadedTitle: "Update is ready to install",
       updateCardDownloadedDetail:
-        "Restart Nextop to finish installing version {{version}}.",
+        "Restart Tutti to finish installing version {{version}}.",
       updateCardDownloadAction: "Download Update",
       updateCardInstallAction: "Restart and Install",
       sectionSpacesTitle: "Rooms",
@@ -1893,10 +1892,10 @@ export const en = {
       sectionMoreComingSoonHint: "Coming soon",
       betaGateCheckingTitle: "Checking beta access",
       betaGateCheckingBody:
-        "We are confirming whether this account already has access to Nextop beta.",
+        "We are confirming whether this account already has access to Tutti beta.",
       betaGateBlockedTitle: "This account does not have beta access yet",
       betaGateBlockedBody:
-        "Enter your invite code to unlock the Nextop desktop beta.",
+        "Enter your invite code to unlock the Tutti desktop beta.",
       betaGateInviteCodeLabel: "Invite code",
       betaGateInviteCodePlaceholder: "Enter invite code",
       betaGateInviteCodeRequired: "Enter an invite code before continuing.",
@@ -2225,7 +2224,7 @@ export const en = {
       openclaw: "OpenClaw",
       claudeCode: "Claude",
       codex: "Codex",
-      nexightAgent: "Nextop Agent"
+      nexightAgent: "Tutti Agent"
     },
     dockPopupAgentAvailabilitySectionAria: "Availability status for {{name}}",
     nodeDockContextNew: {

@@ -1,7 +1,7 @@
 import type {
-  NextopdClient,
-  NextopdEventStreamClient
-} from "@tutti-os/client-nextopd-ts";
+  TuttidClient,
+  TuttidEventStreamClient
+} from "@tutti-os/client-tuttid-ts";
 import type {
   IssueManagerAgentProviderOptionsAdapter,
   IssueManagerFileReference
@@ -30,11 +30,11 @@ export function createDesktopIssueManagerFeature(input: {
   agentProviderOptions?: IssueManagerAgentProviderOptionsAdapter;
   hostFilesApi: DesktopHostFilesApi;
   i18n: I18nRuntime<string>;
-  eventStreamClient?: NextopdEventStreamClient;
+  eventStreamClient?: TuttidEventStreamClient;
   launchAgentGui?: (
     input: DesktopIssueManagerAgentGuiLaunchInput
   ) => Promise<void> | void;
-  nextopdClient: NextopdClient;
+  tuttidClient: TuttidClient;
   openWorkspaceFileManager?: (
     reference: IssueManagerFileReference
   ) => Promise<boolean> | boolean;
@@ -45,7 +45,7 @@ export function createDesktopIssueManagerFeature(input: {
 }) {
   const fileAdapter = createDesktopIssueManagerFileAdapter({
     hostFilesApi: input.hostFilesApi,
-    nextopdClient: input.nextopdClient,
+    tuttidClient: input.tuttidClient,
     openWorkspaceFileManager: input.openWorkspaceFileManager,
     workspaceId: input.workspaceId
   });
@@ -77,7 +77,7 @@ export function createDesktopIssueManagerFeature(input: {
             })
         }
       : undefined,
-    backend: createDesktopIssueManagerBackend(input.nextopdClient),
+    backend: createDesktopIssueManagerBackend(input.tuttidClient),
     eventSource: input.eventStreamClient
       ? createDesktopIssueManagerEventSource(input.eventStreamClient)
       : undefined,

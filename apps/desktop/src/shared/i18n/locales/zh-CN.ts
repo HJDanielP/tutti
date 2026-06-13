@@ -28,7 +28,7 @@ export const zhCN = {
     createWorkspace: "创建工作区",
     creatingWorkspace: "正在创建...",
     desktopFirstWorkflowDescription:
-      "Renderer 状态保持为展示层，工作区生命周期仍通过 preload 和 nextopd 流转。",
+      "Renderer 状态保持为展示层，工作区生命周期仍通过 preload 和 tuttid 流转。",
     desktopFirstWorkflowTitle: "桌面优先工作流",
     emptyDescription: "创建一个工作区后，Tutti 会立即打开工作区窗口。",
     emptyTitle: "还没有工作区",
@@ -166,7 +166,7 @@ export const zhCN = {
       lastOpenedDescription: "这个工作区上次被恢复或打开的时间。",
       lastOpenedLabel: "上次打开",
       rendererRoleDescription:
-        "桌面 UI 保持为展示层，durable state 仍由 nextopd 持有。",
+        "桌面 UI 保持为展示层，durable state 仍由 tuttid 持有。",
       rendererRoleLabel: "Renderer 角色",
       rendererRoleValue: "UI 外壳"
     },
@@ -278,7 +278,7 @@ export const zhCN = {
           deleteSucceeded: "托管 provider 已删除。",
           addModel: "添加",
           description:
-            "在 Nextop 中保存 provider 凭证，并允许工作区应用申请短期访问。",
+            "在 Tutti 中保存 provider 凭证，并允许工作区应用申请短期访问。",
           detectModels: "检测模型",
           detectingModels: "检测中...",
           detectModelsEmpty: "这个 provider 没有返回可用模型。",
@@ -286,7 +286,7 @@ export const zhCN = {
           detectModelsSucceeded: "已检测到 provider 模型。",
           enabled: "启用 {{provider}}",
           hideApiKey: "隐藏 API key",
-          keyConfigured: "API key 已保存在 Nextop",
+          keyConfigured: "API key 已保存在 Tutti",
           keyMissing: "尚未配置 API key",
           keepExistingKey: "留空则继续使用已保存的 key",
           loadFailed: "暂时无法加载托管模型 provider。",

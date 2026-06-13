@@ -237,8 +237,8 @@ function resolveUserDocumentsProjectPath(input: {
 
   const documentsPath = path.resolve(documentsPathInput);
   const projectName = normalizeProjectDirectoryName(input.name);
-  const nextopProjectsPath = path.resolve(documentsPath, "nextop");
-  const targetPath = path.resolve(nextopProjectsPath, projectName);
+  const tuttiProjectsPath = path.resolve(documentsPath, "tutti");
+  const targetPath = path.resolve(tuttiProjectsPath, projectName);
   if (!isPathWithinRoot(documentsPath, targetPath)) {
     throw createProjectNameInvalidError();
   }

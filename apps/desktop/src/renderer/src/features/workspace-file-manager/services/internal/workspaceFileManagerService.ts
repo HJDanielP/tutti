@@ -12,7 +12,7 @@ import type {
   WorkspaceFileManagerCanvasPreviewLauncher,
   WorkspaceFileManagerSession
 } from "../workspaceFileManagerService.interface";
-import type { NextopdClient } from "@tutti-os/client-nextopd-ts";
+import type { TuttidClient } from "@tutti-os/client-tuttid-ts";
 import {
   INotificationService,
   type NotificationService
@@ -26,7 +26,7 @@ import type { IReporterService } from "../../../analytics/services/reporterServi
 
 export interface WorkspaceFileManagerServiceDependencies {
   hostFilesApi: DesktopHostFilesApi;
-  nextopdClient: NextopdClient;
+  tuttidClient: TuttidClient;
   platformApi: Pick<
     DesktopPlatformApi,
     "homeDirectory" | "os" | "resolveDroppedPaths"

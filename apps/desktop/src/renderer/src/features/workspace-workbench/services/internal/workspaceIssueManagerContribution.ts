@@ -2,10 +2,10 @@ import { createElement } from "react";
 import { agentGuiDockIconUrls } from "@tutti-os/agent-gui";
 import type {
   AgentProviderStatus,
-  NextopdClient,
-  NextopdEventStreamClient,
+  TuttidClient,
+  TuttidEventStreamClient,
   WorkspaceAgentProvider
-} from "@tutti-os/client-nextopd-ts";
+} from "@tutti-os/client-tuttid-ts";
 import type { I18nRuntime } from "@tutti-os/ui-i18n-runtime";
 import issueManagerDockIconUrl from "@tutti-os/workspace-issue-manager/assets/workspace-dock-task.png";
 import {
@@ -51,8 +51,8 @@ export function createWorkspaceIssueManagerContribution(input: {
   dockIconUrl?: string;
   hostFilesApi: DesktopHostFilesApi;
   i18n: I18nRuntime<string>;
-  eventStreamClient?: NextopdEventStreamClient;
-  nextopdClient: NextopdClient;
+  eventStreamClient?: TuttidEventStreamClient;
+  tuttidClient: TuttidClient;
   platformApi: Pick<
     DesktopPlatformApi,
     "homeDirectory" | "os" | "resolveDroppedPaths"
@@ -66,7 +66,7 @@ export function createWorkspaceIssueManagerContribution(input: {
 }): WorkbenchContribution {
   const agentHostApi = createDesktopAgentHostApi({
     hostFilesApi: input.hostFilesApi,
-    nextopdClient: input.nextopdClient,
+    tuttidClient: input.tuttidClient,
     platformApi: input.platformApi,
     reporterService: input.reporterService,
     runtimeApi: input.runtimeApi,
@@ -95,7 +95,7 @@ export function createWorkspaceIssueManagerContribution(input: {
         provider: normalizeDesktopAgentGUIProvider(request.provider)
       });
     },
-    nextopdClient: input.nextopdClient,
+    tuttidClient: input.tuttidClient,
     openWorkspaceFileManager: async (reference) =>
       requestWorkspaceFilesLaunch({
         homeDirectory: input.platformApi.homeDirectory,

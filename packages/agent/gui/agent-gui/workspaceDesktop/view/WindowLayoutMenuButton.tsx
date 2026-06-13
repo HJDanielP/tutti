@@ -152,7 +152,7 @@ export function WindowLayoutMenuButton({
       <DropdownMenuContent
         align="end"
         sideOffset={10}
-        className="t-dropdown is-open relative min-w-[160px] rounded-[var(--nextop-radius-xl)] border border-hairline bg-background-fronted p-0 text-foreground shadow-[var(--tsh-shell-shadow)]"
+        className="t-dropdown is-open relative min-w-[160px] rounded-[var(--tutti-radius-xl)] border border-hairline bg-background-fronted p-0 text-foreground shadow-[var(--tsh-shell-shadow)]"
         data-origin="top-right"
         data-testid="window-layout-menu"
       >

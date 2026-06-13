@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { NextopdClient } from "@tutti-os/client-nextopd-ts";
+import type { TuttidClient } from "@tutti-os/client-tuttid-ts";
 import type { ReporterEventInput } from "../../../analytics/services/reporterService.interface.ts";
 import type {
   WorkspaceAppCenterApp,
@@ -637,7 +637,7 @@ test("WorkspaceAppCenterService consumes operation errors once", async () => {
       }
     }),
     hostFilesApi: createHostFilesApi({
-      selectAppArchive: async () => "/tmp/app.nextopapp"
+      selectAppArchive: async () => "/tmp/app.tuttiapp"
     }),
     hostWorkspaceApi: createHostWorkspaceApi()
   });
@@ -673,7 +673,7 @@ test("WorkspaceAppCenterService tracks import failure and catalog refresh result
         })
     }),
     hostFilesApi: createHostFilesApi({
-      selectAppArchive: async () => "/tmp/app.nextopapp"
+      selectAppArchive: async () => "/tmp/app.tuttiapp"
     }),
     hostWorkspaceApi: createHostWorkspaceApi(),
     reporterNow: () => 1749124800000,
@@ -798,7 +798,7 @@ test("WorkspaceAppCenterService normalizes provider configuration", async () => 
     gateway: createGateway(),
     hostFilesApi: createHostFilesApi(),
     hostWorkspaceApi: createHostWorkspaceApi(),
-    nextopdClient: createNextopdClient({
+    tuttidClient: createTuttidClient({
       async getAgentProviderComposerOptions(provider) {
         assert.equal(provider, "codex");
         return {
@@ -877,7 +877,7 @@ test("WorkspaceAppCenterService makes effective permission default visible", asy
     gateway: createGateway(),
     hostFilesApi: createHostFilesApi(),
     hostWorkspaceApi: createHostWorkspaceApi(),
-    nextopdClient: createNextopdClient({
+    tuttidClient: createTuttidClient({
       async getAgentProviderComposerOptions(provider) {
         return {
           effectiveSettings: {
@@ -1012,7 +1012,7 @@ function createGateway(
     async exportWorkspaceApp() {
       return {
         appId: "app-1",
-        archivePath: "/tmp/app.nextopapp",
+        archivePath: "/tmp/app.tuttiapp",
         artifactSha256: "sha",
         artifactSizeBytes: 1,
         version: "1.0.0",
@@ -1154,11 +1154,9 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   assert.equal(predicate(), true);
 }
 
-function createNextopdClient(
-  overrides: Partial<
-    Pick<NextopdClient, "getAgentProviderComposerOptions">
-  > = {}
-): Pick<NextopdClient, "getAgentProviderComposerOptions"> {
+function createTuttidClient(
+  overrides: Partial<Pick<TuttidClient, "getAgentProviderComposerOptions">> = {}
+): Pick<TuttidClient, "getAgentProviderComposerOptions"> {
   return {
     async getAgentProviderComposerOptions(provider) {
       return {

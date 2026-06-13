@@ -2,51 +2,51 @@
 
 Workspace App Center can show built-in apps from two sources:
 
-- embedded app packages committed in `services/nextopd/builtin-apps`
+- embedded app packages committed in `services/tuttid/builtin-apps`
 - remote built-in app packages listed by a JSON catalog
 
 Remote built-in apps are optional. App Center can show their name, description, and icon before the package is downloaded. The package zip is downloaded only when the user installs the app.
 
 ## Runtime Overrides
 
-`NEXTOP_APP_CATALOG_FILE` points nextopd at a local catalog JSON file and has priority over `NEXTOP_APP_CATALOG_URL`.
+`TUTTI_APP_CATALOG_FILE` points tuttid at a local catalog JSON file and has priority over `TUTTI_APP_CATALOG_URL`.
 
-When `NEXTOP_APP_CATALOG_URL` is unset, nextopd loads the default published catalog:
+When `TUTTI_APP_CATALOG_URL` is unset, tuttid loads the default published catalog:
 
 ```text
-https://d1x7gb6wqsqmnm.cloudfront.net/nextop-app-releases/catalog.json
+https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases/catalog.json
 ```
 
 Staging releases use a separate catalog and must not write production
 `latest.json` objects:
 
 ```text
-https://d1x7gb6wqsqmnm.cloudfront.net/nextop-app-releases-staging/catalog.json
+https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases-staging/catalog.json
 ```
 
-`NEXTOP_APP_CATALOG_URL` points nextopd at a public HTTP(S) catalog JSON file, usually served through CloudFront or S3. Set it to an empty string to disable the default remote catalog.
+`TUTTI_APP_CATALOG_URL` points tuttid at a public HTTP(S) catalog JSON file, usually served through CloudFront or S3. Set it to an empty string to disable the default remote catalog.
 
 Example local mock:
 
 ```sh
-NEXTOP_APP_CATALOG_FILE=/tmp/nextop-app-catalog/catalog.json pnpm dev:desktop
+TUTTI_APP_CATALOG_FILE=/tmp/tutti-app-catalog/catalog.json pnpm dev:desktop
 ```
 
 ## Refresh Behavior
 
-`nextopd` is the source of truth for remote catalog retrieval, manifest validation, artifact URLs, and artifact SHA-256 values. Renderer code should ask `nextopd` to refresh the catalog instead of fetching the CDN catalog directly.
+`tuttid` is the source of truth for remote catalog retrieval, manifest validation, artifact URLs, and artifact SHA-256 values. Renderer code should ask `tuttid` to refresh the catalog instead of fetching the CDN catalog directly.
 
-App Center opening should call `POST /v1/workspaces/{workspaceID}/apps/catalog/refresh`. The refresh request is in-flight deduplicated by `nextopd`, keeps local and previously loaded apps visible while loading, and retries retryable network or 5xx failures for a total of three attempts.
+App Center opening should call `POST /v1/workspaces/{workspaceID}/apps/catalog/refresh`. The refresh request is in-flight deduplicated by `tuttid`, keeps local and previously loaded apps visible while loading, and retries retryable network or 5xx failures for a total of three attempts.
 
 ## Catalog Shape
 
 ```json
 {
-  "schemaVersion": "nextop.app.catalog.v1",
+  "schemaVersion": "tutti.app.catalog.v1",
   "apps": [
     {
       "manifest": {
-        "schemaVersion": "nextop.app.manifest.v1",
+        "schemaVersion": "tutti.app.manifest.v1",
         "appId": "vibe-design",
         "version": "0.1.0+abc123",
         "name": "Vibe Design",
@@ -71,13 +71,13 @@ App Center opening should call `POST /v1/workspaces/{workspaceID}/apps/catalog/r
 }
 ```
 
-Remote catalog entries must include `distribution.iconUrl`, `distribution.artifactUrl`, `distribution.artifactSha256`, and a manifest icon asset. The zip package must contain a complete app package with `nextop.app.json`, `bootstrap.sh`, `AGENTS.md`, and the manifest icon asset.
+Remote catalog entries must include `distribution.iconUrl`, `distribution.artifactUrl`, `distribution.artifactSha256`, and a manifest icon asset. The zip package must contain a complete app package with `tutti.app.json`, `bootstrap.sh`, `AGENTS.md`, and the manifest icon asset.
 
 Workspace app packages do not declare runtime kind or bundle Python/Node. Managed runtime release and download rules belong to [Workspace App Runtime](./workspace-app-runtime.md).
 
 ## Release Flow
 
-External app repositories should call `.github/workflows/publish-nextop-app-release.yml` from this repository. The reusable workflow:
+External app repositories should call `.github/workflows/publish-tutti-app-release.yml` from this repository. The reusable workflow:
 
 1. Checks out the app repository.
 2. Serializes releases per app and branch.
@@ -92,17 +92,17 @@ External app repositories should call `.github/workflows/publish-nextop-app-rele
    enabled.
 
 External repositories that use automatic bumping must commit a source manifest
-at `version_manifest_path`, which defaults to root `nextop.app.json`. That
+at `version_manifest_path`, which defaults to root `tutti.app.json`. That
 manifest is the only source of automatic release version state. Do not derive
 automatic release versions from mutable S3 metadata, package build output,
 `package.json`, or git tags. App package scripts must copy or render the package
 manifest from the source manifest named by `version_manifest_path` so the
 released package contains the bumped version. This also applies in monorepos:
 the app package's `package.json` may have a separate package version and must
-not overwrite `nextop.app.json.version`.
+not overwrite `tutti.app.json.version`.
 
 Caller repositories should test this contract directly. After running the
-package command, `package_dir/nextop.app.json` must have the same `version` as
+package command, `package_dir/tutti.app.json` must have the same `version` as
 `version_manifest_path`. A mismatch is a release blocker because the reusable
 workflow resolves the uploaded release version from the generated package
 manifest.
@@ -146,7 +146,7 @@ apps/<appId>/<version>/
 apps/<appId>/latest.json
 ```
 
-The Tutti repository owns `.github/workflows/publish-nextop-app-catalog.yml`.
+The Tutti repository owns `.github/workflows/publish-tutti-app-catalog.yml`.
 That workflow reads selected `apps/<appId>/latest.json` files from S3 and
 publishes one shared `catalog.json`. It defaults to merge mode, which preserves
 existing catalog apps and updates only selected app ids. Replace mode publishes
@@ -178,15 +178,15 @@ published `apps/*/latest.json`.
 Production and staging release metadata must stay on separate S3 prefixes:
 
 ```text
-nextop-app-releases/apps/<appId>/latest.json
-nextop-app-releases/catalog.json
+tutti-app-releases/apps/<appId>/latest.json
+tutti-app-releases/catalog.json
 
-nextop-app-releases-staging/apps/<appId>/latest.json
-nextop-app-releases-staging/catalog.json
+tutti-app-releases-staging/apps/<appId>/latest.json
+tutti-app-releases-staging/catalog.json
 ```
 
-Use `.github/workflows/publish-nextop-app-catalog-staging.yml` to publish a
-staging catalog. Use `.github/workflows/publish-nextop-app-catalog.yml` to
+Use `.github/workflows/publish-tutti-app-catalog-staging.yml` to publish a
+staging catalog. Use `.github/workflows/publish-tutti-app-catalog.yml` to
 publish the production catalog. Production catalog publishing must read only
 production release metadata; staging catalog publishing must read only staging
 release metadata. In merge mode, an empty app id input refreshes the existing

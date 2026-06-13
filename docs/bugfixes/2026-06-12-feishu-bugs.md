@@ -8,9 +8,9 @@
 - Fix: Added `inProgress` to the OpenAPI/generated contracts and mapped backend counts through to the issue-manager shell.
 - Verification:
   - `node --test --experimental-strip-types packages/workspace/issue-manager/src/ui/internal/shell/IssueManagerShellState.test.ts`
-  - `go test ./services/nextopd/api/workspace -run TestGeneratedIssueManagerStatusCountsFromDomainIncludesInProgress -count=1`
-  - `pnpm --filter @nextop-os/workspace-issue-manager typecheck`
-  - `go test ./services/nextopd/api/workspace`
+  - `go test ./services/tuttid/api/workspace -run TestGeneratedIssueManagerStatusCountsFromDomainIncludesInProgress -count=1`
+  - `pnpm --filter @tutti-os/workspace-issue-manager typecheck`
+  - `go test ./services/tuttid/api/workspace`
 - Status: fixed
 - Commit: `790a6b3b`
 
@@ -35,7 +35,7 @@
 - Fix: Added file and arrow icons, explicit open label, title, and aria affordances to output rows.
 - Verification:
   - `node --test --experimental-strip-types packages/workspace/issue-manager/src/ui/internal/issue/IssueManagerIssueSections.test.ts`
-  - `pnpm --filter @nextop-os/workspace-issue-manager typecheck`
+  - `pnpm --filter @tutti-os/workspace-issue-manager typecheck`
 - Status: fixed
 - Commit: `e729fee3`
 
@@ -66,6 +66,6 @@
   - `node --test --experimental-strip-types packages/browser/workbench-node/src/electron-main/electronMain.test.ts --test-name-pattern 'blocks cross-origin|converts guest preload open-url|registerBrowserNodeElectronMain routes guest open-url'`
   - `node --test --experimental-strip-types apps/desktop/src/main/ipc/workspaceAppWindowOpen.test.ts`
   - `node --test --experimental-strip-types apps/desktop/src/renderer/src/features/workspace-workbench/services/internal/workspaceBrowserService.test.ts apps/desktop/src/renderer/src/features/workspace-workbench/services/internal/contributions/appCenterWorkbenchContributionFactory.test.ts`
-  - `pnpm --filter @nextop-os/browser-node test`
+  - `pnpm --filter @tutti-os/browser-node test`
 - Status: fixed
 - Commit: `a8d486a2`

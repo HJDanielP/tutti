@@ -1494,15 +1494,15 @@
       "storyboard": true
     },
     {
-      "id": "nextop-mark-filled-icon",
+      "id": "tutti-mark-filled-icon",
       "layer": "base",
-      "name": "NextopMark",
-      "export": "NextopMark",
+      "name": "TuttiMark",
+      "export": "TuttiMark",
       "from": "@tutti-os/ui-system/icons",
       "category": "icon",
       "status": "stable",
-      "source": "src/icons/nextop-mark.tsx",
-      "description": "Nextop brand mark SVG icon.",
+      "source": "src/icons/tutti-mark.tsx",
+      "description": "Tutti brand mark SVG icon.",
       "useCases": ["Brand marks", "Application identity"],
       "migrationHints": [],
       "iconVariant": "filled"

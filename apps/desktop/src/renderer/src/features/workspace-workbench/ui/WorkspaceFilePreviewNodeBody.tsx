@@ -10,7 +10,7 @@ import { FileTextIcon, ImageFileIcon, LoadingIcon } from "@tutti-os/ui-system";
 import type { WorkspaceFileActivationTarget } from "@tutti-os/workspace-file-manager/services";
 import { WorkspaceFilePreviewSurface } from "@tutti-os/workspace-file-preview/react";
 import type { WorkbenchHostNodeBodyContext } from "@tutti-os/workbench-surface";
-import type { NextopdClient } from "@tutti-os/client-nextopd-ts";
+import type { TuttidClient } from "@tutti-os/client-tuttid-ts";
 import type { I18nRuntime } from "@tutti-os/ui-i18n-runtime";
 import type { WorkspaceWorkbenchDesktopI18nRuntime } from "@shared/i18n";
 import {
@@ -32,15 +32,15 @@ export function WorkspaceFilePreviewNodeBody({
   appI18n,
   context,
   i18n,
-  nextopdClient,
+  tuttidClient,
   saveRequestSource,
   workspaceID
 }: {
   appI18n: I18nRuntime<string>;
   context: WorkbenchHostNodeBodyContext;
   i18n: WorkspaceWorkbenchDesktopI18nRuntime;
-  nextopdClient: Pick<
-    NextopdClient,
+  tuttidClient: Pick<
+    TuttidClient,
     "readWorkspaceFilePreview" | "writeWorkspaceFileText"
   >;
   saveRequestSource: WorkspaceFilePreviewSaveRequestSource;
@@ -74,7 +74,7 @@ export function WorkspaceFilePreviewNodeBody({
         appI18n,
         i18n,
         initialFile: activeFile,
-        nextopdClient,
+        tuttidClient,
         onRuntimeStateChange: setNodeRuntimeState,
         onSnapshotStateChange: setSnapshotNodeState,
         workspaceID
@@ -82,7 +82,7 @@ export function WorkspaceFilePreviewNodeBody({
     [
       appI18n,
       i18n,
-      nextopdClient,
+      tuttidClient,
       setNodeRuntimeState,
       setSnapshotNodeState,
       workspaceID

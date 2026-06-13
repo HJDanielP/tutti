@@ -26,7 +26,7 @@ export const en = {
     createWorkspace: "Create workspace",
     creatingWorkspace: "Creating...",
     desktopFirstWorkflowDescription:
-      "Renderer state stays presentation-only. Workspace lifecycle still flows through preload and nextopd.",
+      "Renderer state stays presentation-only. Workspace lifecycle still flows through preload and tuttid.",
     desktopFirstWorkflowTitle: "Desktop-first workflow",
     emptyDescription: "Create a workspace and Tutti will open it right away.",
     emptyTitle: "No workspaces yet",
@@ -168,7 +168,7 @@ export const en = {
       lastOpenedDescription: "Last time this workspace was restored or opened.",
       lastOpenedLabel: "Last opened",
       rendererRoleDescription:
-        "Desktop UI remains presentation-only while nextopd owns durable state.",
+        "Desktop UI remains presentation-only while tuttid owns durable state.",
       rendererRoleLabel: "Renderer role",
       rendererRoleValue: "UI shell"
     },
@@ -291,7 +291,7 @@ export const en = {
           deleteSucceeded: "Managed provider deleted.",
           addModel: "Add",
           description:
-            "Store provider credentials in Nextop and let workspace apps request short-lived access.",
+            "Store provider credentials in Tutti and let workspace apps request short-lived access.",
           detectModels: "Detect models",
           detectingModels: "Detecting...",
           detectModelsEmpty: "No models were found for that provider.",
@@ -299,7 +299,7 @@ export const en = {
           detectModelsSucceeded: "Provider models detected.",
           enabled: "Enable {{provider}}",
           hideApiKey: "Hide API key",
-          keyConfigured: "API key saved in Nextop",
+          keyConfigured: "API key saved in Tutti",
           keyMissing: "API key not configured",
           keepExistingKey: "Leave blank to keep the saved key",
           loadFailed: "We couldn't load managed model providers.",

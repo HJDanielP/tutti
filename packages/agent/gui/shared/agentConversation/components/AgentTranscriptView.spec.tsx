@@ -174,7 +174,7 @@ describe("AgentTranscriptView", () => {
     const dividers = screen.getAllByTestId("agent-transcript-turn-divider");
     expect(dividers).toHaveLength(1);
     expect(dividers[0]!.className).toContain(
-      "bg-[var(--line-2,var(--nextop-line-2))]"
+      "bg-[var(--line-2,var(--tutti-line-2))]"
     );
   });
 

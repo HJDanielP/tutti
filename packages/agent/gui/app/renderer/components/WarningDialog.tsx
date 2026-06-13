@@ -53,12 +53,12 @@ export function WarningDialog({
     <Dialog open>
       <DialogContent
         className={cn(
-          "t-modal is-open nextop-window workspace-warning-dialog nodrag tsh-desktop-no-drag",
+          "t-modal is-open tutti-window workspace-warning-dialog nodrag tsh-desktop-no-drag",
           isNeutralTone && "workspace-warning-dialog--neutral",
           dialogClassName
         )}
         overlayClassName={cn(
-          "t-modal-backdrop is-open nextop-window-backdrop workspace-warning-dialog-backdrop nodrag tsh-desktop-no-drag",
+          "t-modal-backdrop is-open tutti-window-backdrop workspace-warning-dialog-backdrop nodrag tsh-desktop-no-drag",
           isNeutralTone && "workspace-warning-dialog-backdrop--neutral",
           backdropClassName
         )}
@@ -141,7 +141,7 @@ export function WarningDialog({
         ) : null}
 
         <div
-          className="nextop-window__actions workspace-warning-dialog__actions mt-1 flex flex-wrap items-center justify-end gap-2.5"
+          className="tutti-window__actions workspace-warning-dialog__actions mt-1 flex flex-wrap items-center justify-end gap-2.5"
           data-warning-dialog-actions="true"
         >
           {actions}

@@ -1,8 +1,8 @@
 import { SyncDescriptor, type ServiceRegistry } from "@zk-tech/bedrock/di";
 import type {
-  NextopdClient,
-  NextopdEventStreamClient
-} from "@tutti-os/client-nextopd-ts";
+  TuttidClient,
+  TuttidEventStreamClient
+} from "@tutti-os/client-tuttid-ts";
 import type {
   DesktopBrowserApi,
   DesktopDeveloperApi,
@@ -25,11 +25,11 @@ export interface WorkspaceWorkbenchServiceRegistrationInput {
   browserApi?: DesktopBrowserApi;
   developerApi: DesktopDeveloperApi;
   dockPreviewCacheApi: DesktopDockPreviewCacheApi;
-  eventStreamClient?: NextopdEventStreamClient;
+  eventStreamClient?: TuttidEventStreamClient;
   hostFilesApi: DesktopHostFilesApi;
   hostWindowApi: DesktopHostWindowApi;
   hostWorkspaceApi: Pick<DesktopHostWorkspaceApi, "onOpenSettingsRequest">;
-  nextopdClient: NextopdClient;
+  tuttidClient: TuttidClient;
   platformApi: Pick<
     DesktopPlatformApi,
     "homeDirectory" | "os" | "resolveDroppedPaths"
@@ -53,7 +53,7 @@ export function registerWorkspaceWorkbenchServices(
         hostFilesApi: input.hostFilesApi,
         hostWindowApi: input.hostWindowApi,
         hostWorkspaceApi: input.hostWorkspaceApi,
-        nextopdClient: input.nextopdClient,
+        tuttidClient: input.tuttidClient,
         platformApi: input.platformApi,
         reporterService: input.reporterService,
         runtimeApi: input.runtimeApi,

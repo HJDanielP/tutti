@@ -16,7 +16,7 @@ import {
   type WorkspaceAgentMessageCenterItem
 } from "@tutti-os/agent-gui/agent-message-center";
 import type { AgentActivitySnapshot } from "@tutti-os/agent-activity-core";
-import type { WorkspaceSummary } from "@tutti-os/client-nextopd-ts";
+import type { WorkspaceSummary } from "@tutti-os/client-tuttid-ts";
 import type {
   WorkbenchHostChromeRenderContext,
   WorkbenchController,

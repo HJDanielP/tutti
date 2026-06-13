@@ -5,9 +5,9 @@ import type {
 } from "@preload/types";
 import type {
   AgentProviderComposerOptionsResponse,
-  NextopdClient,
-  NextopdEventStreamClient
-} from "@tutti-os/client-nextopd-ts";
+  TuttidClient,
+  TuttidEventStreamClient
+} from "@tutti-os/client-tuttid-ts";
 import { getActiveLocale } from "../../../../i18n/runtime.ts";
 import {
   getDesktopErrorCode,
@@ -48,12 +48,12 @@ const catalogLoadingRefreshDelayMs = 750;
 const appOpenLaunchWaitTimeoutMs = 35_000;
 const installRefreshDelayMs = 750;
 type AgentProviderComposerOptionsClient = Pick<
-  NextopdClient,
+  TuttidClient,
   "getAgentProviderComposerOptions"
 >;
 
 export interface WorkspaceAppCenterServiceDependencies {
-  eventStreamClient: NextopdEventStreamClient;
+  eventStreamClient: TuttidEventStreamClient;
   appOpenLaunchWaitTimeoutMs?: number;
   gateway: WorkspaceAppCenterGateway;
   hostFilesApi: Pick<
@@ -64,7 +64,7 @@ export interface WorkspaceAppCenterServiceDependencies {
     | "selectAppIconImage"
   >;
   hostWorkspaceApi: Pick<DesktopHostWorkspaceApi, "openWorkspaceAppFolder">;
-  nextopdClient?: AgentProviderComposerOptionsClient;
+  tuttidClient?: AgentProviderComposerOptionsClient;
   reporterNow?: () => number;
   reporterService?: Pick<IReporterService, "trackEvents">;
   runtimeApi?: Pick<DesktopRuntimeApi, "logRendererDiagnostic">;
@@ -291,11 +291,11 @@ export class WorkspaceAppCenterService implements IWorkspaceAppCenterService {
     provider: string
   ): Promise<WorkspaceAppFactoryProviderConfiguration> {
     const normalizedProvider = provider.trim();
-    if (!normalizedProvider || !this.dependencies.nextopdClient) {
+    if (!normalizedProvider || !this.dependencies.tuttidClient) {
       return emptyFactoryProviderConfiguration();
     }
     const response =
-      await this.dependencies.nextopdClient.getAgentProviderComposerOptions(
+      await this.dependencies.tuttidClient.getAgentProviderComposerOptions(
         normalizedProvider as Parameters<
           AgentProviderComposerOptionsClient["getAgentProviderComposerOptions"]
         >[0]

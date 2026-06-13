@@ -186,8 +186,8 @@ function isWorkspaceAppContext(
   );
 }
 
-contextBridge.exposeInMainWorld("nextopAppContext", appContext);
-contextBridge.exposeInMainWorld("nextop", {
+contextBridge.exposeInMainWorld("tuttiAppContext", appContext);
+contextBridge.exposeInMainWorld("tutti", {
   appContext,
   managedCredentials,
   workspace

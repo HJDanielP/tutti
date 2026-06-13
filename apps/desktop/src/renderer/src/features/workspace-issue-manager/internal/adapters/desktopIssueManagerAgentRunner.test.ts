@@ -35,7 +35,7 @@ test("desktop issue-manager agent runner sends execute handoff without run conte
             activation: { status: "attached" },
             session: {
               agentSessionId: input.agentSessionId,
-              cwd: "/Users/example/.nextop-dev/sessions/2026-06-03-001",
+              cwd: "/Users/example/.tutti-dev/sessions/2026-06-03-001",
               status: "ready"
             }
           };
@@ -83,12 +83,12 @@ test("desktop issue-manager agent runner sends execute handoff without run conte
   assert.doesNotMatch(capturedExec?.prompt ?? "", /Task 标题：Port renderer/);
   assert.doesNotMatch(
     capturedExec?.prompt ?? "",
-    /工作目录：\/Users\/liying\/\.nextop-dev\/sessions\/2026-06-03-001/
+    /工作目录：\/Users\/liying\/\.tutti-dev\/sessions\/2026-06-03-001/
   );
   assert.doesNotMatch(capturedExec?.prompt ?? "", /建议输出目录：/);
   assert.doesNotMatch(capturedExec?.prompt ?? "", /docs\/spec\.md/);
   assert.doesNotMatch(capturedExec?.prompt ?? "", /docs\/design\.md/);
-  assert.doesNotMatch(capturedExec?.prompt ?? "", /Nextop Issue Run Context/);
+  assert.doesNotMatch(capturedExec?.prompt ?? "", /Tutti Issue Run Context/);
   assert.doesNotMatch(capturedExec?.prompt ?? "", /Agent Provider：codex/);
   assert.doesNotMatch(
     capturedExec?.prompt ?? "",
@@ -115,7 +115,7 @@ test("desktop issue-manager agent runner reports exec rejection", async () => {
             activation: { status: "attached" },
             session: {
               agentSessionId: input.agentSessionId,
-              cwd: "/Users/example/.nextop-dev/sessions/2026-06-03-002",
+              cwd: "/Users/example/.tutti-dev/sessions/2026-06-03-002",
               status: "ready"
             }
           };
@@ -153,7 +153,7 @@ test("desktop issue-manager agent runner sends localized execute prompt", async 
             activation: { status: "attached" },
             session: {
               agentSessionId: input.agentSessionId,
-              cwd: "/Users/example/.nextop-dev/sessions/2026-06-03-001",
+              cwd: "/Users/example/.tutti-dev/sessions/2026-06-03-001",
               status: "ready"
             }
           };
@@ -202,7 +202,7 @@ test("desktop issue-manager agent runner passes selected execution directory", a
           };
         },
         async exec(input) {
-          assert.doesNotMatch(input.prompt, /\/Users\/liying\/project\/nextop/);
+          assert.doesNotMatch(input.prompt, /\/Users\/liying\/project\/tutti/);
           assert.match(input.prompt, /mention:\/\/workspace-issue/);
           return {
             accepted: true,
@@ -218,10 +218,10 @@ test("desktop issue-manager agent runner passes selected execution directory", a
   });
 
   const result = await runner.runTask(
-    createRunRequest({ executionDirectory: "/Users/example/project/nextop" })
+    createRunRequest({ executionDirectory: "/Users/example/project/tutti" })
   );
 
-  assert.equal(capturedActivation?.cwd, "/Users/example/project/nextop");
+  assert.equal(capturedActivation?.cwd, "/Users/example/project/tutti");
   assert.equal(result.status, "opened");
 });
 

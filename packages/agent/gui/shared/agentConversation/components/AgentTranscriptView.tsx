@@ -188,7 +188,7 @@ export const AgentTranscriptView = memo(function AgentTranscriptView({
       <Fragment key={rowKey}>
         {showTurnDivider ? (
           <div
-            className="h-px w-full flex-none bg-[var(--line-2,var(--nextop-line-2))]"
+            className="h-px w-full flex-none bg-[var(--line-2,var(--tutti-line-2))]"
             data-testid="agent-transcript-turn-divider"
             aria-hidden="true"
           />

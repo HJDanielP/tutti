@@ -110,7 +110,7 @@ function createWebRuntimeApi(
             : input.level === "debug"
               ? console.debug
               : console.info;
-      method("[nextop dev-web] renderer diagnostic", {
+      method("[tutti dev-web] renderer diagnostic", {
         details: input.details ?? {},
         event: input.event,
         source: input.source,
@@ -127,7 +127,7 @@ function createWebRuntimeApi(
             : input.level === "debug"
               ? console.debug
               : console.info;
-      method(`[nextop dev-web] terminal diagnostic ${input.event}`, {
+      method(`[tutti dev-web] terminal diagnostic ${input.event}`, {
         details: input.details ?? {},
         event: input.event,
         nodeId: input.nodeId ?? null,
@@ -309,8 +309,8 @@ function createWebUpdateApi(): DesktopUpdateApi {
 }
 
 function resolveWebBackendConfig(): DesktopBackendConfig {
-  const baseUrl = readRequiredEnv("VITE_NEXTOPD_BASE_URL");
-  const accessToken = readRequiredEnv("VITE_NEXTOPD_ACCESS_TOKEN");
+  const baseUrl = readRequiredEnv("VITE_TUTTID_BASE_URL");
+  const accessToken = readRequiredEnv("VITE_TUTTID_ACCESS_TOKEN");
   return {
     accessToken,
     baseUrl
@@ -318,7 +318,7 @@ function resolveWebBackendConfig(): DesktopBackendConfig {
 }
 
 function readRequiredEnv(
-  name: "VITE_NEXTOPD_ACCESS_TOKEN" | "VITE_NEXTOPD_BASE_URL"
+  name: "VITE_TUTTID_ACCESS_TOKEN" | "VITE_TUTTID_BASE_URL"
 ): string {
   const value = import.meta.env[name]?.trim();
   if (!value) {

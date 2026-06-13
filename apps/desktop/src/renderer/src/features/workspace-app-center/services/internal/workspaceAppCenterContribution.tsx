@@ -43,7 +43,7 @@ import {
 } from "./workspaceAppCenterLaunchRequest.ts";
 import { shouldShowWorkspaceApp } from "../workspaceAppVisibility.ts";
 
-export const workspaceAppBrowserPartitionPrefix = "persist:nextop-app:";
+export const workspaceAppBrowserPartitionPrefix = "persist:tutti-app:";
 
 export {
   reportWorkspaceAppOpenedFromDockEntry,

@@ -13,8 +13,8 @@
   min-height: 0;
   height: 100%;
   flex-direction: column;
-  background: var(--nextop-surface, #111);
-  color: var(--nextop-text, #f4f4f5);
+  background: var(--tutti-surface, #111);
+  color: var(--tutti-text, #f4f4f5);
 }
 
 .workspace-terminal__header {
@@ -231,7 +231,7 @@
   height: 100%;
   min-height: 160px;
   place-items: center;
-  color: var(--nextop-text-muted, rgb(244 244 245 / 68%));
+  color: var(--tutti-text-muted, rgb(244 244 245 / 68%));
 }
 
 .workspace-terminal__close-guard {
@@ -258,7 +258,7 @@
 
 .workspace-terminal__close-guard > p {
   margin: 0;
-  color: var(--nextop-text-muted, rgb(244 244 245 / 68%));
+  color: var(--tutti-text-muted, rgb(244 244 245 / 68%));
   font-size: 13px;
   line-height: 1.5;
 }

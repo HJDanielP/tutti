@@ -436,7 +436,7 @@ export function RichTextAtTextarea({
       {isMenuOpen && menuPoint ? (
         <ViewportMenuSurface
           open
-          className="nextop-rich-text-at-menu max-h-64 w-[min(28rem,calc(100vw-24px))] overflow-y-auto p-1"
+          className="tutti-rich-text-at-menu max-h-64 w-[min(28rem,calc(100vw-24px))] overflow-y-auto p-1"
           dismissIgnoreRefs={[textareaRef]}
           placement={{
             type: "point",

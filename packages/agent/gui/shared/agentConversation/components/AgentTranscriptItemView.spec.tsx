@@ -226,7 +226,7 @@ describe("AgentTranscriptItemView render stability", () => {
       /\.workspace-agents-status-panel__detail-markdown\.agent-gui-conversation__assistant-markdown\s+p\s*{[^}]*margin:\s*0[^}]*}/s
     );
     expect(css).toMatch(
-      /\.workspace-agents-status-panel__detail-markdown\.agent-gui-conversation__assistant-markdown\s+hr\s*{[^}]*height:\s*1px[^}]*margin:\s*14px 0[^}]*border:\s*0[^}]*background:\s*var\(--line-2,\s*var\(--nextop-line-2\)\)/s
+      /\.workspace-agents-status-panel__detail-markdown\.agent-gui-conversation__assistant-markdown\s+hr\s*{[^}]*height:\s*1px[^}]*margin:\s*14px 0[^}]*border:\s*0[^}]*background:\s*var\(--line-2,\s*var\(--tutti-line-2\)\)/s
     );
     expect(css).not.toMatch(
       /\.workspace-agents-status-panel__detail-markdown\.agent-gui-conversation__assistant-markdown\s+:is\(h1,\s*h2,\s*h3,\s*h4,\s*h5,\s*h6,\s*ul,\s*ol,\s*li\)\s*{[^}]*font-size:\s*\d+(?:\.\d+)?px/s

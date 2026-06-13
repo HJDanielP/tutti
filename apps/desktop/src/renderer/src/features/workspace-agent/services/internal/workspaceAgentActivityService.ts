@@ -9,16 +9,16 @@ import {
 } from "@tutti-os/agent-activity-core";
 import type { AgentActivityRuntime } from "@tutti-os/agent-gui";
 import type {
-  NextopdClient,
-  NextopdEventStreamClient
-} from "@tutti-os/client-nextopd-ts";
+  TuttidClient,
+  TuttidEventStreamClient
+} from "@tutti-os/client-tuttid-ts";
 import type { DesktopHostFilesApi, DesktopRuntimeApi } from "@preload/types";
 import {
   isDesktopAgentGUIProvider,
   normalizeDesktopAgentGUIProvider
 } from "../../desktopAgentGUINodeState.ts";
 import {
-  agentActivitySessionFromNextopdSession,
+  agentActivitySessionFromTuttidSession,
   createDesktopAgentActivityAdapter
 } from "../desktopAgentActivityAdapter.ts";
 import {
@@ -44,12 +44,12 @@ import type {
 import type { IWorkspaceUserProjectService } from "../../../workspace-user-project/index.ts";
 
 export interface WorkspaceAgentActivityServiceDependencies {
-  eventStreamClient?: NextopdEventStreamClient;
+  eventStreamClient?: TuttidEventStreamClient;
   hostFilesApi?: Pick<
     DesktopHostFilesApi,
     "createUserDocumentsProjectDirectory"
   >;
-  nextopdClient: NextopdClient;
+  tuttidClient: TuttidClient;
   runtimeApi: Pick<DesktopRuntimeApi, "logTerminalDiagnostic">;
   workspaceUserProjectService?: IWorkspaceUserProjectService;
 }
@@ -135,12 +135,12 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
   }): Promise<AgentActivitySession> {
     const workspaceId = normalizeWorkspaceId(input.workspaceId);
     const session =
-      await this.dependencies.nextopdClient.updateWorkspaceAgentSessionPin(
+      await this.dependencies.tuttidClient.updateWorkspaceAgentSessionPin(
         workspaceId,
         input.agentSessionId,
         { pinned: input.pinned }
       );
-    const activitySession = agentActivitySessionFromNextopdSession(
+    const activitySession = agentActivitySessionFromTuttidSession(
       workspaceId,
       session
     );
@@ -275,7 +275,7 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
     workspaceId: string;
   }): ReturnType<IWorkspaceAgentActivityService["readSessionAttachment"]> {
     const workspaceId = normalizeWorkspaceId(input.workspaceId);
-    return this.dependencies.nextopdClient.readWorkspaceAgentSessionAttachment(
+    return this.dependencies.tuttidClient.readWorkspaceAgentSessionAttachment(
       workspaceId,
       input.agentSessionId,
       input.attachmentId
@@ -357,7 +357,7 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
   }): ReturnType<IWorkspaceAgentActivityService["updateSessionSettings"]> {
     const workspaceState = desktopAgentHostWorkspaceState(input.workspaceId);
     const session =
-      await this.dependencies.nextopdClient.updateWorkspaceAgentSessionSettings(
+      await this.dependencies.tuttidClient.updateWorkspaceAgentSessionSettings(
         input.workspaceId,
         input.agentSessionId,
         normalizeComposerSettings(input.settings)
@@ -378,7 +378,7 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
   }) {
     return loadWorkspaceAgentSessionControlState({
       agentSessionId: input.agentSessionId,
-      nextopdClient: this.dependencies.nextopdClient,
+      tuttidClient: this.dependencies.tuttidClient,
       workspaceId: input.workspaceId
     });
   }
@@ -402,7 +402,7 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
     }
 
     const adapter = createDesktopAgentActivityAdapter({
-      nextopdClient: this.dependencies.nextopdClient,
+      tuttidClient: this.dependencies.tuttidClient,
       runtimeApi: this.dependencies.runtimeApi
     });
     const controller = createAgentActivityController({
@@ -439,7 +439,7 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
       return { cwd: trimmed };
     }
     const response =
-      await this.dependencies.nextopdClient.listWorkspaceFileDirectory(
+      await this.dependencies.tuttidClient.listWorkspaceFileDirectory(
         input.workspaceId,
         {}
       );
@@ -452,11 +452,11 @@ export class WorkspaceAgentActivityService implements IWorkspaceAgentActivitySer
   ): Promise<AgentActivitySession> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const session =
-      await this.dependencies.nextopdClient.getWorkspaceAgentSession(
+      await this.dependencies.tuttidClient.getWorkspaceAgentSession(
         normalizedWorkspaceId,
         agentSessionId
       );
-    return agentActivitySessionFromNextopdSession(
+    return agentActivitySessionFromTuttidSession(
       normalizedWorkspaceId,
       session
     );

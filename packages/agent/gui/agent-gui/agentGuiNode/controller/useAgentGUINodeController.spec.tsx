@@ -407,16 +407,16 @@ describe("useAgentGUINodeController", () => {
     getComposerOptions.mockClear();
 
     act(() => {
-      result.current.actions.updateSelectedProjectPath("/workspace/nextop");
+      result.current.actions.updateSelectedProjectPath("/workspace/tutti");
     });
 
     expect(result.current.viewModel.composerSettings.selectedProjectPath).toBe(
-      "/workspace/nextop"
+      "/workspace/tutti"
     );
     await waitFor(() => {
       expect(getComposerOptions).toHaveBeenCalledWith(
         expect.objectContaining({
-          cwd: "/workspace/nextop",
+          cwd: "/workspace/tutti",
           force: true,
           provider: "codex"
         })
@@ -494,7 +494,7 @@ describe("useAgentGUINodeController", () => {
     );
 
     act(() => {
-      result.current.actions.updateSelectedProjectPath("/workspace/nextop", {
+      result.current.actions.updateSelectedProjectPath("/workspace/tutti", {
         action: "select_existing"
       });
     });

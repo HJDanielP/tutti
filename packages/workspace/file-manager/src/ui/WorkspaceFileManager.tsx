@@ -7,7 +7,7 @@ import type {
 } from "react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@tutti-os/ui-system";
-import type { NextopDateLocale } from "@tutti-os/ui-system/date-format";
+import type { TuttiDateLocale } from "@tutti-os/ui-system/date-format";
 import type { WorkspaceFileManagerSession } from "../services/workspaceFileManagerService.interface.ts";
 import {
   resolveRevealInFolderLabel,
@@ -45,7 +45,7 @@ import {
 
 export interface WorkspaceFileManagerProps {
   className?: string;
-  dateLocale?: NextopDateLocale;
+  dateLocale?: TuttiDateLocale;
   entryDragMode?: WorkspaceFileManagerEntryDragMode;
   openInAppBrowserIcon?: ReactElement;
   resolveOpenWithApplicationIcon?: (
@@ -411,7 +411,7 @@ function WorkspaceFileManagerPanelsContainer({
   resolveEntryIconUrl,
   session
 }: {
-  dateLocale?: NextopDateLocale;
+  dateLocale?: TuttiDateLocale;
   entryDragMode?: WorkspaceFileManagerEntryDragMode;
   i18n: WorkspaceFileManagerI18nRuntime;
   layoutMode: WorkspaceFileManagerLayoutMode;

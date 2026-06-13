@@ -190,11 +190,11 @@ describe("AgentTurnSummaryRow", () => {
     fireEvent.click(openFileButton);
 
     expect(
-      openFileButton.querySelector('svg[data-nextop-chrome-glyph="fill"]')
+      openFileButton.querySelector('svg[data-tutti-chrome-glyph="fill"]')
     ).toBeTruthy();
     expect(
       openFileButton
-        .querySelector('svg[data-nextop-chrome-glyph="fill"]')
+        .querySelector('svg[data-tutti-chrome-glyph="fill"]')
         ?.getAttribute("class")
     ).toContain("text-[var(--text-secondary)]");
 

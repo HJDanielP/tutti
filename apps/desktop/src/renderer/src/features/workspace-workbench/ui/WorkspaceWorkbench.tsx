@@ -1,6 +1,6 @@
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { WorkspaceSummary } from "@tutti-os/client-nextopd-ts";
+import type { WorkspaceSummary } from "@tutti-os/client-tuttid-ts";
 import {
   defaultIssueManagerWorkbenchTypeId,
   issueManagerOpenActivationType,

@@ -141,4 +141,4 @@ To report a security vulnerability, see [SECURITY.md](SECURITY.md).
 
 Tutti is licensed under the [Apache License 2.0](LICENSE).
 
-> Note: this codebase uses the internal codename `nextop` — you will see it in directory and binary names such as `services/nextopd`.
+> Note: this codebase uses the internal codename `tutti` — you will see it in directory and binary names such as `services/tuttid`.

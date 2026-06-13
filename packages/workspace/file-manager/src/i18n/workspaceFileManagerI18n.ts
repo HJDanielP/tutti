@@ -7,7 +7,7 @@ import {
 
 type WorkspaceFileManagerI18nLocale = "en" | "zh-CN";
 export const workspaceFileManagerI18nNamespace = "workspaceFileManager";
-export const nextopI18nModule = createScopedLocaleObjectsI18nModuleManifest({
+export const tuttiI18nModule = createScopedLocaleObjectsI18nModuleManifest({
   localeObjectByLocale: {
     en: "workspaceFileManagerEn",
     "zh-CN": "workspaceFileManagerZhCN"
@@ -47,7 +47,7 @@ const workspaceFileManagerEn = {
   noSearchResults: "No files matched your search",
   openFailedTitle: "Open failed",
   openLabel: "Open",
-  openInAppBrowserLabel: "Nextop built-in browser",
+  openInAppBrowserLabel: "Tutti built-in browser",
   openInDefaultBrowserLabel: "Default Browser",
   openWithLabel: "Open With",
   openWithLoadingLabel: "Loading apps...",
@@ -139,7 +139,7 @@ const workspaceFileManagerZhCN = {
   noSearchResults: "没有匹配的文件",
   openFailedTitle: "打开失败",
   openLabel: "打开",
-  openInAppBrowserLabel: "Nextop 内置的浏览器",
+  openInAppBrowserLabel: "Tutti 内置的浏览器",
   openInDefaultBrowserLabel: "默认浏览器",
   openWithLabel: "打开方式",
   openWithLoadingLabel: "正在加载应用...",

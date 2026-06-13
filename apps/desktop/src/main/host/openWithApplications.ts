@@ -253,7 +253,7 @@ async function resolveListOpenWithApplicationsSwiftScriptPath(): Promise<string>
   }
 
   const tempDirectory = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-swift-")
+    path.join(tmpdir(), "tutti-open-with-swift-")
   );
   const scriptPath = path.join(tempDirectory, "listOpenWithApplications.swift");
   await writeFile(scriptPath, listOpenWithApplicationsSwiftSource, "utf8");
@@ -267,7 +267,7 @@ async function resolveOpenFileWithDefaultBrowserSwiftScriptPath(): Promise<strin
   }
 
   const tempDirectory = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-default-browser-swift-")
+    path.join(tmpdir(), "tutti-open-with-default-browser-swift-")
   );
   const scriptPath = path.join(
     tempDirectory,
@@ -411,7 +411,7 @@ async function resolveReadApplicationIconSwiftScriptPath(): Promise<string> {
   }
 
   const tempDirectory = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-icon-swift-")
+    path.join(tmpdir(), "tutti-open-with-icon-swift-")
   );
   const scriptPath = path.join(tempDirectory, "readApplicationIcon.swift");
   await writeFile(scriptPath, readApplicationIconSwiftSource, "utf8");

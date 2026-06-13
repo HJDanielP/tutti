@@ -1,7 +1,7 @@
 export type WorkspaceFileManagerLayoutMode = "icon" | "list";
 
 export const workspaceFileManagerLayoutModeStorageKey =
-  "nextop.workspace-file-manager.layout-mode";
+  "tutti.workspace-file-manager.layout-mode";
 
 export function readWorkspaceFileManagerLayoutMode(): WorkspaceFileManagerLayoutMode {
   if (typeof window === "undefined") {

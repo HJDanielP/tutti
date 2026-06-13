@@ -32,14 +32,14 @@
 .workspace-agents-status-panel
   .workspace-agents-status-panel__detail-tool-terminal {
   box-shadow: none;
-  border-color: var(--line-2, var(--nextop-line-2));
+  border-color: var(--line-2, var(--tutti-line-2));
   background: var(--background-panel);
 }
 
 .workspace-agents-status-panel
   .workspace-agents-status-panel__detail-tool-terminal
   [data-agent-terminal-command-row="true"] {
-  border-color: var(--line-2, var(--nextop-line-2));
+  border-color: var(--line-2, var(--tutti-line-2));
   background: var(--transparency-block);
 }
 
@@ -803,7 +803,7 @@ aside.workspace-agents-status-panel
 }
 
 .workspace-agents-status-panel__resize-handle:focus-visible {
-  outline: 1px solid var(--nextop-d-border-signal-focus);
+  outline: 1px solid var(--tutti-d-border-signal-focus);
   outline-offset: -1px;
 }
 
@@ -2088,7 +2088,7 @@ aside.workspace-agents-status-panel
 
 .agent-gui-node__mention-palette-footer {
   min-height: 36px;
-  border-top: 1px solid var(--line-2, var(--nextop-line-2));
+  border-top: 1px solid var(--line-2, var(--tutti-line-2));
   background: var(--background-fronted, var(--background-panel));
 }
 
@@ -2173,7 +2173,7 @@ aside.workspace-agents-status-panel
 }
 
 .agent-gui-node__mention-palette-hint-separator {
-  color: var(--line-2, var(--nextop-line-2));
+  color: var(--line-2, var(--tutti-line-2));
 }
 
 .agent-gui-node__mention-palette:hover
@@ -2684,12 +2684,12 @@ aside.workspace-agents-status-panel
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  border: 1px solid var(--line-2, var(--nextop-line-2));
+  border: 1px solid var(--line-2, var(--tutti-line-2));
   border-radius: 12px;
   background: var(--background-fronted);
   padding: 12px 16px 16px;
   box-shadow: 0 8px 24px
-    color-mix(in srgb, var(--nextop-p-shadow-node) 16%, transparent);
+    color-mix(in srgb, var(--tutti-p-shadow-node) 16%, transparent);
   transform-origin: bottom center;
   animation: agent-gui-interactive-prompt-enter 190ms
     cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -3261,7 +3261,7 @@ aside.workspace-agents-status-panel
   height: 1px;
   margin: 14px 0;
   border: 0;
-  background: var(--line-2, var(--nextop-line-2));
+  background: var(--line-2, var(--tutti-line-2));
 }
 
 .workspace-agents-status-panel__detail-markdown.agent-gui-conversation__assistant-markdown
@@ -6642,7 +6642,7 @@ html[data-theme="light"] [data-message-center-item-id].agent-gui-edge-glow {
   min-width: 220px;
   max-width: calc(100vw - 48px);
   padding: 10px 12px;
-  border: 1px solid var(--line-2, var(--nextop-line-2));
+  border: 1px solid var(--line-2, var(--tutti-line-2));
   border-radius: 8px;
   background: var(--background-fronted);
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.16);

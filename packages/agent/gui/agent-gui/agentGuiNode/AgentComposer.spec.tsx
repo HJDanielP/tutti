@@ -856,7 +856,7 @@ describe("AgentComposer", () => {
     expect(inputShell?.nextElementSibling).toBeNull();
 
     const nativeOption = container.querySelector(
-      'option[value="__nextop_workspace_reference_add__"]'
+      'option[value="__tutti_workspace_reference_add__"]'
     );
     expect(nativeOption).toHaveTextContent("引用空间文件");
   });

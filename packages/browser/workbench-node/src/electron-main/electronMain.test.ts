@@ -159,11 +159,11 @@ test("matches Browser Node webview attachments without handling unrelated webvie
   assert.equal(
     isBrowserNodeWebviewAttach(
       {
-        partition: "persist:nextop-app:workspace:hello",
+        partition: "persist:tutti-app:workspace:hello",
         src: "http://127.0.0.1:4100/"
       },
       {
-        additionalAllowedPrefixes: ["persist:nextop-app:"]
+        additionalAllowedPrefixes: ["persist:tutti-app:"]
       }
     ),
     true
@@ -224,14 +224,14 @@ test("handles additional allowed Browser Node webview partitions", () => {
   const contents = new EventEmitter();
   const webPreferences: Record<string, unknown> = {};
   const params: Record<string, string> = {
-    partition: "persist:nextop-app:workspace:hello",
+    partition: "persist:tutti-app:workspace:hello",
     src: "http://127.0.0.1:4100/"
   };
   let guestAttachedId: number | null = null;
   let setWindowOpenHandlerCount = 0;
   const cleanup = installBrowserWebviewSecurity({
     allowedSessionPartitions: {
-      additionalAllowedPrefixes: ["persist:nextop-app:"]
+      additionalAllowedPrefixes: ["persist:tutti-app:"]
     },
     contents:
       contents as unknown as InstallBrowserWebviewSecurityInput["contents"],
@@ -329,7 +329,7 @@ test("allows attached guests to override the default window-open handler", () =>
   const contents = new EventEmitter();
   const webPreferences: Record<string, unknown> = {};
   const params = {
-    partition: "persist:nextop-app:workspace:hello",
+    partition: "persist:tutti-app:workspace:hello",
     src: "http://127.0.0.1:4100/"
   };
   type WindowOpenHandler = (details: {
@@ -340,7 +340,7 @@ test("allows attached guests to override the default window-open handler", () =>
   let externallyOpenedUrl: string | null = null;
   const cleanup = installBrowserWebviewSecurity({
     allowedSessionPartitions: {
-      additionalAllowedPrefixes: ["persist:nextop-app:"]
+      additionalAllowedPrefixes: ["persist:tutti-app:"]
     },
     contents:
       contents as unknown as InstallBrowserWebviewSecurityInput["contents"],

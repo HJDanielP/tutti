@@ -143,10 +143,10 @@ export function createDesktopAgentHostAgentSessionsApi({
       agentSessionId: string;
       content: AgentActivitySendInput["content"];
     }) {
-      const nextopdSessionId = resolveNextopdSessionId(payload.agentSessionId);
+      const tuttidSessionId = resolveTuttidSessionId(payload.agentSessionId);
       const session = await agentActivityService.sendInput({
         workspaceId,
-        agentSessionId: nextopdSessionId,
+        agentSessionId: tuttidSessionId,
         content: [...payload.content]
       });
       await messageSentTracker.track({
@@ -162,10 +162,10 @@ export function createDesktopAgentHostAgentSessionsApi({
       };
     },
     async cancel(payload: { agentSessionId: string }) {
-      const nextopdSessionId = resolveNextopdSessionId(payload.agentSessionId);
+      const tuttidSessionId = resolveTuttidSessionId(payload.agentSessionId);
       const session = await agentActivityService.cancelSession({
         workspaceId,
-        agentSessionId: nextopdSessionId
+        agentSessionId: tuttidSessionId
       });
       await messageStoppedTracker.track({
         agentSessionId: session.agentSessionId,
@@ -184,14 +184,14 @@ export function createDesktopAgentHostAgentSessionsApi({
         workspaceState,
         payload.agentSessionId
       )?.settings;
-      const nextopdSessionId = resolveNextopdSessionId(payload.agentSessionId);
+      const tuttidSessionId = resolveTuttidSessionId(payload.agentSessionId);
       const previousState = await agentActivityService.getSessionControlState({
         workspaceId,
-        agentSessionId: nextopdSessionId
+        agentSessionId: tuttidSessionId
       });
       const result = await agentActivityService.updateSessionSettings({
         workspaceId,
-        agentSessionId: nextopdSessionId,
+        agentSessionId: tuttidSessionId,
         settings: payload.settings
       });
       await reportAgentSessionSettingsChanges({
@@ -205,10 +205,10 @@ export function createDesktopAgentHostAgentSessionsApi({
       return result;
     },
     async pinSession(payload: { agentSessionId: string; pinned: boolean }) {
-      const nextopdSessionId = resolveNextopdSessionId(payload.agentSessionId);
+      const tuttidSessionId = resolveTuttidSessionId(payload.agentSessionId);
       const session = await agentActivityService.setSessionPinned({
         workspaceId,
-        agentSessionId: nextopdSessionId,
+        agentSessionId: tuttidSessionId,
         pinned: payload.pinned
       });
       const reporter = payload.pinned
@@ -241,7 +241,7 @@ export function createDesktopAgentHostAgentSessionsApi({
     async getState(payload: { agentSessionId: string }) {
       return agentActivityService.getSessionControlState({
         workspaceId,
-        agentSessionId: resolveNextopdSessionId(payload.agentSessionId)
+        agentSessionId: resolveTuttidSessionId(payload.agentSessionId)
       });
     },
     async submitInteractive(payload: {
@@ -251,11 +251,11 @@ export function createDesktopAgentHostAgentSessionsApi({
       optionId?: string;
       payload?: Record<string, unknown>;
     }) {
-      const nextopdSessionId = resolveNextopdSessionId(payload.agentSessionId);
+      const tuttidSessionId = resolveTuttidSessionId(payload.agentSessionId);
       await agentActivityService.submitInteractive({
         workspaceId,
         action: payload.action ?? null,
-        agentSessionId: nextopdSessionId,
+        agentSessionId: tuttidSessionId,
         optionId: payload.optionId ?? null,
         payload: payload.payload ?? null,
         requestId: payload.requestId
@@ -327,7 +327,7 @@ export function createDesktopAgentHostAgentSessionsApi({
 
   function retainAgentSessionEventStream(agentSessionId: string): string {
     const leaseId = `${workspaceId}:${agentSessionId}`;
-    const nextopdSessionId = resolveNextopdSessionId(agentSessionId);
+    const tuttidSessionId = resolveTuttidSessionId(agentSessionId);
     const existingLease = retainedEventStreamLeases.get(leaseId);
     if (existingLease) {
       existingLease.refCount += 1;
@@ -335,7 +335,7 @@ export function createDesktopAgentHostAgentSessionsApi({
     }
     const release = agentActivityService.retainSessionEvents({
       workspaceId,
-      agentSessionId: nextopdSessionId,
+      agentSessionId: tuttidSessionId,
       onError: (error: unknown) => {
         void runtimeApi.logTerminalDiagnostic({
           details: { error: stringifyError(error) },
@@ -379,6 +379,6 @@ function promptContentDisplayText(
     .join("\n");
 }
 
-function resolveNextopdSessionId(agentSessionId: string): string {
+function resolveTuttidSessionId(agentSessionId: string): string {
   return agentSessionId.trim();
 }

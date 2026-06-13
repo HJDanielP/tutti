@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { createAgentGuiWorkbenchContribution } from "@tutti-os/agent-gui/workbench/contribution";
 import type { AgentGuiWorkbenchProvider } from "@tutti-os/agent-gui/workbench/types";
 import type { I18nRuntime } from "@tutti-os/ui-i18n-runtime";
-import type { NextopdClient } from "@tutti-os/client-nextopd-ts";
+import type { TuttidClient } from "@tutti-os/client-tuttid-ts";
 import type {
   WorkbenchContribution,
   WorkbenchDockPreviewCache
@@ -44,7 +44,7 @@ export function createWorkspaceAgentGuiContribution(input: {
   >[0]["dockIconUrls"];
   hostFilesApi: DesktopHostFilesApi;
   i18n: WorkspaceWorkbenchDesktopI18nRuntime;
-  nextopdClient: NextopdClient;
+  tuttidClient: TuttidClient;
   platformApi: Pick<
     DesktopPlatformApi,
     "homeDirectory" | "os" | "resolveDroppedPaths"
@@ -59,7 +59,7 @@ export function createWorkspaceAgentGuiContribution(input: {
 }): WorkbenchContribution {
   const agentGUIWorkbenchHostInput = createDesktopAgentGUIWorkbenchHostInput({
     hostFilesApi: input.hostFilesApi,
-    nextopdClient: input.nextopdClient,
+    tuttidClient: input.tuttidClient,
     platformApi: input.platformApi,
     reporterService: input.reporterService,
     richTextAtService: input.richTextAtService,

@@ -12,7 +12,7 @@ import {
   HealthIcon,
   LoadingIcon,
   WarningLinedIcon,
-  NextopMark,
+  TuttiMark,
   PlatformIcon,
   Separator
 } from "@tutti-os/ui-system";
@@ -84,7 +84,7 @@ export function WorkspaceOverview({
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex min-w-0 items-start gap-4">
                 <div className="flex size-14 items-center justify-center rounded-lg bg-transparency-block text-primary">
-                  <NextopMark size={30} />
+                  <TuttiMark size={30} />
                 </div>
                 <div className="min-w-0 space-y-2">
                   <Badge className="w-fit" variant="outline">

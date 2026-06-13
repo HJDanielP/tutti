@@ -218,7 +218,7 @@ const iconStories = uiSystemMetadata.components
   .filter(
     ({ component }) =>
       component.category === "icon" &&
-      component.export !== "NextopMark" &&
+      component.export !== "TuttiMark" &&
       !hiddenIconStoryExports.has(component.export)
   )
   .map(({ component, metadataIndex }) => ({
@@ -394,8 +394,8 @@ const hasBusinessStories = sections.some(
 
 type StoryboardLanguage = "zh" | "en";
 
-const storyboardLanguageStorageKey = "nextop-ui-storyboard-language";
-const storyboardThemeStorageKey = "nextop-ui-storyboard-theme";
+const storyboardLanguageStorageKey = "tutti-ui-storyboard-language";
+const storyboardThemeStorageKey = "tutti-ui-storyboard-theme";
 
 const isStoryboardLanguage = (
   value: string | null
@@ -597,14 +597,14 @@ const storyboardCopy = {
     english: "EN",
     light: "亮",
     dark: "暗",
-    title: "Nextop UI Storyboard",
+    title: "Tutti UI Storyboard",
     subtitle: "用于校准 UI system 的组件、设计 token 与跨语言呈现。",
     baseLayerTitle: "基础组件",
     baseLayerDescription:
       "基础组件层提供无业务语义的视觉 primitive、图标、样式入口和基础组合。",
     businessLayerTitle: "业务组件",
     businessLayerDescription:
-      "业务组件层提供可跨端复用的 Nextop 业务展示组件，基于 base 组件组合。"
+      "业务组件层提供可跨端复用的 Tutti 业务展示组件，基于 base 组件组合。"
   },
   en: {
     ariaNavigation: "UI storyboard sections",
@@ -618,7 +618,7 @@ const storyboardCopy = {
     english: "EN",
     light: "Light",
     dark: "Dark",
-    title: "Nextop UI Storyboard",
+    title: "Tutti UI Storyboard",
     subtitle:
       "A review surface for UI-system components, design tokens, and bilingual presentation.",
     baseLayerTitle: "Base Components",
@@ -626,7 +626,7 @@ const storyboardCopy = {
       "Base components provide business-agnostic primitives, icons, style entrypoints, and small compositions.",
     businessLayerTitle: "Business Components",
     businessLayerDescription:
-      "Business components provide reusable Nextop product surfaces built from base components."
+      "Business components provide reusable Tutti product surfaces built from base components."
   }
 } as const;
 
@@ -2854,7 +2854,7 @@ function InputStoryboard() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2">
               <span className={standardFieldLabelClass}>Workspace name</span>
-              <Input variant="md" defaultValue="Nextop Design System" />
+              <Input variant="md" defaultValue="Tutti Design System" />
             </label>
             <label className="grid gap-2">
               <span className={standardFieldLabelClass}>Search token</span>
@@ -3177,7 +3177,7 @@ function DialogStoryboard() {
                   Create workspace
                 </DialogTitle>
                 <DialogDescription className={standardDialogDescriptionClass}>
-                  Name the workspace before Nextop creates the local container.
+                  Name the workspace before Tutti creates the local container.
                 </DialogDescription>
               </DialogHeader>
               <Input
@@ -3548,7 +3548,7 @@ export function App() {
       <div className="mx-auto flex max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 overflow-y-auto border-r border-[var(--border-1)] py-10 pr-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:block">
           <div className="mb-10 text-[28px] font-semibold leading-none tracking-normal text-[var(--storyboard-ink)]">
-            Nextop
+            Tutti
           </div>
           <nav className="space-y-5" aria-label={copy.ariaNavigation}>
             {localizedNavigationGroups.map((group) => (

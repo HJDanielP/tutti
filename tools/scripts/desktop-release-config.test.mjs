@@ -130,7 +130,7 @@ test("desktop release workflow passes tsh-aligned Feishu card context", async ()
   );
   assert.match(
     workflow,
-    /NEXTOP_DESKTOP_RELEASE_ASSETS_BASE_URL:\s+\${{\s*vars\.NEXTOP_DESKTOP_RELEASE_ASSETS_BASE_URL\s*}}/
+    /TUTTI_DESKTOP_RELEASE_ASSETS_BASE_URL:\s+\${{\s*vars\.TUTTI_DESKTOP_RELEASE_ASSETS_BASE_URL\s*}}/
   );
   assert.match(workflow, /RELEASE_ASSET_DIRECTORY:\s+release-assets/);
 });
@@ -185,7 +185,7 @@ test("desktop release workflow can mirror release assets to S3 and upsert direct
   assert.match(workflow, /aws-actions\/configure-aws-credentials@v4/);
   assert.match(
     workflow,
-    /NEXTOP_DESKTOP_RELEASE_ASSETS_BASE_URL=https:\/\/\${NEXTOP_DESKTOP_RELEASE_ASSETS_S3_BUCKET}\.s3-accelerate\.amazonaws\.com\/\${NEXTOP_DESKTOP_RELEASE_ASSETS_S3_PREFIX%\/}/
+    /TUTTI_DESKTOP_RELEASE_ASSETS_BASE_URL=https:\/\/\${TUTTI_DESKTOP_RELEASE_ASSETS_S3_BUCKET}\.s3-accelerate\.amazonaws\.com\/\${TUTTI_DESKTOP_RELEASE_ASSETS_S3_PREFIX%\/}/
   );
   assert.match(
     workflow,

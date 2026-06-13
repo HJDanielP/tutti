@@ -35,7 +35,7 @@ const aliases = {
 
 const externalizeRuntimeDeps = externalizeDepsPlugin({
   exclude: [
-    "@tutti-os/client-nextopd-ts",
+    "@tutti-os/client-tuttid-ts",
     "@tutti-os/browser-node",
     "@tutti-os/event-protocol",
     "@tutti-os/agent-gui",

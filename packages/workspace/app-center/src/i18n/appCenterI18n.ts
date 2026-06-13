@@ -9,7 +9,7 @@ import {
 type AppCenterI18nLocale = "en" | "zh-CN";
 
 export const appCenterI18nNamespace = "appCenter";
-export const nextopI18nModule = createScopedLocaleObjectsI18nModuleManifest({
+export const tuttiI18nModule = createScopedLocaleObjectsI18nModuleManifest({
   localeObjectByLocale: {
     en: "appCenterEn",
     "zh-CN": "appCenterZhCN"
@@ -26,7 +26,7 @@ export const appCenterEn = {
     exportApp: "Export",
     importApp: "Import",
     importAppTooltip:
-      "Only valid Nextop app .zip packages are supported. You can export an app and import it here.",
+      "Only valid Tutti app .zip packages are supported. You can export an app and import it here.",
     installApp: "Install",
     moreActions: "More actions",
     openApp: "Open",
@@ -314,7 +314,7 @@ export const appCenterZhCN = {
     exportApp: "导出",
     importApp: "导入",
     importAppTooltip:
-      "仅支持符合规范的 Nextop 应用 .zip 包。你可以先导出应用，再在这里导入。",
+      "仅支持符合规范的 Tutti 应用 .zip 包。你可以先导出应用，再在这里导入。",
     installApp: "安装",
     moreActions: "更多操作",
     openApp: "打开",

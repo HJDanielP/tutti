@@ -103,7 +103,7 @@ test("listOpenWithApplications returns installed handlers on macOS", async (t) =
   }
 
   const workspaceRoot = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-list-")
+    path.join(tmpdir(), "tutti-open-with-list-")
   );
   const targetPath = path.join(workspaceRoot, "notes.txt");
   await writeFile(targetPath, "hello", "utf8");
@@ -137,7 +137,7 @@ test("openFileWithDefaultBrowser delegates to the macOS browser opener without l
   }
 
   const workspaceRoot = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-default-browser-")
+    path.join(tmpdir(), "tutti-open-with-default-browser-")
   );
   const targetPath = path.join(workspaceRoot, "notes.html");
   await writeFile(targetPath, "<html></html>", "utf8");
@@ -163,7 +163,7 @@ test("openFileWithApplication delegates to macOS open without launching the appl
   }
 
   const workspaceRoot = await mkdtemp(
-    path.join(tmpdir(), "nextop-open-with-open-")
+    path.join(tmpdir(), "tutti-open-with-open-")
   );
   const targetPath = path.join(workspaceRoot, "notes.txt");
   const applicationPath = path.join(workspaceRoot, "TextEdit.app");

@@ -204,8 +204,8 @@ test("promoted base primitive sources stay on the shared workbench contract", ()
   );
   assert.match(baseStylesSource, /button:not\(:disabled\)/);
   assert.match(baseStylesSource, /cursor: pointer/);
-  assert.match(baseStylesSource, /@keyframes nextop-dropdown-open/);
-  assert.match(baseStylesSource, /@keyframes nextop-dropdown-close/);
+  assert.match(baseStylesSource, /@keyframes tutti-dropdown-open/);
+  assert.match(baseStylesSource, /@keyframes tutti-dropdown-close/);
   assert.match(baseStylesSource, /--dropdown-open-dur/);
   assert.match(baseStylesSource, /--dropdown-close-dur/);
   assert.match(baseStylesSource, /--dropdown-pre-scale/);
