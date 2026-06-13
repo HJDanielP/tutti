@@ -23,6 +23,9 @@ func TestComposerProviderCapabilitiesDefaults(t *testing.T) {
 	if got := composerProviderCapabilities("gemini"); len(got) != 1 || got[0] != "interrupt" {
 		t.Fatalf("gemini defaults = %v, want [interrupt]", got)
 	}
+	if got := composerProviderCapabilities("openclaw"); len(got) != 1 || got[0] != "interrupt" {
+		t.Fatalf("openclaw defaults = %v, want [interrupt]", got)
+	}
 	if got := composerProviderCapabilities("unknown"); got != nil {
 		t.Fatalf("unknown provider defaults = %v, want nil", got)
 	}
