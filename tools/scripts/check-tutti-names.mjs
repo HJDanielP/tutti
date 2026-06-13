@@ -25,6 +25,8 @@ const allowedFiles = new Set([
   "services/tuttid/service/workspace/app_archives.go",
   "services/tuttid/service/workspace/app_archives_test.go",
   "services/tuttid/service/workspace/app_factory_test.go",
+  "services/tuttid/service/workspace/apps_runner.go",
+  "services/tuttid/service/workspace/apps_runner_test.go",
   "services/tuttid/service/workspace/app_runtime_env.go",
   "services/tuttid/service/workspace/app_runtime_env_test.go",
   "services/tuttid/builtin-apps/catalog.go",
