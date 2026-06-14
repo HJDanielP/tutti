@@ -926,7 +926,18 @@ export const AgentGUINode = memo(function AgentGUINode({
   );
   const windowTitle = windowAgentTitle || title;
   useEffect(() => {
+    if (!viewModel.activeConversation) {
+      return;
+    }
     const nextTitle = activeConversationDockTitle;
+    const previousTitle = state.lastActiveConversationTitle ?? null;
+    if (
+      nextTitle === null &&
+      previousTitle !== null &&
+      viewModel.activeConversation.id === state.lastActiveAgentSessionId
+    ) {
+      return;
+    }
     if ((state.lastActiveConversationTitle ?? null) === nextTitle) {
       return;
     }
@@ -942,7 +953,9 @@ export const AgentGUINode = memo(function AgentGUINode({
   }, [
     activeConversationDockTitle,
     onUpdateNode,
-    state.lastActiveConversationTitle
+    state.lastActiveAgentSessionId,
+    state.lastActiveConversationTitle,
+    viewModel.activeConversation
   ]);
   const activeProbeProvider = activeProvider as AgentProvider;
   const activeAgentProbe = useMemo(

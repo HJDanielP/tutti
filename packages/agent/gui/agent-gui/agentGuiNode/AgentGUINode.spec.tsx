@@ -999,6 +999,91 @@ describe("AgentGUINode", () => {
     expect(windowTitle).toHaveTextContent("Codex");
   });
 
+  it("does not clear the dock conversation title while the active conversation is unavailable", () => {
+    const onUpdateNode =
+      vi.fn<
+        (updater: (current: AgentGUINodeData) => AgentGUINodeData) => void
+      >();
+    mockViewModel = createViewModel({
+      activeConversation: null,
+      activeConversationId: "session-1"
+    });
+
+    renderAgentGUINode({
+      onUpdateNode,
+      state: {
+        provider: "codex",
+        lastActiveAgentSessionId: "session-1",
+        lastActiveConversationTitle: "Existing dock title",
+        conversationRailWidthPx: null
+      }
+    });
+
+    expect(onUpdateNode).not.toHaveBeenCalled();
+  });
+
+  it("does not clear the dock conversation title while the active conversation title is hydrating", () => {
+    const onUpdateNode =
+      vi.fn<
+        (updater: (current: AgentGUINodeData) => AgentGUINodeData) => void
+      >();
+    mockViewModel = createViewModel({
+      activeConversation: {
+        id: "session-1",
+        provider: "codex",
+        title: "",
+        status: "ready",
+        cwd: "/workspace",
+        updatedAtUnixMs: 1
+      },
+      activeConversationId: "session-1"
+    });
+
+    renderAgentGUINode({
+      onUpdateNode,
+      state: {
+        provider: "codex",
+        lastActiveAgentSessionId: "session-1",
+        lastActiveConversationTitle: "Existing dock title",
+        conversationRailWidthPx: null
+      }
+    });
+
+    expect(onUpdateNode).not.toHaveBeenCalled();
+  });
+
+  it("syncs the dock conversation title when the active conversation has a title", () => {
+    const onUpdateNode =
+      vi.fn<
+        (updater: (current: AgentGUINodeData) => AgentGUINodeData) => void
+      >();
+    const state: AgentGUINodeData = {
+      provider: "codex",
+      lastActiveAgentSessionId: "session-1",
+      lastActiveConversationTitle: "Existing dock title",
+      conversationRailWidthPx: null
+    };
+    mockViewModel = createViewModel({
+      activeConversation: {
+        id: "session-1",
+        provider: "codex",
+        title: "Fresh dock title",
+        status: "ready",
+        cwd: "/workspace",
+        updatedAtUnixMs: 1
+      },
+      activeConversationId: "session-1"
+    });
+
+    renderAgentGUINode({ onUpdateNode, state });
+
+    expect(onUpdateNode).toHaveBeenCalledTimes(1);
+    expect(onUpdateNode.mock.calls[0]?.[0](state)).toEqual({
+      ...state,
+      lastActiveConversationTitle: "Fresh dock title"
+    });
+  });
+
   it("unregisters agent probe demand when the Agent GUI closes", () => {
     const onAgentProbeDemandChange = vi.fn();
 
