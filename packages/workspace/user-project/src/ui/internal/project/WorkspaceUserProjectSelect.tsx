@@ -113,29 +113,21 @@ const noProjectOptionValue = "__tutti_no_project__";
 const addProjectOptionValue = "__tutti_add_project__";
 const linkExistingProjectOptionValue = "__tutti_link_existing_project__";
 const workspaceUserProjectOverflowLabelStyle = `
-@keyframes workspace-user-project-label-marquee {
-  0% {
-    transform: translateX(0);
-  }
-
-  44%,
-  56% {
-    transform: translateX(min(0px, calc(100cqw - 100%)));
-  }
-
-  88%,
-  100% {
-    transform: translateX(0);
-  }
-}
-
 .workspace-user-project-overflow-label {
-  container-type: inline-size;
+  container-type: normal;
   display: block;
-  flex: 1 1 0%;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+}
+
+.workspace-user-project-trigger-label {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .workspace-user-project-overflow-label__content {
@@ -147,21 +139,6 @@ const workspaceUserProjectOverflowLabelStyle = `
   transform: translateX(0);
   white-space: nowrap;
   width: max-content;
-}
-
-.workspace-user-project-overflow-label:hover
-  .workspace-user-project-overflow-label__content {
-  animation: workspace-user-project-label-marquee 14s linear infinite;
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-user-project-overflow-label:hover
-    .workspace-user-project-overflow-label__content {
-    animation: none;
-  }
 }
 `;
 const defaultWorkspaceUserProjectSelectI18n =
@@ -489,6 +466,13 @@ export function WorkspaceUserProjectSelect({
         .catch(() => {});
       return;
     }
+    const knownProject = projects.find((project) => project.path === nextValue);
+    if (knownProject) {
+      void effectiveApi.rememberDefaultSelection?.({ path: knownProject.path });
+      setHasPinnedNoProjectSelection(false);
+      onProjectPathChange(knownProject.path, { action: "select_existing" });
+      return;
+    }
     void useProjectPath(nextValue, "select_existing");
   };
 
@@ -510,7 +494,10 @@ export function WorkspaceUserProjectSelect({
           }
           className={classNames?.trigger}
         >
-          <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            className="workspace-user-project-trigger-label"
+            data-workspace-user-project-trigger-label="true"
+          >
             {selectedProject || shouldShowLockedProjectPath ? (
               <FolderIcon aria-hidden className="shrink-0" size={15} />
             ) : (

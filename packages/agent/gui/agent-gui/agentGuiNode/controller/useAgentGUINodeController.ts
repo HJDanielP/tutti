@@ -2046,6 +2046,7 @@ export function useAgentGUINodeController({
     useState(resolvePendingCreateConversationId);
   const conversations = conversationListState?.conversations ?? [];
   const [userProjects, setUserProjects] = useState<AgentHostUserProject[]>([]);
+  const isNoProjectPath = agentHostApi.userProjects?.isNoProjectPath;
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(data.lastActiveAgentSessionId);
@@ -2330,6 +2331,7 @@ export function useAgentGUINodeController({
   const activeConversationIdRef = useRef(activeConversationId);
   const selectedProjectPathRef = useRef(selectedProjectPath);
   const userProjectsRef = useRef(userProjects);
+  const isNoProjectPathRef = useRef(isNoProjectPath);
   const userProjectsLoadSeqRef = useRef(0);
   const composerOptionsProjectKeyRef = useRef<string | null>(null);
   const conversationsRef = useRef(conversations);
@@ -2493,6 +2495,7 @@ export function useAgentGUINodeController({
       return;
     }
     const snapshotConversations = buildAgentGUIConversationSummaries({
+      isNoProjectPath,
       snapshot: agentActivitySnapshot,
       provider: data.provider,
       sessionMessagesById: agentActivitySnapshot.sessionMessagesById,
@@ -2576,12 +2579,15 @@ export function useAgentGUINodeController({
           merged.push(conversation);
         }
       }
-      return applyAgentGUIConversationProjects(merged, userProjects);
+      return applyAgentGUIConversationProjects(merged, userProjects, {
+        isNoProjectPath
+      });
     });
   }, [
     agentActivitySnapshot,
     conversationListQuery,
     data.provider,
+    isNoProjectPath,
     previewMode,
     updateConversationList,
     userProjects
@@ -2618,16 +2624,20 @@ export function useAgentGUINodeController({
       return;
     }
     updateConversationList((current) =>
-      applyAgentGUIConversationProjects(current, userProjects)
+      applyAgentGUIConversationProjects(current, userProjects, {
+        isNoProjectPath
+      })
     );
     setTransientConversation((current) =>
       current
-        ? (applyAgentGUIConversationProjects([current], userProjects)[0] ??
-          current)
+        ? (applyAgentGUIConversationProjects([current], userProjects, {
+            isNoProjectPath
+          })[0] ?? current)
         : current
     );
   }, [
     conversations,
+    isNoProjectPath,
     previewMode,
     setTransientConversation,
     updateConversationList,
@@ -2769,6 +2779,10 @@ export function useAgentGUINodeController({
   useEffect(() => {
     userProjectsRef.current = userProjects;
   }, [userProjects]);
+
+  useEffect(() => {
+    isNoProjectPathRef.current = isNoProjectPath;
+  }, [isNoProjectPath]);
 
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -4200,7 +4214,8 @@ export function useAgentGUINodeController({
           cwd: selectedProjectPath ?? "",
           project: resolveAgentGUIConversationProject(
             selectedProjectPath,
-            userProjectsRef.current
+            userProjectsRef.current,
+            { isNoProjectPath: isNoProjectPathRef.current }
           ),
           sortTimeUnixMs: createdAtUnixMs,
           updatedAtUnixMs: createdAtUnixMs
@@ -4252,7 +4267,10 @@ export function useAgentGUINodeController({
           }
           const projectedConversation = conversationSummaryFromAgentSession(
             result.session,
-            { userProjects: userProjectsRef.current }
+            {
+              isNoProjectPath: isNoProjectPathRef.current,
+              userProjects: userProjectsRef.current
+            }
           );
           const optimisticSortTimeUnixMs =
             transientConversationRef.current?.id === agentSessionId
@@ -4372,7 +4390,8 @@ export function useAgentGUINodeController({
             cwd: selectedProjectPathRef.current ?? "",
             project: resolveAgentGUIConversationProject(
               selectedProjectPathRef.current,
-              userProjectsRef.current
+              userProjectsRef.current,
+              { isNoProjectPath: isNoProjectPathRef.current }
             ),
             status: "failed",
             sortTimeUnixMs: failedAtUnixMs,
@@ -6263,7 +6282,9 @@ export function useAgentGUINodeController({
       titleFallback: null,
       status: fallbackStatus,
       cwd: workspacePath,
-      project: resolveAgentGUIConversationProject(workspacePath, userProjects),
+      project: resolveAgentGUIConversationProject(workspacePath, userProjects, {
+        isNoProjectPath
+      }),
       sortTimeUnixMs: fallbackUpdatedAtUnixMs,
       updatedAtUnixMs: fallbackUpdatedAtUnixMs,
       syncState: undefined
@@ -6276,6 +6297,7 @@ export function useAgentGUINodeController({
     draftBySessionId,
     isCreatingConversation,
     isSubmitting,
+    isNoProjectPath,
     stableRuntimeSyncStateBySessionId,
     transientConversation,
     userProjects,

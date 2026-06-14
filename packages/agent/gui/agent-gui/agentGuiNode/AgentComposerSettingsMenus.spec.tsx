@@ -219,6 +219,21 @@ describe("AgentProjectDropdown", () => {
     const trigger = screen.getByRole("combobox", { name: "Project" });
     expect(trigger).toHaveTextContent("Private Project");
     expect(trigger).not.toHaveTextContent(privateProjectPath);
+    const triggerLabelFrame = trigger.querySelector<HTMLElement>(
+      '[data-workspace-user-project-trigger-label="true"]'
+    );
+    expect(triggerLabelFrame).not.toBeNull();
+    expect(getComputedStyle(triggerLabelFrame!).flexBasis).toBe("auto");
+    const triggerLabel = trigger.querySelector<HTMLElement>(
+      '[data-workspace-user-project-overflow-label="true"]'
+    );
+    expect(triggerLabel).not.toBeNull();
+    expect(getComputedStyle(triggerLabel!).flexBasis).toBe("auto");
+    expect(
+      Array.from(document.querySelectorAll("style")).some((style) =>
+        style.textContent?.includes("container-type: inline-size")
+      )
+    ).toBe(false);
 
     ensurePointerCaptureApi();
     fireEvent.pointerDown(trigger, {
@@ -518,6 +533,58 @@ describe("AgentProjectDropdown", () => {
       })
     );
     expect(onProjectPathChange).toHaveBeenCalledWith("/workspace/existing", {
+      action: "select_existing"
+    });
+  });
+
+  it("selects a known project without re-registering it", async () => {
+    const onProjectPathChange = vi.fn();
+    const rememberDefaultSelection = vi.fn();
+    const useProject = vi.fn();
+    mockAgentHostApi.userProjects = {
+      list: vi.fn().mockResolvedValue({
+        projects: [
+          {
+            id: "home",
+            path: "/Users/ccr",
+            label: "ccr"
+          }
+        ]
+      }),
+      rememberDefaultSelection,
+      use: useProject
+    };
+
+    render(
+      <AgentProjectDropdown
+        composerSettings={{
+          selectedProjectPath: null,
+          projectLocked: false
+        }}
+        labels={projectLabels}
+        i18n={workspaceUserProjectI18n}
+        onProjectPathChange={onProjectPathChange}
+      />
+    );
+
+    await waitFor(() =>
+      expect(mockAgentHostApi.userProjects?.list).toHaveBeenCalled()
+    );
+
+    ensurePointerCaptureApi();
+    fireEvent.pointerDown(screen.getByRole("combobox", { name: "Project" }), {
+      button: 0,
+      ctrlKey: false,
+      pointerId: 1,
+      pointerType: "mouse"
+    });
+    fireEvent.click(await screen.findByRole("option", { name: "ccr" }));
+
+    expect(useProject).not.toHaveBeenCalled();
+    expect(rememberDefaultSelection).toHaveBeenCalledWith({
+      path: "/Users/ccr"
+    });
+    expect(onProjectPathChange).toHaveBeenCalledWith("/Users/ccr", {
       action: "select_existing"
     });
   });

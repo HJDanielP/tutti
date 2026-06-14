@@ -99,6 +99,14 @@ export type AgentGUIConversationUserProject = Pick<
   | "lastUsedAtUnixMs"
 >;
 
+export type AgentGUIConversationNoProjectPathResolver = (input: {
+  path: string;
+}) => boolean;
+
+export interface AgentGUIConversationProjectResolutionOptions {
+  isNoProjectPath?: AgentGUIConversationNoProjectPathResolver;
+}
+
 export type AgentGUIConversationStatus =
   | "working"
   | "waiting"
@@ -157,6 +165,7 @@ export type AgentGUIInteractivePrompt =
   | Extract<AgentConversationPromptVM, { kind: "exit-plan" }>;
 
 export interface BuildAgentGUIConversationsInput {
+  isNoProjectPath?: AgentGUIConversationNoProjectPathResolver;
   snapshot: WorkspaceAgentActivitySnapshot;
   provider: AgentGUIProvider;
   sessionMessagesById?: Record<string, WorkspaceAgentActivityMessage[]>;
@@ -164,6 +173,7 @@ export interface BuildAgentGUIConversationsInput {
 }
 
 export function buildAgentGUIConversationSummaries({
+  isNoProjectPath,
   snapshot,
   provider,
   sessionMessagesById,
@@ -180,7 +190,7 @@ export function buildAgentGUIConversationSummaries({
       conversationSummaryFromActivity(
         activity,
         sessionsById.get(activity.sessionId),
-        { userProjects }
+        { isNoProjectPath, userProjects }
       )
     )
     .filter(
@@ -342,6 +352,7 @@ export function mergeTimelineItemsByEventID(
 export function conversationSummaryFromAgentSession(
   session: AgentSession,
   options: {
+    isNoProjectPath?: AgentGUIConversationNoProjectPathResolver;
     userProjects?: readonly AgentGUIConversationUserProject[];
   } = {}
 ): AgentGUIConversationSummary {
@@ -353,6 +364,7 @@ export function conversationSummaryFromAgentSession(
     }).activities[0] ?? null;
   if (activity) {
     return conversationSummaryFromActivity(activity, workspaceAgentSession, {
+      isNoProjectPath: options.isNoProjectPath,
       userProjects: options.userProjects ?? []
     });
   }
@@ -374,7 +386,8 @@ export function conversationSummaryFromAgentSession(
     cwd: session.cwd?.trim() ?? "",
     project: resolveAgentGUIConversationProject(
       session.cwd,
-      options.userProjects ?? []
+      options.userProjects ?? [],
+      { isNoProjectPath: options.isNoProjectPath }
     ),
     pinnedAtUnixMs: session.pinnedAtUnixMs ?? null,
     sortTimeUnixMs: resolveWorkspaceAgentSessionSortTimeUnixMs(
@@ -388,10 +401,14 @@ export function conversationSummaryFromAgentSession(
 
 export function resolveAgentGUIConversationProject(
   cwd: string | null | undefined,
-  userProjects: readonly AgentGUIConversationUserProject[] = []
+  userProjects: readonly AgentGUIConversationUserProject[] = [],
+  options: AgentGUIConversationProjectResolutionOptions = {}
 ): AgentGUIConversationProjectSummary | null {
   const normalizedCwd = normalizeAgentGUIProjectPath(cwd);
   if (!normalizedCwd) {
+    return null;
+  }
+  if (options.isNoProjectPath?.({ path: normalizedCwd })) {
     return null;
   }
   let matchedProject: AgentGUIConversationUserProject | null = null;
@@ -433,13 +450,15 @@ export function resolveAgentGUIConversationProject(
 
 export function applyAgentGUIConversationProjects(
   conversations: readonly AgentGUIConversationSummary[],
-  userProjects: readonly AgentGUIConversationUserProject[] = []
+  userProjects: readonly AgentGUIConversationUserProject[] = [],
+  options: AgentGUIConversationProjectResolutionOptions = {}
 ): AgentGUIConversationSummary[] {
   let changed = false;
   const next = conversations.map((conversation) => {
     const project = resolveAgentGUIConversationProject(
       conversation.cwd,
-      userProjects
+      userProjects,
+      options
     );
     if (isSameAgentGUIConversationProject(conversation.project, project)) {
       return conversation;
@@ -524,6 +543,7 @@ function conversationSummaryFromActivity(
   activity: WorkspaceAgentActivityCard,
   session: WorkspaceAgentActivitySession | undefined,
   options: {
+    isNoProjectPath?: AgentGUIConversationNoProjectPathResolver;
     userProjects?: readonly AgentGUIConversationUserProject[];
   } = {}
 ): AgentGUIConversationSummary {
@@ -554,7 +574,8 @@ function conversationSummaryFromActivity(
     cwd: session?.cwd.trim() ?? "",
     project: resolveAgentGUIConversationProject(
       session?.cwd,
-      options.userProjects ?? []
+      options.userProjects ?? [],
+      { isNoProjectPath: options.isNoProjectPath }
     ),
     pinnedAtUnixMs: session?.pinnedAtUnixMs ?? null,
     sortTimeUnixMs: activity.sortTimeUnixMs,
