@@ -36,6 +36,8 @@ export interface WorkspaceAppCenterApp {
   availableIconUrl?: string | null;
   availableVersion?: string | null;
   description?: string | null;
+  installationId?: string | null;
+  runtimeId?: string | null;
   appId: string;
   createdAtUnixMs: number;
   enabled: boolean;
@@ -53,7 +55,7 @@ export interface WorkspaceAppCenterApp {
   stateRevision: number;
   tags?: readonly string[];
   updateAvailable?: boolean;
-  url?: string | null;
+  launchUrl?: string | null;
   version?: string | null;
   windowMinHeight?: number | null;
   windowMinWidth?: number | null;

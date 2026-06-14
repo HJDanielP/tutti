@@ -19,7 +19,6 @@ import type {
 import type { WorkspaceAppCenterApp } from "@tutti-os/workspace-app-center";
 import {
   resolveWorkspaceAppDisplayName,
-  resolveWorkspaceAppSizeConstraints,
   useWorkspaceAppCenterService,
   workspaceAppWebviewInstanceId,
   workspaceAppWebviewTypeID
@@ -388,9 +387,6 @@ function syncWorkspaceAppWebviewNodes(input: {
       node.id,
       resolveWorkspaceAppDisplayName(app, input.locale)
     );
-    input.host.setNodeSizeConstraints(
-      node.id,
-      resolveWorkspaceAppSizeConstraints(app)
-    );
+    input.host.setNodeSizeConstraints(node.id, null);
   }
 }

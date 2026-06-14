@@ -531,7 +531,11 @@ function toWorkspaceAppRecord(
     createdAtUnixMs: app.createdAtUnixMs,
     install: app.installed
       ? {
-          appId: app.appId
+          ...(app.installationId?.trim()
+            ? { installationId: app.installationId.trim() }
+            : {}),
+          appId: app.appId,
+          version: app.version ?? null
         }
       : null,
     manifest,
@@ -575,7 +579,12 @@ function toWorkspaceAppRuntimeState(
       ? app.cli.issues[0]
       : null;
   return {
+    ...(app.runtimeId?.trim() ? { runtimeId: app.runtimeId.trim() } : {}),
+    ...(app.installationId?.trim()
+      ? { installationId: app.installationId.trim() }
+      : {}),
     appId: app.appId,
+    launchUrl: app.launchUrl ?? null,
     ...(cliIssue
       ? {
           error: {

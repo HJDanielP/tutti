@@ -279,7 +279,7 @@ export abstract class WorkspaceAppCenterControllerState extends WorkspaceAppCent
     const app = this.store.apps.find(
       (candidate) => candidate.appId === input.appId
     );
-    return app?.installed && app.runtimeStatus === "running" && app.url
+    return app?.installed && app.runtimeStatus === "running" && app.launchUrl
       ? app
       : null;
   }

@@ -7,6 +7,7 @@ import type {
   WorkspaceAppFactoryJob,
   WorkspaceAppFactorySnapshot
 } from "../contracts/host.ts";
+import { areWorkspaceAppCenterAppsEqual } from "./appCenterControllerHelpers.ts";
 import { createWorkspaceAppCenterController } from "./index.ts";
 
 test("WorkspaceAppCenterController merges catalog fields without runtime regression", () => {
@@ -82,6 +83,39 @@ test("WorkspaceAppCenterController asks host to close removed installed apps", (
   ]);
 });
 
+test("WorkspaceAppCenterController app equality tracks runtime identity fields", () => {
+  const app = createApp({
+    installationId: "inst-1",
+    runtimeId: "rt-1"
+  });
+
+  assert.equal(areWorkspaceAppCenterAppsEqual([app], [app]), true);
+  assert.equal(
+    areWorkspaceAppCenterAppsEqual(
+      [app],
+      [
+        {
+          ...app,
+          installationId: "inst-2"
+        }
+      ]
+    ),
+    false
+  );
+  assert.equal(
+    areWorkspaceAppCenterAppsEqual(
+      [app],
+      [
+        {
+          ...app,
+          runtimeId: "rt-2"
+        }
+      ]
+    ),
+    false
+  );
+});
+
 test("WorkspaceAppCenterController sorts factory jobs and reports snapshot application", () => {
   const appliedSnapshots: Array<{
     nextJobs: readonly WorkspaceAppFactoryJob[];
@@ -134,7 +168,7 @@ function createApp(
     runtimeStatus: "idle",
     source: "generated",
     stateRevision: 1,
-    url: null,
+    launchUrl: null,
     version: "1.0.0",
     ...overrides
   };

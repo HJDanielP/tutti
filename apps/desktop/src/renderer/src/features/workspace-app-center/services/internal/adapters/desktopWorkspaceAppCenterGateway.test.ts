@@ -13,7 +13,8 @@ import type {
 import {
   normalizeWorkspaceAppCenterApp,
   normalizeWorkspaceAppCenterSnapshot,
-  type DesktopWorkspaceAppCenterLocalFileGateway
+  type DesktopWorkspaceAppCenterLocalFileGateway,
+  type WorkspaceAppLike
 } from "./desktopWorkspaceAppCenterGateway.ts";
 import { WorkspaceAppCenterService } from "../workspaceAppCenterService.ts";
 
@@ -66,10 +67,29 @@ test("Workspace App Center gateway exposes launch URLs only for running apps", (
   );
 
   assert.equal(snapshot.catalogStatus, "ready");
-  assert.equal(snapshot.apps[0]?.url, null);
+  assert.equal(snapshot.apps[0]?.launchUrl, null);
   assert.equal(snapshot.apps[1]?.createdAtUnixMs, 20);
   assert.equal(snapshot.apps[1]?.iconUrl, "data:image/png;base64,AAAA");
-  assert.equal(snapshot.apps[1]?.url, "http://127.0.0.1:23456");
+  assert.equal(snapshot.apps[1]?.installationId, null);
+  assert.equal(snapshot.apps[1]?.runtimeId, null);
+  assert.equal(snapshot.apps[1]?.launchUrl, "http://127.0.0.1:23456");
+});
+
+test("Workspace App Center gateway preserves optional remote runtime ids", () => {
+  const app: WorkspaceAppLike = {
+    ...createWorkspaceApp({
+      launchUrl: "https://preview.example/app",
+      status: "running"
+    }),
+    installationId: "inst-1",
+    runtimeId: "rt-1"
+  };
+
+  const normalized = normalizeWorkspaceAppCenterApp(app);
+
+  assert.equal(normalized.installationId, "inst-1");
+  assert.equal(normalized.runtimeId, "rt-1");
+  assert.equal(normalized.launchUrl, "https://preview.example/app");
 });
 
 test("Workspace App Center gateway preserves app failure details", () => {
@@ -101,7 +121,19 @@ test("Workspace App Center gateway preserves app window minimum size", () => {
   assert.equal(app.windowMinWidth, 720);
 });
 
-test("Workspace App Center gateway rejects unsupported app DTO enums", () => {
+test("Workspace App Center gateway maps unavailable runtime aliases", () => {
+  const app = normalizeWorkspaceAppCenterApp(
+    createWorkspaceApp({
+      launchUrl: "https://preview.example/app",
+      status: "runtime_unavailable" as WorkspaceApp["status"]
+    })
+  );
+
+  assert.equal(app.runtimeStatus, "unavailable");
+  assert.equal(app.launchUrl, null);
+});
+
+test("Workspace App Center gateway rejects unsupported app source enums", () => {
   assert.throws(
     () =>
       normalizeWorkspaceAppCenterSnapshot(
@@ -115,21 +147,6 @@ test("Workspace App Center gateway rejects unsupported app DTO enums", () => {
         })
       ),
     /Unsupported workspace app source/
-  );
-
-  assert.throws(
-    () =>
-      normalizeWorkspaceAppCenterSnapshot(
-        createWorkspaceAppListResponse({
-          workspaceId: "workspace-1",
-          apps: [
-            createWorkspaceApp({
-              status: "unknown" as WorkspaceApp["status"]
-            })
-          ]
-        })
-      ),
-    /Unsupported workspace app runtime status/
   );
 });
 
@@ -411,7 +428,7 @@ test("Workspace App Center service keeps async installs busy until the installed
 
   await waitFor(() => service.store.apps[0]?.runtimeStatus === "running");
   assert.equal(service.store.apps[0]?.installed, true);
-  assert.equal(service.store.apps[0]?.url, "http://127.0.0.1:45678");
+  assert.equal(service.store.apps[0]?.launchUrl, "http://127.0.0.1:45678");
 });
 
 test("Workspace App Center service keeps newer event state over stale install snapshots", async () => {
@@ -477,7 +494,7 @@ test("Workspace App Center service keeps newer event state over stale install sn
 
   assert.equal(service.store.apps[0]?.runtimeStatus, "running");
   assert.equal(service.store.apps[0]?.stateRevision, 15);
-  assert.equal(service.store.apps[0]?.url, "http://127.0.0.1:54860");
+  assert.equal(service.store.apps[0]?.launchUrl, "http://127.0.0.1:54860");
   dispose();
 });
 
@@ -544,7 +561,7 @@ test("Workspace App Center service refreshes stuck startup state after timeout",
   assert.equal(service.store.apps[0]?.runtimeStatus, "starting");
 
   await openPromise;
-  assert.equal(service.store.apps[0]?.url, "http://127.0.0.1:45678");
+  assert.equal(service.store.apps[0]?.launchUrl, "http://127.0.0.1:45678");
   assert.equal(launchedAppId, "weather");
 });
 
@@ -1102,7 +1119,7 @@ test("Workspace App Center service starts non-running apps before launching them
       workspaceId: "workspace-1"
     }
   ]);
-  assert.equal(service.store.apps[0]?.url, "http://127.0.0.1:34567");
+  assert.equal(service.store.apps[0]?.launchUrl, "http://127.0.0.1:34567");
 });
 
 function createWorkspaceApp(overrides: Partial<WorkspaceApp>): WorkspaceApp {

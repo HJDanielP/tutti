@@ -53,7 +53,7 @@ test("WorkspaceAppCenterService tracks app install and forwards app open status"
               installed: true,
               runtimeStatus: "idle",
               source: "builtin",
-              url: "http://127.0.0.1:3000"
+              launchUrl: "http://127.0.0.1:3000"
             })
           ]
         }),
@@ -66,7 +66,7 @@ test("WorkspaceAppCenterService tracks app install and forwards app open status"
               runtimeStatus: "running",
               stateRevision: 2,
               source: "builtin",
-              url: "http://127.0.0.1:3000"
+              launchUrl: "http://127.0.0.1:3000"
             })
           ]
         })
@@ -493,7 +493,7 @@ test("WorkspaceAppCenterService forwards running status when reopening a running
               installed: true,
               runtimeStatus: "running",
               source: "builtin",
-              url: "http://127.0.0.1:3000"
+              launchUrl: "http://127.0.0.1:3000"
             })
           ]
         })
@@ -536,7 +536,7 @@ test("WorkspaceAppCenterService ignores stale failed updates before tracking run
               runtimeStatus: "running",
               source: "generated",
               stateRevision: 2,
-              url: "http://127.0.0.1:3000"
+              launchUrl: "http://127.0.0.1:3000"
             })
           ]
         })
@@ -583,7 +583,7 @@ test("WorkspaceAppCenterService tracks accepted runtime failure transitions once
               runtimeStatus: "running",
               source: "generated",
               stateRevision: 2,
-              url: "http://127.0.0.1:3000"
+              launchUrl: "http://127.0.0.1:3000"
             })
           ]
         })
@@ -1066,7 +1066,7 @@ function createApp(
     runtimeStatus: "idle",
     source: "generated",
     stateRevision: 1,
-    url: null,
+    launchUrl: null,
     version: "1.0.0",
     ...overrides
   };
