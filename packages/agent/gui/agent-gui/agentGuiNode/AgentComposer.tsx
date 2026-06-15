@@ -34,7 +34,8 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger
+  SelectTrigger,
+  WebIcon
 } from "@tutti-os/ui-system";
 import { X } from "lucide-react";
 import type { WorkspaceFileReference } from "@tutti-os/workspace-file-reference/contracts";
@@ -178,6 +179,7 @@ export interface AgentComposerProps {
     planModeOnLabel: string;
     planModeOffLabel: string;
     planUnavailable: string;
+    browserUseLabel?: string;
     queuedLabel: string;
     sendQueuedPromptNext: string;
     editQueuedPrompt: string;
@@ -240,6 +242,7 @@ export interface AgentComposerProps {
     model?: string | null;
     reasoningEffort?: string | null;
     planMode?: boolean;
+    browserUse?: boolean;
     permissionModeId?: string | null;
   }) => void;
   onSubmit: (content: AgentPromptContentBlock[]) => void;
@@ -2160,6 +2163,34 @@ export function AgentComposer({
                   }}
                   onSettingsChange={(patch) => onSettingsChange(patch)}
                 />
+              ) : null}
+              {composerSettings.supportsBrowser ? (
+                <button
+                  type="button"
+                  className={styles.composerToggle}
+                  title={labels.browserUseLabel ?? "Browser use"}
+                  aria-pressed={
+                    composerSettings.draftSettings.browserUse ?? true
+                  }
+                  aria-label={labels.browserUseLabel ?? "Browser use"}
+                  // Browser use is fixed once a session starts (the MCP is
+                  // injected at session start), so the toggle only edits a new
+                  // conversation's draft; for a live session it is a read-only
+                  // indicator.
+                  disabled={
+                    settingsControlsDisabled ||
+                    composerSettings.sessionSettings !== null
+                  }
+                  onClick={() =>
+                    onSettingsChange({
+                      browserUse: !(
+                        composerSettings.draftSettings.browserUse ?? true
+                      )
+                    })
+                  }
+                >
+                  <WebIcon aria-hidden className="size-3.5" />
+                </button>
               ) : null}
               {composerSettings.supportsModel ||
               composerSettings.supportsReasoningEffort ? (

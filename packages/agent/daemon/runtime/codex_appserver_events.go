@@ -195,10 +195,25 @@ func (a *CodexAppServerAdapter) appServerItemEvents(
 	case "reasoning", "userMessage", "hookPrompt":
 		return nil
 	case "enteredReviewMode":
+		// Review/compaction items stream both item/started and item/completed.
+		// Emit each banner once, mirroring the agentMessage/plan cases above,
+		// so the GUI does not show "Code review started." twice. The entered
+		// banner rides item/started because that event is always present.
+		if completed {
+			return nil
+		}
 		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", "Code review started.", "")}
 	case "exitedReviewMode":
+		// Emit the finished banner on item/completed, the authoritative final
+		// review item, so it appears exactly once.
+		if !completed {
+			return nil
+		}
 		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", "Code review finished.", "")}
 	case "contextCompaction":
+		if !completed {
+			return nil
+		}
 		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", "Context compacted.", "")}
 	default:
 		update, ok := appServerItemToolCallUpdate(item, completed)

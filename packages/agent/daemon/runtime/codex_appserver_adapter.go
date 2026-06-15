@@ -1087,7 +1087,11 @@ func (a *CodexAppServerAdapter) SessionState(session Session) SessionStateSnapsh
 	if usage := acpUsageRuntimeContext(state.usage); len(usage) > 0 {
 		snapshot.RuntimeContext["usage"] = usage
 	}
-	snapshot.RuntimeContext["capabilities"] = codexAppServerCapabilities(state.planModeSupported)
+	codexCapabilities := codexAppServerCapabilities(state.planModeSupported)
+	if sessionEnvBool(session.Env, browserUseEnabledEnv) {
+		codexCapabilities = append(codexCapabilities, CapabilityBrowserUse)
+	}
+	snapshot.RuntimeContext["capabilities"] = codexCapabilities
 	snapshot.Settings = sessionSettingsWithACPConfig(
 		session.Settings,
 		session.Provider,

@@ -243,6 +243,7 @@ type CreateSessionInput struct {
 	PermissionModeID     *string
 	Model                *string
 	PlanMode             *bool
+	BrowserUse           *bool
 	ReasoningEffort      *string
 	Visible              *bool
 	ExtraSkills          []SessionSkillBundle

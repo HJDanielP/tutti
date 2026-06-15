@@ -3,37 +3,22 @@ import { toast } from "@tutti-os/ui-system";
 import { translate } from "../../../i18n/index";
 import {
   useAgentActivityRuntime,
-  useAgentActivitySnapshot,
-  type AgentActivityRuntime
+  useAgentActivitySnapshot
 } from "../../../agentActivityRuntime";
 import { useAgentHostApi } from "../../../agentActivityHost";
 import {
   resolveAgentActivityCapability,
   resolveAgentActivityUsage
 } from "@tutti-os/agent-activity-core";
+import type { AgentActivitySnapshot } from "@tutti-os/agent-activity-core";
+import type { AgentPromptContentBlock } from "../../../shared/contracts/dto";
 import type {
-  AgentActivityCancelSessionResult,
-  AgentActivityComposerOptions,
-  AgentActivitySnapshot
-} from "@tutti-os/agent-activity-core";
-import type {
-  AppErrorCode,
-  AgentPromptContentBlock,
-  AgentProviderId
-} from "../../../shared/contracts/dto";
-import type {
-  AgentModelCatalogInvalidatedEvent,
   AgentActivityStreamEvent,
-  AgentActivityMessageUpdate,
-  AgentSessionCommand,
   AgentSessionComposerSettings,
-  AgentSessionPermissionConfig,
-  AgentSessionPermissionModeOption,
   AgentSessionReasoningEffort,
   AgentSessionState
 } from "../../../shared/agentSessionTypes";
 import { AGENT_PROVIDER_LABEL } from "../../../contexts/settings/domain/agentSettings";
-import type { AgentGUINodeData } from "../../../types";
 import {
   AGENT_GUI_RUNTIME_SESSION_ORIGIN,
   buildAgentGUIConversationSummaries,
@@ -45,28 +30,20 @@ import {
   resolveAgentGUIConversationProject,
   resolveAgentGUIConversationTitleFromTimelineItems,
   selectAgentGUIConversationId,
-  type AgentGUIApprovalRequest,
   type AgentGUIConversationProjectionSource,
   type AgentGUIInteractivePrompt,
-  type AgentGUIInteractiveQuestion,
   type AgentGUIConversationSummary
 } from "../model/agentGuiConversationModel";
 import type { AgentHostUserProject } from "../../../host/agentHostApi";
 import type {
-  AgentGUIComposerSettingOption,
   AgentGUIComposerSettingsVM,
-  AgentGUIProviderSkillOption,
   AgentGUIProjectConversationDeleteTarget,
   AgentGUIQueuedPromptVM,
   AgentGUISessionChrome,
   OpenclawGatewayViewState
 } from "../model/agentGuiNodeTypes";
-import type { AgentApprovalItemVM } from "../../../shared/agentConversation/contracts/agentApprovalItemVM";
-import type { AgentConversationVM } from "../../../shared/agentConversation/contracts/agentConversationVM";
-import { normalizeOptionalWorkspaceAgentStatus } from "../../../shared/workspaceAgentStatusNormalizer";
 import { projectCoreSessionStatus } from "../../../shared/agentActivitySnapshotProjection";
 import { isWorkspaceAgentUntitledTask } from "../../../shared/workspaceAgentLatestActivitySummary";
-import { projectWorkspaceAgentMessagesToTimelineItems } from "../../../shared/agentConversation/projection/workspaceAgentMessageProjection";
 import { mergeWorkspaceAgentMessages } from "../../../host/workspaceAgentSessionMessages";
 import {
   mergeWorkspaceAgentActivityDurableAndOverlayMessages,
@@ -78,7 +55,6 @@ import {
 } from "../../../shared/workspaceAgentActivityTypes";
 import { useAccountStore } from "../../../host/agentHostAccountStore";
 import { subscribeCoalesced } from "../../../host/agentHostEventBus";
-import { getAppErrorCode } from "../../../shared/errors/appError";
 import {
   deleteAgentSessionView,
   getAgentSessionView,
@@ -113,12 +89,6 @@ import {
 } from "../../../contexts/workspace/presentation/renderer/agentGuiConversationList/agentGuiConversationListStore";
 import { useAgentGuiConversationList } from "../../../contexts/workspace/presentation/renderer/agentGuiConversationList/useAgentGuiConversationList";
 import { useAgentGUIActivation } from "./useAgentGUIActivation";
-import {
-  buildAgentSessionMentionHref,
-  formatAgentMentionMarkdown,
-  normalizeAgentSessionMentionTitle
-} from "../agentRichText/agentFileMentionExtension";
-import { resolveAgentGUIExplicitConversationTitle } from "../model/agentGuiProviderIdentity";
 import { composerSettingsSupportFromOptions } from "../model/composerSettingsSupport";
 import {
   PLAN_IMPLEMENTATION_ACTION_FEEDBACK,
@@ -135,1863 +105,128 @@ import {
   type UsageAlertTier
 } from "../model/agentUsageAlerts";
 
-const EMPTY_AGENT_GUI_MESSAGES: readonly WorkspaceAgentActivityMessage[] = [];
-const EMPTY_AGENT_GUI_AVAILABLE_COMMANDS: AgentSessionCommand[] = [];
-const ACTIVITY_STREAM_STATE_RELOAD_DEBOUNCE_MS = 150;
-
-function mergeAgentModelCatalogInvalidationEvents(
-  events: AgentModelCatalogInvalidatedEvent[]
-): AgentModelCatalogInvalidatedEvent {
-  const providers = new Set<AgentProviderId>();
-  let occurredAtUnixMs = 0;
-  for (const event of events) {
-    occurredAtUnixMs = Math.max(occurredAtUnixMs, event.occurredAtUnixMs);
-    for (const provider of event.providers) {
-      providers.add(provider);
-    }
-  }
-  const lastEvent = events[events.length - 1]!;
-  return {
-    ...lastEvent,
-    providers: [...providers],
-    occurredAtUnixMs: occurredAtUnixMs || lastEvent.occurredAtUnixMs
-  };
-}
-
-const AGENT_PROVIDER_SESSION_NOT_FOUND_ERROR =
-  "agent.provider_session_not_found";
-const AGENT_RESUME_SESSION_NOT_LOCAL_ERROR = "agent.resume_session_not_local";
-const AGENT_SETTINGS_REQUIRE_NEW_SESSION_ERROR =
-  "agent.settings_require_new_session";
-const AGENT_SESSION_NOT_FOUND_ERROR = "session.not_found";
-const AGENT_SESSION_ACTIVE_TURN_CONFLICT_MESSAGE =
-  "agent session already has an active turn";
-const AGENT_PROVIDER_SESSION_NOT_FOUND_FALLBACK_MESSAGE =
-  "The previous agent session can no longer be restored.";
-const AGENT_RESUME_SESSION_NOT_LOCAL_FALLBACK_MESSAGE =
-  "The previous agent session is not available on this machine.";
-const AGENT_GUI_CAUGHT_ERROR_STACK_LIMIT = 4000;
-
-type AgentGUIRuntimeErrorPhase =
-  | "create_conversation"
-  | "drain_queued_prompt_interrupt"
-  | "interrupt_current_turn"
-  | "load_session_state"
-  | "retry_activation"
-  | "send_prompt"
-  | "submit_interactive"
-  | "toggle_conversation_pinned"
-  | "delete_conversation"
-  | "update_session_settings"
-  | "warmup_openclaw_gateway";
-
-interface QueuedPromptRetryBlock {
-  queuedPromptId: string;
-  sessionStateUpdatedAtUnixMs: number | null;
-  conversationUpdatedAtUnixMs: number | null;
-}
-
-interface QueuedComposerSettingsUpdate {
-  sessionSettingsPatch: AgentSessionComposerSettings;
-  nextNodeDefaults: AgentSessionComposerSettings;
-}
-
-interface ACPConfigOptionSelection {
-  options: AgentGUIComposerSettingOption[];
-  currentValue: string | null;
-}
-
-function reportAgentGUIRuntimeError(input: {
-  agentSessionId?: string | null;
-  context?: Record<string, unknown>;
-  error: unknown;
-  phase: AgentGUIRuntimeErrorPhase;
-  provider?: string | null;
-  requestId?: number | string | null;
-  runtime: AgentActivityRuntime;
-  workspaceId: string;
-}): void {
-  const reportDiagnostic = input.runtime.reportDiagnostic;
-  if (!reportDiagnostic) {
-    return;
-  }
-  const details: Record<string, unknown> = {
-    error: normalizeAgentGUIDiagnosticError(input.error),
-    errorCode: getAgentGUIErrorCode(input.error),
-    phase: input.phase,
-    ...(input.agentSessionId ? { agentSessionId: input.agentSessionId } : {}),
-    ...(input.provider ? { provider: input.provider } : {}),
-    ...(input.requestId !== undefined && input.requestId !== null
-      ? { requestId: input.requestId }
-      : {}),
-    ...(input.context ?? {})
-  };
-  try {
-    void Promise.resolve(
-      reportDiagnostic.call(input.runtime, {
-        details,
-        event: "agent.gui.caught_error",
-        level: "error",
-        source: "agent-gui",
-        workspaceId: input.workspaceId
-      })
-    ).catch(() => {});
-  } catch {
-    // Diagnostic logging must never affect the Agent GUI recovery path.
-  }
-}
-
-function reportAgentGUICancelDiagnostic(input: {
-  agentSessionId: string;
-  busySource?: string | null;
-  currentSessionStatus?: string | null;
-  phase: "drain_queued_prompt_interrupt" | "interrupt_current_turn";
-  provider?: string | null;
-  result: AgentActivityCancelSessionResult;
-  runtime: AgentActivityRuntime;
-  workspaceId: string;
-}): void {
-  if (input.result.canceled) {
-    return;
-  }
-  const reportDiagnostic = input.runtime.reportDiagnostic;
-  if (!reportDiagnostic) {
-    return;
-  }
-  try {
-    void Promise.resolve(
-      reportDiagnostic.call(input.runtime, {
-        details: {
-          agentSessionId: input.agentSessionId,
-          busySource: input.busySource ?? "unknown",
-          canceled: input.result.canceled,
-          cancelReason: input.result.reason,
-          currentSessionStatus: input.currentSessionStatus ?? null,
-          phase: input.phase,
-          provider: input.provider ?? null,
-          returnedSessionNonBusy: cancelResultSessionStatusIsNonBusy(
-            input.result
-          ),
-          returnedSessionStatus: input.result.session.status
-        },
-        event: "agent.gui.cancel.noop",
-        level: "info",
-        source: "agent-gui",
-        workspaceId: input.workspaceId
-      })
-    ).catch(() => {});
-  } catch {
-    // Diagnostic logging must never affect the Agent GUI recovery path.
-  }
-}
-
-function cancelResultSessionStatusIsNonBusy(
-  result: AgentActivityCancelSessionResult
-): boolean {
-  const status = normalizeOptionalWorkspaceAgentStatus({
-    currentPhase: result.session.currentPhase,
-    status: projectCoreSessionStatus(result.session.status)
-  });
-  return (
-    status !== null && status.kind !== "working" && status.kind !== "waiting"
-  );
-}
-
-function cancelBusySource(input: {
-  conversationStatus?: string | null;
-  hasActivePrompt?: boolean;
-  runtimeSessionStatus?: string | null;
-  sessionStateStatus?: string | null;
-}): string {
-  if (input.hasActivePrompt) {
-    return "interactive_prompt";
-  }
-  if (
-    agentSessionStatusBusy({
-      status: input.conversationStatus ?? undefined
-    })
-  ) {
-    return "conversation_status";
-  }
-  if (
-    agentSessionStatusBusy({
-      status: input.runtimeSessionStatus ?? undefined
-    })
-  ) {
-    return "runtime_session";
-  }
-  if (
-    agentSessionStatusBusy({
-      status: input.sessionStateStatus ?? undefined
-    })
-  ) {
-    return "session_state";
-  }
-  return "unknown";
-}
-
-function normalizeAgentGUIDiagnosticError(
-  error: unknown
-): Record<string, unknown> {
-  const record =
-    error && typeof error === "object"
-      ? (error as Record<string, unknown>)
-      : null;
-  const appErrorCode = getAgentGUIErrorCode(error);
-  const explicitCode = typeof record?.code === "string" ? record.code : null;
-  const hasStructuredCode = appErrorCode !== null || explicitCode !== null;
-  const nativeRuntimeError =
-    error instanceof Error && isNativeRuntimeError(error);
-  const base: Record<string, unknown> = {
-    ...(error instanceof Error ? { name: error.name } : {}),
-    ...(explicitCode ? { code: explicitCode } : {}),
-    ...(typeof record?.statusCode === "number"
-      ? { statusCode: record.statusCode }
-      : {}),
-    ...(typeof record?.correlationId === "string"
-      ? { correlationId: record.correlationId }
-      : {}),
-    ...(typeof record?.reason === "string" ? { reason: record.reason } : {}),
-    ...(typeof record?.retryable === "boolean"
-      ? { retryable: record.retryable }
-      : {})
-  };
-  if (nativeRuntimeError) {
-    return {
-      ...base,
-      message: error.message,
-      ...(error.stack ? { stack: limitDiagnosticText(error.stack) } : {})
-    };
-  }
-  if (record) {
-    return {
-      ...base,
-      ...(typeof record.name === "string" && !("name" in base)
-        ? { name: record.name }
-        : {}),
-      ...(typeof record.message === "string"
-        ? { messageLength: record.message.length }
-        : {}),
-      ...(typeof record.debugMessage === "string"
-        ? { debugMessageLength: record.debugMessage.length }
-        : {})
-    };
-  }
-  const rawMessage = getAgentGUIRawErrorMessage(error);
-  return {
-    ...(hasStructuredCode ? {} : { messageLength: rawMessage?.length ?? 0 }),
-    type: typeof error
-  };
-}
-
-function isNativeRuntimeError(error: Error): boolean {
-  return (
-    error instanceof RangeError ||
-    error instanceof ReferenceError ||
-    error instanceof SyntaxError ||
-    error instanceof TypeError ||
-    error instanceof URIError
-  );
-}
-
-function limitDiagnosticText(value: string): string {
-  if (value.length <= AGENT_GUI_CAUGHT_ERROR_STACK_LIMIT) {
-    return value;
-  }
-  return `${value.slice(0, AGENT_GUI_CAUGHT_ERROR_STACK_LIMIT)}...`;
-}
-
-function getAgentGUIErrorCode(error: unknown): AppErrorCode | null {
-  return (
-    getAppErrorCode(error) ??
-    inferAgentGUIErrorCodeFromMessage(getAgentGUIRawErrorMessage(error))
-  );
-}
-
-function inferAgentGUIErrorCodeFromMessage(
-  message: string | null
-): AppErrorCode | null {
-  if (!message) {
-    return null;
-  }
-  switch (message.trim()) {
-    case AGENT_PROVIDER_SESSION_NOT_FOUND_FALLBACK_MESSAGE:
-      return AGENT_PROVIDER_SESSION_NOT_FOUND_ERROR as AppErrorCode;
-    case AGENT_RESUME_SESSION_NOT_LOCAL_FALLBACK_MESSAGE:
-      return AGENT_RESUME_SESSION_NOT_LOCAL_ERROR as AppErrorCode;
-    default:
-      return null;
-  }
-}
-
-function isProviderSessionNotFoundErrorCode(
-  code: AppErrorCode | null | undefined
-): boolean {
-  return code === AGENT_PROVIDER_SESSION_NOT_FOUND_ERROR;
-}
-
-function isResumeSessionNotLocalErrorCode(
-  code: AppErrorCode | null | undefined
-): boolean {
-  return code === AGENT_RESUME_SESSION_NOT_LOCAL_ERROR;
-}
-
-function isNonRetryableResumeErrorCode(
-  code: AppErrorCode | null | undefined
-): boolean {
-  return (
-    isProviderSessionNotFoundErrorCode(code) ||
-    isResumeSessionNotLocalErrorCode(code)
-  );
-}
-
-function isSessionNotFoundErrorCode(
-  code: AppErrorCode | null | undefined
-): boolean {
-  return code === AGENT_SESSION_NOT_FOUND_ERROR;
-}
-
-function isSettingsRequireNewSessionErrorCode(
-  code: AppErrorCode | null | undefined
-): boolean {
-  return code === AGENT_SETTINGS_REQUIRE_NEW_SESSION_ERROR;
-}
-
-function buildProviderSessionNotFoundActivationError(message?: string | null): {
-  code: AppErrorCode;
-  message: string;
-  debugMessage?: string;
-} {
-  const localizedMessage = translate("messages.agentProviderSessionNotFound");
-  const normalizedMessage =
-    typeof message === "string" && message.trim() ? message.trim() : null;
-  return {
-    code: AGENT_PROVIDER_SESSION_NOT_FOUND_ERROR,
-    message: localizedMessage,
-    ...(normalizedMessage ? { debugMessage: normalizedMessage } : {})
-  };
-}
-
-function buildResumeSessionNotLocalActivationError(message?: string | null): {
-  code: AppErrorCode;
-  message: string;
-  debugMessage?: string;
-} {
-  const localizedMessage = translate("messages.agentResumeSessionNotLocal");
-  const normalizedMessage =
-    typeof message === "string" && message.trim() ? message.trim() : null;
-  return {
-    code: AGENT_RESUME_SESSION_NOT_LOCAL_ERROR,
-    message: localizedMessage,
-    ...(normalizedMessage ? { debugMessage: normalizedMessage } : {})
-  };
-}
-
-function getAgentGUIErrorMessage(error: unknown): string {
-  if (isProviderSessionNotFoundErrorCode(getAgentGUIErrorCode(error))) {
-    return translate("messages.agentProviderSessionNotFound");
-  }
-  if (isResumeSessionNotLocalErrorCode(getAgentGUIErrorCode(error))) {
-    return translate("messages.agentResumeSessionNotLocal");
-  }
-  if (isSettingsRequireNewSessionErrorCode(getAgentGUIErrorCode(error))) {
-    return translate("messages.agentSettingsRequireNewSession");
-  }
-  if (error && typeof error === "object") {
-    const debugMessage = (error as { debugMessage?: unknown }).debugMessage;
-    if (typeof debugMessage === "string" && debugMessage.trim()) {
-      return debugMessage.trim();
-    }
-  }
-  return error instanceof Error ? error.message : String(error);
-}
-
-function getAgentGUIRawErrorMessage(error: unknown): string | null {
-  if (error && typeof error === "object") {
-    const debugMessage = (error as { debugMessage?: unknown }).debugMessage;
-    if (typeof debugMessage === "string" && debugMessage.trim()) {
-      return debugMessage.trim();
-    }
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.trim();
-  }
-  if (typeof error === "string" && error.trim()) {
-    return error.trim();
-  }
-  return null;
-}
-
-function buildContinueInNewConversationPrompt(input: {
-  workspaceId: string;
-  agentSessionId: string;
-  conversationUserId?: string | null;
-  currentUserId?: string | null;
-  userProfilesByUserId: Record<string, { name?: string | null }>;
-  provider: string;
-  conversationTitle: string;
-  existingDraftPrompt: string;
-}): string {
-  const providerLabelFromCatalog =
-    AGENT_PROVIDER_LABEL[input.provider as keyof typeof AGENT_PROVIDER_LABEL] ??
-    null;
-  const providerLabel =
-    providerLabelFromCatalog || input.provider.trim() || "Agent";
-  const normalizedTitle = normalizeAgentSessionMentionTitle(
-    input.conversationTitle
-  );
-  const normalizedConversationUserId = input.conversationUserId?.trim() ?? "";
-  const normalizedCurrentUserId = input.currentUserId?.trim() ?? "";
-  const initiatorName =
-    (normalizedConversationUserId &&
-      input.userProfilesByUserId[normalizedConversationUserId]?.name?.trim()) ||
-    (normalizedCurrentUserId &&
-      input.userProfilesByUserId[normalizedCurrentUserId]?.name?.trim()) ||
-    normalizedConversationUserId ||
-    normalizedCurrentUserId ||
-    translate("messages.agentThisSessionMentionLabel").trim();
-  const mentionLabel = `${initiatorName} & ${providerLabel}${
-    normalizedTitle ? ` ${normalizedTitle}` : ""
-  }`.trim();
-  const href = buildAgentSessionMentionHref(
-    input.workspaceId,
-    input.agentSessionId,
-    input.provider
-  );
-  const mention = formatAgentMentionMarkdown({
-    kind: "session",
-    href,
-    workspaceId: input.workspaceId,
-    targetId: input.agentSessionId,
-    name: mentionLabel,
-    title: normalizedTitle || providerLabel,
-    scope: "my_sessions",
-    initiatorName,
-    agentName: providerLabel
-  });
-  const existingDraftPrompt = input.existingDraftPrompt.trim();
-  if (!existingDraftPrompt) {
-    return `${mention} `;
-  }
-  if (existingDraftPrompt.includes(href)) {
-    return existingDraftPrompt;
-  }
-  return `${mention} ${existingDraftPrompt}`;
-}
-
-function isAgentSessionActiveTurnConflictError(error: unknown): boolean {
-  const message = getAgentGUIRawErrorMessage(error);
-  return (
-    message
-      ?.toLowerCase()
-      .includes(AGENT_SESSION_ACTIVE_TURN_CONFLICT_MESSAGE) ?? false
-  );
-}
-
-export function resolveConversationUpdatedAtUnixMsFromSessionState(input: {
-  currentUpdatedAtUnixMs: number;
-  snapshotUpdatedAtUnixMs?: number;
-  source?: "conversation-selected" | "activity-stream" | "settings-update";
-}): number {
-  if (input.source === "conversation-selected") {
-    return input.currentUpdatedAtUnixMs;
-  }
-  const updatedAtUnixMs = input.snapshotUpdatedAtUnixMs ?? Date.now();
-  return Math.max(input.currentUpdatedAtUnixMs, updatedAtUnixMs);
-}
-
-function resolveConversationSummaryById(
-  conversations: readonly AgentGUIConversationSummary[],
-  conversationId: string | null | undefined,
-  transientConversation: AgentGUIConversationSummary | null
-): AgentGUIConversationSummary | null {
-  const normalized = conversationId?.trim() ?? "";
-  if (!normalized) {
-    return null;
-  }
-  return (
-    conversations.find((conversation) => conversation.id === normalized) ??
-    (transientConversation?.id === normalized ? transientConversation : null)
-  );
-}
-
-function mergeVisibleConversations(
-  conversations: readonly AgentGUIConversationSummary[],
-  transientConversation: AgentGUIConversationSummary | null
-): AgentGUIConversationSummary[] {
-  if (!transientConversation) {
-    return [...conversations];
-  }
-  if (
-    conversations.some(
-      (conversation) => conversation.id === transientConversation.id
-    )
-  ) {
-    return [...conversations];
-  }
-  return [transientConversation, ...conversations];
-}
-
-function stableConversationSummaryList(
-  previous: readonly AgentGUIConversationSummary[] | null,
-  next: AgentGUIConversationSummary[]
-): AgentGUIConversationSummary[] {
-  if (previous?.length !== next.length) {
-    return next;
-  }
-  for (let index = 0; index < next.length; index += 1) {
-    if (previous[index] !== next[index]) {
-      return next;
-    }
-  }
-  return previous as AgentGUIConversationSummary[];
-}
-
-function mergeConversationTitleUpdateFields(
-  current: AgentGUIConversationSummary,
-  incomingTitle: string
-): Pick<AgentGUIConversationSummary, "title" | "titleFallback"> {
-  const title = incomingTitle.trim();
-  if (!title) {
-    return {
-      title: current.title,
-      titleFallback: current.titleFallback
-    };
-  }
-  const currentHasPromptTitle = hasPromptConversationTitle(current);
-  if (currentHasPromptTitle) {
-    return {
-      title: current.title,
-      titleFallback: current.titleFallback
-    };
-  }
-  return {
-    title,
-    titleFallback: null
-  };
-}
-
-function hasPromptConversationTitle(
-  conversation: AgentGUIConversationSummary
-): boolean {
-  return resolveAgentGUIExplicitConversationTitle(conversation) !== null;
-}
-
-function syncStateUpdatedAtUnixMs(
-  syncState: WorkspaceAgentActivitySyncState | null | undefined
-): number | null {
-  const updatedAtUnixMs = syncState?.updatedAtUnixMs;
-  return typeof updatedAtUnixMs === "number" && Number.isFinite(updatedAtUnixMs)
-    ? updatedAtUnixMs
-    : null;
-}
-
-function shouldApplySyncState(
-  currentSyncState: WorkspaceAgentActivitySyncState | null | undefined,
-  nextSyncState: WorkspaceAgentActivitySyncState
-): boolean {
-  const currentUpdatedAtUnixMs = syncStateUpdatedAtUnixMs(currentSyncState);
-  const nextUpdatedAtUnixMs = syncStateUpdatedAtUnixMs(nextSyncState);
-  return !(
-    currentUpdatedAtUnixMs !== null &&
-    nextUpdatedAtUnixMs !== null &&
-    nextUpdatedAtUnixMs < currentUpdatedAtUnixMs
-  );
-}
-
-function hasPendingSyncReplay(
-  syncState: WorkspaceAgentActivitySyncState | null | undefined
-): boolean {
-  const status = syncState?.status.trim().toLowerCase() ?? "";
-  return (
-    status === "pending" ||
-    (syncState?.pendingTimelineItemCount ?? 0) > 0 ||
-    (syncState?.pendingStatePatchCount ?? 0) > 0
-  );
-}
-
-function hasSettledTimelineEvidence(
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[]
-): boolean {
-  if (timelineItems.length === 0) {
-    return false;
-  }
-  let latestTurnId: string | null = null;
-  let latestTurnTime = -1;
-  for (const item of timelineItems) {
-    const turnId = item.turnId?.trim();
-    if (!turnId) {
-      continue;
-    }
-    const occurredAtUnixMs = timelineItemTime(item);
-    if (occurredAtUnixMs >= latestTurnTime) {
-      latestTurnTime = occurredAtUnixMs;
-      latestTurnId = turnId;
-    }
-  }
-  const relevantItems = latestTurnId
-    ? timelineItems.filter((item) => item.turnId?.trim() === latestTurnId)
-    : timelineItems;
-  if (
-    relevantItems.length === 0 ||
-    conversationStatusFromTimelineItems(relevantItems) !== null
-  ) {
-    return false;
-  }
-  return relevantItems.some((item) => {
-    const normalizedStatus = normalizeOptionalWorkspaceAgentStatus({
-      status: item.status ?? stringPayloadValue(item.payload, "status")
-    })?.kind;
-    return (
-      item.role === "assistant" ||
-      normalizedStatus === "completed" ||
-      normalizedStatus === "ready" ||
-      normalizedStatus === "failed" ||
-      normalizedStatus === "canceled"
-    );
-  });
-}
-
-function canSettleBusyConversationFromSessionState(input: {
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[];
-  syncState: WorkspaceAgentActivitySyncState | null | undefined;
-}): boolean {
-  return (
-    !hasPendingSyncReplay(input.syncState) &&
-    (input.syncState !== null && input.syncState !== undefined
-      ? true
-      : hasSettledTimelineEvidence(input.timelineItems))
-  );
-}
-
-function isSettledConversationStatus(
-  status: AgentGUIConversationSummary["status"]
-): status is Exclude<
-  AgentGUIConversationSummary["status"],
-  "working" | "waiting"
-> {
-  return !conversationBusyStatus(status);
-}
-
-function settledConversationStatusFromSessionState(input: {
-  currentStatus: AgentGUIConversationSummary["status"];
-  sessionState: AgentSessionState | null | undefined;
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[];
-}): Exclude<
-  AgentGUIConversationSummary["status"],
-  "working" | "waiting"
-> | null {
-  if (!conversationBusyStatus(input.currentStatus) || !input.sessionState) {
-    return null;
-  }
-  const sessionStatus = conversationStatusFromSessionState(input.sessionState);
-  if (!sessionStatus || !isSettledConversationStatus(sessionStatus)) {
-    return null;
-  }
-  return hasSettledTimelineEvidence(input.timelineItems) ? sessionStatus : null;
-}
-
-function resolveConversationStatusFromTimelineEvidence(input: {
-  status: AgentGUIConversationSummary["status"];
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[];
-}): AgentGUIConversationSummary["status"] {
-  if (
-    input.status === "canceled" &&
-    hasRejectedApprovalDecision(input.timelineItems)
-  ) {
-    return "completed";
-  }
-  return input.status;
-}
-
-function hasRejectedApprovalDecision(
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[]
-): boolean {
-  return timelineItems.some((item) => {
-    const payload = item.payload ?? {};
-    const callType = (
-      item.callType ??
-      stringPayloadValue(payload, "callType") ??
-      ""
-    )
-      .trim()
-      .toLowerCase();
-    const toolName = (stringPayloadValue(payload, "toolName") ?? "")
-      .trim()
-      .toLowerCase();
-    if (callType !== "approval" && toolName !== "approval") {
-      return false;
-    }
-    const status = normalizeOptionalWorkspaceAgentStatus({
-      status: item.status ?? stringPayloadValue(payload, "status")
-    })?.kind;
-    if (status !== "completed") {
-      return false;
-    }
-    const output = recordValue(payload.output);
-    return isRejectedApprovalDecision(output);
-  });
-}
-
-function isRejectedApprovalDecision(
-  output: Record<string, unknown> | null | undefined
-): boolean {
-  const selectedId = stringPayloadValue(output ?? undefined, "selectedId");
-  if (!selectedId) {
-    return false;
-  }
-  switch (normalizeApprovalDecisionToken(selectedId)) {
-    case "deny":
-    case "denied":
-    case "disallow":
-    case "reject":
-    case "rejected":
-    case "rejectonce":
-    case "decline":
-    case "declined":
-    case "no":
-      return true;
-    default:
-      return false;
-  }
-}
-
-function normalizeApprovalDecisionToken(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-export function resolveConversationStatusAfterTimelineUpdate(input: {
-  currentStatus: AgentGUIConversationSummary["status"];
-  incomingTimelineStatus: Extract<
-    AgentGUIConversationSummary["status"],
-    "working" | "waiting"
-  > | null;
-  sessionState: AgentSessionState | null | undefined;
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[];
-}): AgentGUIConversationSummary["status"] {
-  const projectedStatus = input.incomingTimelineStatus ?? input.currentStatus;
-  if (!hasSettledTimelineEvidence(input.timelineItems)) {
-    return resolveConversationStatusFromTimelineEvidence({
-      status: projectedStatus,
-      timelineItems: input.timelineItems
-    });
-  }
-  const settledStatus =
-    settledConversationStatusFromSessionState({
-      currentStatus: projectedStatus,
-      sessionState: input.sessionState,
-      timelineItems: input.timelineItems
-    }) ?? projectedStatus;
-  return resolveConversationStatusFromTimelineEvidence({
-    status: settledStatus,
-    timelineItems: input.timelineItems
-  });
-}
-
-export function syncStateRenderFieldsEqual(
-  currentSyncState: WorkspaceAgentActivitySyncState | null | undefined,
-  nextSyncState: WorkspaceAgentActivitySyncState
-): boolean {
-  if (!currentSyncState) {
-    return false;
-  }
-  return (
-    (currentSyncState.agentSessionId?.trim() ?? "") ===
-      (nextSyncState.agentSessionId?.trim() ?? "") &&
-    (currentSyncState.status?.trim() ?? "") ===
-      (nextSyncState.status?.trim() ?? "") &&
-    (currentSyncState.lastError?.trim() ?? "") ===
-      (nextSyncState.lastError?.trim() ?? "") &&
-    (currentSyncState.pendingTimelineItemCount ?? 0) ===
-      (nextSyncState.pendingTimelineItemCount ?? 0) &&
-    (currentSyncState.pendingStatePatchCount ?? 0) ===
-      (nextSyncState.pendingStatePatchCount ?? 0)
-  );
-}
-
-function conversationSyncStatesEqual(
-  currentSyncState: WorkspaceAgentActivitySyncState | null | undefined,
-  nextSyncState: WorkspaceAgentActivitySyncState | null | undefined
-): boolean {
-  if (!currentSyncState || !nextSyncState) {
-    return currentSyncState === nextSyncState;
-  }
-  return (
-    syncStateRenderFieldsEqual(currentSyncState, nextSyncState) &&
-    syncStateUpdatedAtUnixMs(currentSyncState) ===
-      syncStateUpdatedAtUnixMs(nextSyncState)
-  );
-}
-
-function mergeConversationSummaryWithRuntimeSession(input: {
-  conversation: AgentGUIConversationSummary;
-  runtimeSyncState: WorkspaceAgentActivitySyncState | null | undefined;
-}): AgentGUIConversationSummary {
-  if (
-    conversationSyncStatesEqual(
-      input.conversation.syncState,
-      input.runtimeSyncState
-    )
-  ) {
-    return input.conversation;
-  }
-  return {
-    ...input.conversation,
-    syncState: input.runtimeSyncState ?? undefined
-  };
-}
-
-function runtimeSessionSyncState(
-  session: unknown
-): WorkspaceAgentActivitySyncState | null | undefined {
-  if (!session || typeof session !== "object") {
-    return undefined;
-  }
-  const syncState = (session as { syncState?: unknown }).syncState;
-  if (!syncState || typeof syncState !== "object") {
-    return undefined;
-  }
-  return syncState as WorkspaceAgentActivitySyncState;
-}
-
-function stringPayloadValue(
-  value: Record<string, unknown> | undefined,
-  key: string
-): string | undefined {
-  const nested = value?.[key];
-  return typeof nested === "string" ? nested : undefined;
-}
-
-function createAgentGUIConversationId(): string {
-  if (typeof globalThis.crypto?.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
-  }
-  const fallbackHex = Math.random().toString(16).slice(2).padEnd(12, "0");
-  return `00000000-0000-4000-8000-${fallbackHex.slice(0, 12)}`;
-}
-
-function createOptimisticPromptMessage(input: {
-  workspaceId: string;
-  agentSessionId: string;
-  turnId: string;
-  userId: string;
-  prompt: string;
-  content: AgentPromptContentBlock[];
-  occurredAtUnixMs: number;
-}): WorkspaceAgentActivityMessage {
-  return {
-    id: Math.max(1, Math.floor(input.occurredAtUnixMs)),
-    workspaceId: input.workspaceId,
-    agentSessionId: input.agentSessionId,
-    messageId: `optimistic:user:${input.turnId}`,
-    version: Math.max(1, Math.floor(input.occurredAtUnixMs)),
-    turnId: input.turnId,
-    role: "user",
-    kind: "text",
-    payload: {
-      __agentGuiOptimisticPrompt: true,
-      actorId: input.userId,
-      content: input.content,
-      text: input.prompt
-    },
-    occurredAtUnixMs: input.occurredAtUnixMs,
-    startedAtUnixMs: input.occurredAtUnixMs
-  };
-}
-
-function projectAgentGUIMessagesToTimelineItems(
-  messages: readonly WorkspaceAgentActivityMessage[]
-): WorkspaceAgentActivityTimelineItem[] {
-  return mergeAgentGUITimelineItems(
-    [],
-    projectWorkspaceAgentMessagesToTimelineItems(messages)
-  );
-}
-
-function normalizeOptionalText(
-  value: string | null | undefined
-): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function normalizeOptionalPrompt(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function textPromptContent(prompt: string): AgentPromptContentBlock[] {
-  const text = prompt.trim();
-  return text ? [{ type: "text", text }] : [];
-}
-
-function normalizePromptContentBlocks(
-  content: readonly AgentPromptContentBlock[]
-): AgentPromptContentBlock[] {
-  const result: AgentPromptContentBlock[] = [];
-  for (const block of content) {
-    if (block.type === "text") {
-      const text = block.text?.trim() ?? "";
-      if (text) {
-        result.push({ type: "text", text });
-      }
-      continue;
-    }
-    if (block.type === "image") {
-      const mimeType = block.mimeType?.trim();
-      const data = block.data?.trim();
-      if (
-        !data ||
-        (mimeType !== "image/png" &&
-          mimeType !== "image/jpeg" &&
-          mimeType !== "image/webp")
-      ) {
-        continue;
-      }
-      result.push({
-        type: "image",
-        mimeType,
-        data,
-        ...(block.name?.trim() ? { name: block.name.trim() } : {})
-      });
-    }
-  }
-  return result;
-}
-
-function promptContentDisplayText(
-  content: readonly AgentPromptContentBlock[]
-): string {
-  return content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text?.trim() ?? "")
-    .filter(Boolean)
-    .join("\n");
-}
-
-function promptContentHasImage(
-  content: readonly AgentPromptContentBlock[]
-): boolean {
-  return content.some((block) => block.type === "image");
-}
-
-function recordValue(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function normalizeConfigOptionValue(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function reasoningConfigOptionIdForProvider(
-  provider: AgentGUINodeData["provider"]
-): string {
-  return provider === "codex" ? "reasoning_effort" : "effort";
-}
-
-function composerSettingOptionsFromActivity(
-  options: readonly AgentActivityComposerOptions["models"][number][]
-): AgentGUIComposerSettingOption[] {
-  return options.map((option) => ({ ...option }));
-}
-
-function modelSelectionFromComposerOptions(
-  options: AgentActivityComposerOptions | null,
-  currentValue: string | null
-): ACPConfigOptionSelection | null {
-  if (!options) {
-    return null;
-  }
-  return {
-    options: composerSettingOptionsFromActivity(options.models),
-    currentValue
-  };
-}
-
-function reasoningSelectionFromComposerOptions(
-  options: AgentActivityComposerOptions | null,
-  currentValue: AgentSessionReasoningEffort | null
-): ACPConfigOptionSelection | null {
-  if (!options) {
-    return null;
-  }
-  return {
-    options: composerSettingOptionsFromActivity(options.reasoningEfforts),
-    currentValue
-  };
-}
-
-function providerSkillsFromComposerOptions(
-  options: AgentActivityComposerOptions | null
-): AgentGUIProviderSkillOption[] {
-  return options?.skills.map((skill) => ({ ...skill })) ?? [];
-}
-
-function areProviderSkillOptionsEqual(
-  left: AgentGUIProviderSkillOption,
-  right: AgentGUIProviderSkillOption
-): boolean {
-  return (
-    left.name === right.name &&
-    left.trigger === right.trigger &&
-    left.sourceKind === right.sourceKind &&
-    left.description === right.description &&
-    left.pluginName === right.pluginName
-  );
-}
-
-function areProviderSkillOptionListsEqual(
-  left: readonly AgentGUIProviderSkillOption[],
-  right: readonly AgentGUIProviderSkillOption[]
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((skill, index) =>
-      areProviderSkillOptionsEqual(skill, right[index]!)
-    )
-  );
-}
-
-function permissionConfigFromComposerOptions(
-  options: AgentActivityComposerOptions | null
-): AgentSessionPermissionConfig | null {
-  const config = options?.permissionConfig;
-  if (!config) {
-    return null;
-  }
-  const defaultValue = normalizePermissionModeId(config.defaultValue);
-  return {
-    configurable: config.configurable,
-    ...(defaultValue ? { defaultValue } : {}),
-    modes: config.modes.map((mode) => ({
-      id: mode.id,
-      label: mode.label,
-      description: mode.description,
-      semantic: normalizePermissionModeSemantic(mode.semantic)
-    }))
-  };
-}
-
-function normalizePermissionModeSemantic(
-  value: string | undefined
-): AgentSessionPermissionModeOption["semantic"] {
-  switch (value) {
-    case "ask-before-write":
-    case "accept-edits":
-    case "locked-down":
-    case "auto":
-    case "full-access":
-    case "unconfigurable":
-      return value;
-    default:
-      return (normalizeOptionalText(value) ??
-        "unconfigurable") as AgentSessionPermissionModeOption["semantic"];
-  }
-}
-
-function resolveEffectiveComposerSettings(input: {
-  settings: AgentSessionComposerSettings;
-}): AgentSessionComposerSettings {
-  return {
-    model: normalizeOptionalText(input.settings.model) ?? null,
-    reasoningEffort:
-      (normalizeOptionalText(
-        input.settings.reasoningEffort
-      ) as AgentSessionReasoningEffort | null) ?? null,
-    planMode: Boolean(input.settings.planMode),
-    permissionModeId: normalizePermissionModeId(input.settings.permissionModeId)
-  };
-}
-
-function runtimeConfigKeyForSetting(
-  provider: AgentGUINodeData["provider"],
-  setting: "model" | "reasoningEffort" | "permissionModeId"
-): string {
-  if (setting === "reasoningEffort") {
-    return reasoningConfigOptionIdForProvider(provider);
-  }
-  if (setting === "permissionModeId") {
-    return "mode";
-  }
-  return "model";
-}
-
-function shouldUpdateRuntimeConfigOption(
-  provider: AgentGUINodeData["provider"],
-  id: string | null,
-  setting: "model" | "reasoningEffort" | "permissionModeId"
-): boolean {
-  if (setting === "model") {
-    return id === "model";
-  }
-  if (setting === "permissionModeId") {
-    return id === "mode";
-  }
-  return (
-    id === reasoningConfigOptionIdForProvider(provider) ||
-    id === "model_reasoning_effort" ||
-    id === "reasoning_effort" ||
-    id === "effort"
-  );
-}
-
-function mergeRuntimeContextComposerSettings(
-  provider: AgentGUINodeData["provider"],
-  runtimeContext: Record<string, unknown> | undefined,
-  settings: AgentSessionComposerSettings
-): Record<string, unknown> | undefined {
-  if (!runtimeContext) {
-    return runtimeContext;
-  }
-  const nextRuntimeContext: Record<string, unknown> = { ...runtimeContext };
-  const runtimeConfigPatch: Record<string, unknown> = {};
-  const optionPatches: Array<{
-    setting: "model" | "reasoningEffort" | "permissionModeId";
-    value: string | null;
-  }> = [];
-
-  if (settings.model !== undefined) {
-    const value = normalizeOptionalText(settings.model);
-    runtimeConfigPatch[runtimeConfigKeyForSetting(provider, "model")] = value;
-    optionPatches.push({ setting: "model", value });
-  }
-  if (settings.reasoningEffort !== undefined) {
-    const value = normalizeOptionalText(settings.reasoningEffort);
-    runtimeConfigPatch[
-      runtimeConfigKeyForSetting(provider, "reasoningEffort")
-    ] = value;
-    optionPatches.push({ setting: "reasoningEffort", value });
-  }
-  if (settings.permissionModeId !== undefined) {
-    const value = normalizeOptionalText(settings.permissionModeId);
-    runtimeConfigPatch[
-      runtimeConfigKeyForSetting(provider, "permissionModeId")
-    ] = value;
-    optionPatches.push({ setting: "permissionModeId", value });
-  }
-
-  if (Object.keys(runtimeConfigPatch).length > 0) {
-    const currentConfig = recordValue(nextRuntimeContext.config);
-    nextRuntimeContext.config = {
-      ...(currentConfig ?? {}),
-      ...runtimeConfigPatch
-    };
-  }
-  if (
-    optionPatches.length > 0 &&
-    Array.isArray(nextRuntimeContext.configOptions)
-  ) {
-    nextRuntimeContext.configOptions = nextRuntimeContext.configOptions.map(
-      (option) => {
-        const optionRecord = recordValue(option);
-        if (!optionRecord) {
-          return option;
-        }
-        const id = normalizeConfigOptionValue(optionRecord.id);
-        const patch = optionPatches.find((item) =>
-          shouldUpdateRuntimeConfigOption(provider, id, item.setting)
-        );
-        return patch ? { ...optionRecord, currentValue: patch.value } : option;
-      }
-    );
-  }
-  return nextRuntimeContext;
-}
-
-function normalizePermissionModeId(
-  value: string | null | undefined
-): string | null {
-  return normalizeOptionalText(value);
-}
-
-function cloneComposerSettings(
-  settings: AgentSessionComposerSettings | null
-): AgentSessionComposerSettings | null {
-  if (!settings) {
-    return null;
-  }
-  return { ...settings };
-}
-
-function sameComposerSettings(
-  left: AgentSessionComposerSettings | null,
-  right: AgentSessionComposerSettings | null
-): boolean {
-  return (
-    (left?.model ?? null) === (right?.model ?? null) &&
-    (left?.reasoningEffort ?? null) === (right?.reasoningEffort ?? null) &&
-    Boolean(left?.planMode) === Boolean(right?.planMode) &&
-    (left?.permissionModeId ?? null) === (right?.permissionModeId ?? null)
-  );
-}
-
-function useStableComposerSettings(
-  settings: AgentSessionComposerSettings
-): AgentSessionComposerSettings;
-function useStableComposerSettings(
-  settings: AgentSessionComposerSettings | null
-): AgentSessionComposerSettings | null;
-function useStableComposerSettings(
-  settings: AgentSessionComposerSettings | null
-): AgentSessionComposerSettings | null {
-  const settingsRef = useRef<{
-    value: AgentSessionComposerSettings | null;
-  } | null>(null);
-  if (
-    settingsRef.current === null ||
-    !sameComposerSettings(settingsRef.current.value, settings)
-  ) {
-    settingsRef.current = { value: settings };
-  }
-  return settingsRef.current.value;
-}
-
-function useStableProviderSkillOptions(
-  skills: AgentGUIProviderSkillOption[]
-): AgentGUIProviderSkillOption[] {
-  const skillsRef = useRef<AgentGUIProviderSkillOption[] | null>(null);
-  if (
-    skillsRef.current === null ||
-    !areProviderSkillOptionListsEqual(skillsRef.current, skills)
-  ) {
-    skillsRef.current = skills;
-  }
-  return skillsRef.current;
-}
-
-function useStableControllerEventCallback<Args extends unknown[], Result>(
-  callback: (...args: Args) => Result
-): (...args: Args) => Result {
-  const callbackRef = useRef(callback);
-  callbackRef.current = callback;
-  return useCallback((...args: Args) => callbackRef.current(...args), []);
-}
-
-function pendingApprovalFromState(
-  state: AgentSessionState | null
-): AgentSessionState["pendingInteractive"] | null {
-  return state?.pendingInteractive?.kind === "approval"
-    ? state.pendingInteractive
-    : null;
-}
-
-function pendingInteractiveFromState(
-  state: AgentSessionState | null
-): AgentSessionState["pendingInteractive"] | null {
-  if (!state?.pendingInteractive) {
-    return null;
-  }
-  return state.pendingInteractive.kind === "approval"
-    ? null
-    : state.pendingInteractive;
-}
-
-function promptRequestId(
-  prompt: { requestId?: string | null } | null | undefined
-): string | null {
-  const requestId = prompt?.requestId?.trim() ?? "";
-  return requestId || null;
-}
-
-function conversationBusyStatus(
-  status: AgentGUIConversationSummary["status"] | null
-): boolean {
-  return status === "working" || status === "waiting";
-}
-
-function agentSessionStatusBusy(input: {
-  lifecycleStatus?: string;
-  effectiveStatus?: string;
-  status?: string;
-  turnPhase?: string;
-  currentPhase?: string;
-}): boolean {
-  const normalized = normalizeOptionalWorkspaceAgentStatus(input);
-  return normalized?.kind === "working" || normalized?.kind === "waiting";
-}
-
-function conversationHasActiveWork(
-  conversation: AgentConversationVM | null | undefined
-): boolean {
-  return (
-    conversation?.rows.some((row) => {
-      switch (row.kind) {
-        case "processing":
-          return true;
-        case "tool-group":
-          return row.calls.some(
-            (call) =>
-              call.statusKind === "working" || call.statusKind === "waiting"
-          );
-        case "message":
-          return row.thinking.some(
-            (thinking) =>
-              thinking.statusKind === "working" ||
-              thinking.statusKind === "waiting"
-          );
-        default:
-          return false;
-      }
-    }) ?? false
-  );
-}
-
-function buildNodeDefaultComposerSettings(
-  data: AgentGUINodeData,
-  options?: {
-    defaultReasoningEffort?: AgentSessionReasoningEffort | null;
-  }
-): AgentSessionComposerSettings {
-  // Generic cleanup only — provider-level clamping is owned by the daemon
-  // (normalizeComposerSettingsForProvider and the session create path).
-  const composerOverrides = nodeComposerOverridesForProvider(data) ?? {};
-  return {
-    model: normalizeOptionalText(composerOverrides.model),
-    reasoningEffort:
-      (normalizeOptionalText(
-        composerOverrides.reasoningEffort
-      ) as AgentSessionReasoningEffort | null) ??
-      options?.defaultReasoningEffort ??
-      null,
-    planMode: Boolean(composerOverrides.planMode),
-    permissionModeId: normalizePermissionModeId(
-      composerOverrides.permissionModeId
-    )
-  };
-}
-
-function nodeComposerOverridesForProvider(
-  data: AgentGUINodeData
-): AgentSessionComposerSettings | null {
-  return (
-    data.composerOverridesByProvider?.[data.provider] ??
-    data.composerOverrides ??
-    null
-  );
-}
-
-function composerSupportForProvider(provider: AgentGUINodeData["provider"]): {
-  model: boolean;
-  permission: boolean;
-  reasoning: boolean;
-  plan: boolean;
-} {
-  if (
-    provider === "claude-code" ||
-    provider === "codex" ||
-    provider === "gemini"
-  ) {
-    return {
-      model: true,
-      permission: provider === "claude-code" || provider === "codex",
-      reasoning: true,
-      plan: false
-    };
-  }
-  return {
-    model: false,
-    permission: provider === "nexight",
-    reasoning: false,
-    plan: false
-  };
-}
-
-function permissionModeOptions(
-  provider: AgentGUINodeData["provider"],
-  permissionConfig: AgentSessionPermissionConfig | null | undefined
-): AgentGUIComposerSettingOption[] {
-  if (!permissionConfig?.configurable) {
-    return [];
-  }
-  return permissionConfig.modes.map((mode) => ({
-    value: mode.id,
-    label: permissionModeLabel(provider, mode),
-    description: permissionModeDescription(provider, mode)
-  }));
-}
-
-function nodeDataFromComposerSettings(
-  current: AgentGUINodeData,
-  settings: AgentSessionComposerSettings
-): AgentGUINodeData {
-  // Generic cleanup only — provider-level clamping is owned by the daemon.
-  const composerOverrides = {
-    model: normalizeOptionalText(settings.model),
-    reasoningEffort: normalizeOptionalText(settings.reasoningEffort),
-    planMode: Boolean(settings.planMode),
-    permissionModeId: normalizePermissionModeId(settings.permissionModeId)
-  };
-  return {
-    ...current,
-    composerOverrides,
-    composerOverridesByProvider: {
-      ...(current.composerOverridesByProvider ?? {}),
-      [current.provider]: composerOverrides
-    }
-  };
-}
-
-function permissionModeLabel(
-  provider: AgentGUINodeData["provider"],
-  option: AgentSessionPermissionModeOption
-): string {
-  const providerKey = `agentHost.agentGui.permissionModes.${provider}.${option.id}.label`;
-  const providerLabel = translate(providerKey);
-  if (providerLabel !== providerKey) {
-    return providerLabel;
-  }
-  const semanticKey = `agentHost.agentGui.permissionSemantics.${option.semantic}.label`;
-  const semanticLabel = translate(semanticKey);
-  if (semanticLabel !== semanticKey) {
-    return semanticLabel;
-  }
-  const contractLabel = normalizeOptionalText(option.label);
-  if (contractLabel) {
-    return contractLabel;
-  }
-  return option.id;
-}
-
-function permissionModeDescription(
-  provider: AgentGUINodeData["provider"],
-  option: AgentSessionPermissionModeOption
-): string | undefined {
-  const providerKey = `agentHost.agentGui.permissionModes.${provider}.${option.id}.description`;
-  const providerLabel = translate(providerKey);
-  if (providerLabel !== providerKey) {
-    return providerLabel;
-  }
-  const semanticKey = `agentHost.agentGui.permissionSemantics.${option.semantic}.description`;
-  const semanticLabel = translate(semanticKey);
-  if (semanticLabel !== semanticKey) {
-    return semanticLabel;
-  }
-  const contractDescription = normalizeOptionalText(option.description);
-  if (contractDescription) {
-    return contractDescription;
-  }
-  return undefined;
-}
-
-function removeQueuedPromptById(
-  queue: readonly AgentGUIQueuedPromptVM[],
-  queuedPromptId: string
-): AgentGUIQueuedPromptVM[] {
-  return queue.filter((queuedPrompt) => queuedPrompt.id !== queuedPromptId);
-}
-
-const NODE_DEFAULT_DRAFT_KEY = "__agent_gui_node_defaults__";
-
-function nodeDefaultDraftKey(
-  agentProvider: AgentGUINodeData["provider"]
-): string {
-  return `${NODE_DEFAULT_DRAFT_KEY}:${agentProvider}`;
-}
-
-function nodeDefaultDraftPromptKey(
-  agentProvider: AgentGUINodeData["provider"]
-): string {
-  return nodeDefaultDraftKey(agentProvider);
-}
-
-function normalizeProjectDraftPath(
-  value: string | null | undefined
-): string | null {
-  const normalized = value?.trim().replaceAll("\\", "/").replace(/\/+$/, "");
-  return normalized ? normalized : null;
-}
-
-function readNodeDefaultDraftPrompt(input: {
-  data: AgentGUINodeData;
-  drafts: Record<string, string>;
-}): string {
-  return (
-    input.drafts[nodeDefaultDraftPromptKey(input.data.provider)] ??
-    input.drafts[NODE_DEFAULT_DRAFT_KEY] ??
-    ""
-  );
-}
-
-function readNodeDefaultDraftSettings(input: {
-  data: AgentGUINodeData;
-  defaultReasoningEffort?: AgentSessionReasoningEffort | null;
-  drafts: Record<string, AgentSessionComposerSettings>;
-}): AgentSessionComposerSettings {
-  return (
-    input.drafts[nodeDefaultDraftKey(input.data.provider)] ??
-    input.drafts[NODE_DEFAULT_DRAFT_KEY] ??
-    buildNodeDefaultComposerSettings(input.data, {
-      defaultReasoningEffort: input.defaultReasoningEffort
-    })
-  );
-}
-
-function conversationStatusFromStatePatch(
-  patch: WorkspaceAgentActivityStatePatch
-): AgentGUIConversationSummary["status"] | null {
-  const normalized = normalizeOptionalWorkspaceAgentStatus({
-    lifecycleStatus: patch.lifecycleStatus,
-    currentPhase: patch.currentPhase,
-    turnPhase: patch.turn?.phase
-  });
-  switch (normalized?.kind) {
-    case "failed":
-      return "failed";
-    case "canceled":
-      return "canceled";
-    case "completed":
-      return "completed";
-    case "waiting":
-      return "waiting";
-    case "working":
-      return "working";
-    case "ready":
-      return "ready";
-    default:
-      return null;
-  }
-}
-
-function hasSessionControlStatePatch(
-  patch: WorkspaceAgentActivityStatePatch
-): boolean {
-  return (
-    normalizeOptionalText(patch.permissionModeId) !== null ||
-    patch.settings !== undefined ||
-    patch.runtimeContext !== undefined
-  );
-}
-
-function mergeSessionControlStatePatch(
-  current: AgentSessionState | null,
-  patch: WorkspaceAgentActivityStatePatch
-): AgentSessionState | null {
-  if (!current || !hasSessionControlStatePatch(patch)) {
-    return current;
-  }
-  let changed = false;
-  const next: AgentSessionState = { ...current };
-  const patchPermissionMode = normalizePermissionModeId(patch.permissionModeId);
-  if (
-    normalizeOptionalText(patch.permissionModeId) !== null &&
-    patchPermissionMode !== (current.permissionModeId ?? null)
-  ) {
-    next.permissionModeId = patchPermissionMode ?? undefined;
-    changed = true;
-  }
-
-  if (patch.settings !== undefined) {
-    const currentSettings = current.settings ?? {};
-    const nextSettings: AgentSessionComposerSettings = { ...currentSettings };
-    if (patch.settings.model !== undefined) {
-      nextSettings.model = normalizeOptionalText(patch.settings.model);
-    }
-    if (patch.settings.reasoningEffort !== undefined) {
-      nextSettings.reasoningEffort = normalizeOptionalText(
-        patch.settings.reasoningEffort
-      ) as AgentSessionReasoningEffort | null;
-    }
-    if (patch.settings.planMode !== undefined) {
-      nextSettings.planMode = Boolean(patch.settings.planMode);
-    }
-    if (patch.settings.permissionModeId !== undefined) {
-      nextSettings.permissionModeId = normalizePermissionModeId(
-        patch.settings.permissionModeId
-      );
-      if (nextSettings.permissionModeId !== (next.permissionModeId ?? null)) {
-        next.permissionModeId = nextSettings.permissionModeId ?? undefined;
-      }
-    }
-    if (!sameComposerSettings(current.settings ?? null, nextSettings)) {
-      next.settings = nextSettings;
-      changed = true;
-    }
-  }
-
-  if (patch.runtimeContext !== undefined) {
-    next.runtimeContext = {
-      ...(current.runtimeContext ?? {}),
-      ...patch.runtimeContext
-    };
-    changed = true;
-  }
-  const effectivePermissionMode = next.permissionModeId ?? null;
-  if (effectivePermissionMode) {
-    next.runtimeContext = {
-      ...(next.runtimeContext ?? current.runtimeContext ?? {}),
-      permissionModeId: effectivePermissionMode
-    };
-  }
-  if (
-    patch.occurredAtUnixMs !== undefined &&
-    Number.isFinite(patch.occurredAtUnixMs)
-  ) {
-    next.updatedAtUnixMs = patch.occurredAtUnixMs;
-    changed = true;
-  }
-  return changed ? next : current;
-}
-
-function conversationStatusFromSessionState(
-  state: AgentSessionState
-): AgentGUIConversationSummary["status"] | null {
-  return conversationStatusFromStatusValue(state.status);
-}
-
-function conversationStatusFromStatusValue(
-  value: string | null | undefined
-): AgentGUIConversationSummary["status"] | null {
-  return normalizeOptionalWorkspaceAgentStatus({ status: value })?.kind ?? null;
-}
-
-function conversationStatusFromTimelineItems(
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[]
-): Extract<
-  AgentGUIConversationSummary["status"],
-  "working" | "waiting"
-> | null {
-  let hasWorking = false;
-  let hasWaiting = false;
-  const latestByCallId = new Map<string, WorkspaceAgentActivityTimelineItem>();
-  for (const item of timelineItems) {
-    const callId = item.callId?.trim();
-    if (!callId) {
-      continue;
-    }
-    const previous = latestByCallId.get(callId);
-    if (!previous || timelineItemTime(item) >= timelineItemTime(previous)) {
-      latestByCallId.set(callId, item);
-    }
-  }
-  for (const item of latestByCallId.values()) {
-    const status = normalizeTimelineStatus(
-      item.status ?? stringPayloadValue(item.payload, "status")
-    );
-    if (status === "working") {
-      hasWorking = true;
-    } else if (status === "waiting") {
-      hasWaiting = true;
-    }
-  }
-  if (hasWaiting) {
-    return "waiting";
-  }
-  if (hasWorking) {
-    return "working";
-  }
-  return null;
-}
-
-interface AgentPlanModeObservedState {
-  planMode: boolean;
-  observedAtUnixMs: number;
-}
-
-function latestPlanModeStateFromTimelineItems(
-  timelineItems: readonly WorkspaceAgentActivityTimelineItem[]
-): AgentPlanModeObservedState | null {
-  let latest: AgentPlanModeObservedState | null = null;
-  for (const item of timelineItems) {
-    const toolName = normalizePlanModeToolName(
-      item.name ??
-        stringPayloadValue(item.payload, "toolName") ??
-        stringPayloadValue(item.payload, "name") ??
-        stringPayloadValue(item.payload, "title")
-    );
-    if (toolName !== "enterplanmode" && toolName !== "exitplanmode") {
-      continue;
-    }
-    const status = normalizePlanModeToolStatus(
-      item.status ?? stringPayloadValue(item.payload, "status")
-    );
-    if (status === "failed" || status === "canceled") {
-      continue;
-    }
-    if (toolName === "exitplanmode" && status !== "completed") {
-      continue;
-    }
-    const next = {
-      planMode: toolName === "enterplanmode",
-      observedAtUnixMs: timelineItemTime(item)
-    };
-    if (!latest || next.observedAtUnixMs >= latest.observedAtUnixMs) {
-      latest = next;
-    }
-  }
-  return latest;
-}
-
-function planModeStateFromSessionState(
-  state: AgentSessionState | null
-): AgentPlanModeObservedState | null {
-  if (!state) {
-    return null;
-  }
-  const runtimeMode = normalizePlanModeToolName(
-    typeof state.runtimeContext?.mode === "string"
-      ? state.runtimeContext.mode
-      : undefined
-  );
-  if (runtimeMode) {
-    return {
-      planMode: runtimeMode === "plan",
-      observedAtUnixMs: state.updatedAtUnixMs
-    };
-  }
-  if (state.settings?.planMode !== undefined) {
-    return {
-      planMode: Boolean(state.settings.planMode),
-      observedAtUnixMs: state.updatedAtUnixMs
-    };
-  }
-  return null;
-}
-
-function resolveEffectivePlanModeFromStates(input: {
-  sessionPlanModeState: AgentPlanModeObservedState | null;
-  timelinePlanModeState: AgentPlanModeObservedState | null;
-  fallbackPlanMode: boolean;
-}): boolean {
-  if (
-    input.timelinePlanModeState &&
-    (!input.sessionPlanModeState ||
-      input.timelinePlanModeState.observedAtUnixMs >=
-        input.sessionPlanModeState.observedAtUnixMs)
-  ) {
-    return input.timelinePlanModeState.planMode;
-  }
-  return input.sessionPlanModeState?.planMode ?? input.fallbackPlanMode;
-}
-
-function normalizePlanModeToolName(value: string | null | undefined): string {
-  return (value ?? "")
-    .replace(/[_\s-]+/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-function normalizePlanModeToolStatus(
-  value: string | null | undefined
-): "completed" | "failed" | "canceled" | "other" {
-  switch (value?.trim().toLowerCase()) {
-    case "completed":
-    case "complete":
-    case "succeeded":
-    case "success":
-    case "done":
-      return "completed";
-    case "failed":
-    case "failure":
-    case "error":
-      return "failed";
-    case "canceled":
-    case "cancelled":
-    case "rejected":
-    case "aborted":
-      return "canceled";
-    default:
-      return "other";
-  }
-}
-
-function normalizeTimelineStatus(
-  value: string | null | undefined
-): "working" | "waiting" | null {
-  const normalized = normalizeOptionalWorkspaceAgentStatus({
-    status: value ?? undefined
-  });
-  if (normalized?.kind === "working" || normalized?.kind === "waiting") {
-    return normalized.kind;
-  }
-  switch (value?.trim().toLowerCase()) {
-    case "active":
-    case "in_progress":
-      return "working";
-    case "pending":
-      return "waiting";
-    default:
-      return null;
-  }
-}
-
-function messageFromMessageUpdate(
-  update: AgentActivityMessageUpdate
-): WorkspaceAgentActivityMessage {
-  const payload = update.payload ?? {};
-  const normalizedKind = update.kind.trim().toLowerCase();
-  const normalizedRole = update.role.trim().toLowerCase();
-  const id =
-    normalizedPositiveNumber(update.seq) ??
-    normalizedPositiveNumber(update.occurredAtUnixMs) ??
-    0;
-  const isToolCall = normalizedKind === "tool_call";
-  const kind = isToolCall
-    ? "tool_call"
-    : normalizedKind === "reasoning"
-      ? "reasoning"
-      : "text";
-  const role = normalizedRole === "user" ? "user" : "assistant";
-  return {
-    id,
-    workspaceId: update.workspaceId?.trim() || "",
-    agentSessionId: update.agentSessionId,
-    messageId: update.messageId.trim() || `message:${id}`,
-    version: id,
-    ...(update.turnId?.trim() ? { turnId: update.turnId.trim() } : {}),
-    role,
-    kind,
-    status: update.status,
-    payload: {
-      ...payload,
-      ...(isToolCall && update.callId?.trim()
-        ? { callId: update.callId.trim() }
-        : {}),
-      ...(isToolCall && update.title?.trim()
-        ? { title: update.title.trim() }
-        : {})
-    },
-    ...(update.occurredAtUnixMs !== undefined
-      ? { occurredAtUnixMs: update.occurredAtUnixMs }
-      : {}),
-    ...(update.startedAtUnixMs !== undefined
-      ? { startedAtUnixMs: update.startedAtUnixMs }
-      : {})
-  };
-}
-
-function normalizedPositiveNumber(value: number | undefined): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.trunc(value)
-    : null;
-}
-
-function timelineItemTime(item: WorkspaceAgentActivityTimelineItem): number {
-  return item.occurredAtUnixMs ?? item.createdAtUnixMs ?? 0;
-}
-
-interface UseAgentGUINodeControllerInput {
-  nodeId?: string;
-  workspaceId: string;
-  currentUserId?: string | null;
-  workspacePath: string;
-  avoidGroupingEdits: boolean;
-  data: AgentGUINodeData;
-  previewMode?: boolean;
-  onDataChange: (
-    updater: (current: AgentGUINodeData) => AgentGUINodeData
-  ) => void;
-  onShowMessage?: (
-    message: string,
-    tone?: "info" | "warning" | "error"
-  ) => void;
-}
+// Pure helpers live in sibling `agentGuiController.*.ts` files (mechanical split; logic unchanged):
+// - constants / types / errors
+// - conversationHelpers (list, sync, status)
+// - composerHelpers / promptHelpers / planModeHelpers
+// - interactiveHelpers / sessionHelpers / reactHelpers / miscHelpers
+import {
+  ACTIVITY_STREAM_STATE_RELOAD_DEBOUNCE_MS,
+  AGENT_RESUME_SESSION_NOT_LOCAL_ERROR,
+  EMPTY_AGENT_GUI_AVAILABLE_COMMANDS,
+  EMPTY_AGENT_GUI_MESSAGES,
+  mergeAgentModelCatalogInvalidationEvents
+} from "./agentGuiController.constants";
+import type {
+  QueuedComposerSettingsUpdate,
+  QueuedPromptRetryBlock,
+  UseAgentGUINodeControllerInput
+} from "./agentGuiController.types";
+import {
+  agentSessionStatusBusy,
+  canSettleBusyConversationFromSessionState,
+  conversationBusyStatus,
+  conversationHasActiveWork,
+  conversationStatusFromSessionState,
+  conversationStatusFromStatusValue,
+  conversationStatusFromStatePatch,
+  conversationStatusFromTimelineItems,
+  hasPromptConversationTitle,
+  hasSessionControlStatePatch,
+  mergeConversationSummaryWithRuntimeSession,
+  mergeConversationTitleUpdateFields,
+  mergeSessionControlStatePatch,
+  mergeVisibleConversations,
+  normalizeProjectConversationPath,
+  omitConversationLocalState,
+  resolveConversationStatusFromTimelineEvidence,
+  resolveConversationSummaryById,
+  resolveConversationUpdatedAtUnixMsFromSessionState,
+  resolveConversationStatusAfterTimelineUpdate,
+  runtimeSessionSyncState,
+  shouldApplySyncState,
+  stableConversationSummaryList,
+  syncStateRenderFieldsEqual
+} from "./agentGuiController.conversationHelpers";
+import {
+  cloneComposerSettings,
+  composerSupportForProvider,
+  mergeRuntimeContextComposerSettings,
+  modelSelectionFromComposerOptions,
+  nodeDataFromComposerSettings,
+  nodeDefaultDraftKey,
+  nodeDefaultDraftPromptKey,
+  normalizeConfigOptionValue,
+  normalizeProjectDraftPath,
+  normalizePermissionModeId,
+  permissionConfigFromComposerOptions,
+  permissionModeOptions,
+  providerSkillsFromComposerOptions,
+  readNodeDefaultDraftPrompt,
+  readNodeDefaultDraftSettings,
+  reasoningSelectionFromComposerOptions,
+  removeQueuedPromptById,
+  resolveEffectiveComposerSettings
+} from "./agentGuiController.composerHelpers";
+import {
+  buildProviderSessionNotFoundActivationError,
+  buildResumeSessionNotLocalActivationError,
+  buildContinueInNewConversationPrompt,
+  cancelBusySource,
+  getAgentGUIErrorCode,
+  getAgentGUIErrorMessage,
+  isAgentSessionActiveTurnConflictError,
+  isNonRetryableResumeErrorCode,
+  isResumeSessionNotLocalErrorCode,
+  isSessionNotFoundErrorCode,
+  isSettingsRequireNewSessionErrorCode,
+  reportAgentGUICancelDiagnostic,
+  reportAgentGUIRuntimeError
+} from "./agentGuiController.errors";
+import { areAgentGUIUserProjectsEqual } from "./agentGuiController.miscHelpers";
+import {
+  approvalRequestFromConversation,
+  interactiveApprovalFromSessionState,
+  interactivePromptFromConversation,
+  interactivePromptFromSessionState,
+  pendingApprovalFromState,
+  pendingInteractiveFromState,
+  promptRequestId
+} from "./agentGuiController.interactiveHelpers";
+import {
+  createAgentGUIConversationId,
+  createOptimisticPromptMessage,
+  normalizeOptionalPrompt,
+  normalizeOptionalText,
+  normalizePromptContentBlocks,
+  projectAgentGUIMessagesToTimelineItems,
+  promptContentDisplayText,
+  promptContentHasImage,
+  recordValue,
+  textPromptContent
+} from "./agentGuiController.promptHelpers";
+import {
+  latestPlanModeStateFromTimelineItems,
+  planModeStateFromSessionState,
+  resolveEffectivePlanModeFromStates
+} from "./agentGuiController.planModeHelpers";
+import { usePlanModeState } from "./agentGuiController.usePlanModeState";
+import {
+  useStableComposerSettings,
+  useStableControllerEventCallback,
+  useStableProviderSkillOptions
+} from "./agentGuiController.reactHelpers";
+import {
+  messageFromMessageUpdate,
+  timelineItemTime
+} from "./agentGuiController.sessionHelpers";
+
+export {
+  resolveConversationStatusAfterTimelineUpdate,
+  resolveConversationUpdatedAtUnixMsFromSessionState,
+  syncStateRenderFieldsEqual
+} from "./agentGuiController.conversationHelpers";
+export type { UseAgentGUINodeControllerInput } from "./agentGuiController.types";
 
 export function useAgentGUINodeController({
   nodeId,
@@ -5466,7 +3701,9 @@ export function useAgentGUINodeController({
         const merged = {
           ...previousSettings,
           ...supportedNextSettings,
-          planMode: supportedNextSettings.planMode ?? previousSettings.planMode
+          planMode: supportedNextSettings.planMode ?? previousSettings.planMode,
+          browserUse:
+            supportedNextSettings.browserUse ?? previousSettings.browserUse
         };
         draftSettingsBySessionIdRef.current = {
           ...draftSettingsBySessionIdRef.current,
@@ -5505,6 +3742,7 @@ export function useAgentGUINodeController({
         reasoningEffort:
           sessionSettings?.reasoningEffort ?? currentDefaults.reasoningEffort,
         planMode: sessionSettings?.planMode ?? currentDefaults.planMode,
+        browserUse: sessionSettings?.browserUse ?? currentDefaults.browserUse,
         permissionModeId:
           sessionSettings?.permissionModeId ?? currentDefaults.permissionModeId
       };
@@ -5520,6 +3758,9 @@ export function useAgentGUINodeController({
             : baseDefaultsFromSession.reasoningEffort,
         planMode:
           supportedNextSettings.planMode ?? baseDefaultsFromSession.planMode,
+        browserUse:
+          supportedNextSettings.browserUse ??
+          baseDefaultsFromSession.browserUse,
         permissionModeId:
           supportedNextSettings.permissionModeId !== undefined
             ? supportedNextSettings.permissionModeId
@@ -5560,6 +3801,9 @@ export function useAgentGUINodeController({
           latestPlanModeStateFromTimelineItems(activeTimelineItems),
         fallbackPlanMode: sessionSettings?.planMode ?? false
       });
+      const nextBrowserUse = supportedNextSettings.browserUse;
+      // Browser use defaults on, so an unset stored value reads as true.
+      const currentBrowserUse = sessionSettings?.browserUse ?? true;
       const sessionSettingsPatch: AgentSessionComposerSettings = {};
 
       if (nextModel !== undefined && nextModel !== currentModel) {
@@ -5573,6 +3817,12 @@ export function useAgentGUINodeController({
       }
       if (nextPlanMode !== undefined && nextPlanMode !== currentPlanMode) {
         sessionSettingsPatch.planMode = nextPlanMode;
+      }
+      if (
+        nextBrowserUse !== undefined &&
+        nextBrowserUse !== currentBrowserUse
+      ) {
+        sessionSettingsPatch.browserUse = nextBrowserUse;
       }
       if (
         nextPermission &&
@@ -6615,14 +4865,6 @@ export function useAgentGUINodeController({
       });
   const availableCommands =
     activeSessionView?.controlCommands ?? EMPTY_AGENT_GUI_AVAILABLE_COMMANDS;
-  const timelinePlanModeState = useMemo(
-    () => latestPlanModeStateFromTimelineItems(activeTimelineItems),
-    [activeTimelineItems]
-  );
-  const sessionPlanModeState = useMemo(
-    () => planModeStateFromSessionState(activeSessionState),
-    [activeSessionState]
-  );
   const availableSkills = useStableProviderSkillOptions(
     useMemo(
       () => providerSkillsFromComposerOptions(providerComposerOptions),
@@ -6943,15 +5185,11 @@ export function useAgentGUINodeController({
       modelSelectionFromComposerOptions(providerComposerOptions, draftModel),
     [draftModel, providerComposerOptions]
   );
-  const effectivePlanMode = useMemo(
-    () =>
-      resolveEffectivePlanModeFromStates({
-        sessionPlanModeState,
-        timelinePlanModeState,
-        fallbackPlanMode: Boolean(draftSettings.planMode)
-      }),
-    [draftSettings.planMode, sessionPlanModeState, timelinePlanModeState]
-  );
+  const { effectivePlanMode, timelinePlanModeState } = usePlanModeState({
+    activeTimelineItems,
+    activeSessionState,
+    draftPlanMode: draftSettings.planMode
+  });
   const composerSettings = useMemo<AgentGUIComposerSettingsVM>(() => {
     const permissionConfig = permissionConfigFromComposerOptions(
       providerComposerOptions
@@ -6978,6 +5216,8 @@ export function useAgentGUINodeController({
         model: draftModel,
         reasoningEffort: draftReasoningEffort,
         planMode: Boolean(draftSettings.planMode),
+        // Browser use defaults on; an unset stored value means "default".
+        browserUse: draftSettings.browserUse ?? true,
         permissionModeId: normalizePermissionModeId(
           draftSettings.permissionModeId
         )
@@ -6987,6 +5227,7 @@ export function useAgentGUINodeController({
       supportsReasoningEffort: composerSupport.reasoning,
       supportsPermissionMode,
       supportsPlanMode: composerSupport.plan,
+      supportsBrowser: composerSupport.browser,
       isSettingsLoading,
       modelUnavailable:
         activeConversationId !== null &&
@@ -7273,240 +5514,4 @@ export function useAgentGUINodeController({
       visibleConversations
     ]
   );
-}
-
-function normalizeProjectConversationPath(
-  path: string | null | undefined
-): string {
-  const normalized = path?.trim().replaceAll("\\", "/") ?? "";
-  if (!normalized) {
-    return "";
-  }
-  return normalized.replace(/\/+$/, "") || "/";
-}
-
-function omitConversationLocalState<T>(
-  current: Record<string, T>,
-  conversationIds: ReadonlySet<string>
-): Record<string, T> {
-  let changed = false;
-  const next = { ...current };
-  for (const conversationId of conversationIds) {
-    if (conversationId in next) {
-      delete next[conversationId];
-      changed = true;
-    }
-  }
-  return changed ? next : current;
-}
-
-function approvalRequestFromConversation(
-  conversation: AgentConversationVM | null
-): AgentGUIApprovalRequest | null {
-  return conversation?.pendingApproval ?? null;
-}
-
-function interactivePromptFromConversation(
-  conversation: AgentConversationVM | null
-): AgentGUIInteractivePrompt | null {
-  return conversation?.pendingInteractivePrompt ?? null;
-}
-
-function interactiveApprovalFromSessionState(state: AgentSessionState | null) {
-  const prompt = state?.pendingInteractive;
-  if (!prompt || prompt.kind !== "approval") {
-    return null;
-  }
-  const callID =
-    typeof prompt.input?.callId === "string" && prompt.input.callId.trim()
-      ? prompt.input.callId.trim()
-      : (prompt.requestId?.trim() ?? "");
-  const options = Array.isArray(prompt.input?.options)
-    ? prompt.input.options
-    : [];
-  const normalizedOptions = options
-    .map((option) => {
-      if (!option || typeof option !== "object") {
-        return null;
-      }
-      const candidate = option as Record<string, unknown>;
-      const id =
-        typeof candidate.id === "string" && candidate.id.trim()
-          ? candidate.id.trim()
-          : typeof candidate.optionId === "string" && candidate.optionId.trim()
-            ? candidate.optionId.trim()
-            : "";
-      if (!id) {
-        return null;
-      }
-      return {
-        id,
-        label:
-          typeof candidate.name === "string" && candidate.name.trim()
-            ? candidate.name.trim()
-            : typeof candidate.label === "string" && candidate.label.trim()
-              ? candidate.label.trim()
-              : id,
-        kind:
-          typeof candidate.kind === "string" && candidate.kind.trim()
-            ? candidate.kind.trim()
-            : id,
-        ...(typeof candidate.description === "string" &&
-        candidate.description.trim()
-          ? { description: candidate.description.trim() }
-          : {})
-      };
-    })
-    .filter(
-      (
-        option
-      ): option is {
-        id: string;
-        label: string;
-        kind: string;
-        description?: string;
-      } => option !== null
-    );
-  if (!prompt.requestId?.trim() || !callID || normalizedOptions.length === 0) {
-    return null;
-  }
-  const approval: AgentApprovalItemVM = {
-    kind: "approval",
-    id: `approval:${callID}`,
-    turnId: "turn:unknown",
-    requestId: prompt.requestId.trim(),
-    callId: callID,
-    title:
-      typeof prompt.toolName === "string" && prompt.toolName.trim()
-        ? prompt.toolName.trim()
-        : "Approval required",
-    status: "waiting_approval",
-    toolName:
-      typeof prompt.toolName === "string" && prompt.toolName.trim()
-        ? prompt.toolName.trim()
-        : null,
-    input: prompt.input ?? null,
-    options: normalizedOptions,
-    output: null,
-    occurredAtUnixMs:
-      typeof state?.updatedAtUnixMs === "number" ? state.updatedAtUnixMs : null
-  };
-  return approval;
-}
-
-function interactivePromptFromSessionState(
-  state: AgentSessionState | null
-): AgentGUIInteractivePrompt | null {
-  const prompt = state?.pendingInteractive;
-  if (!prompt || prompt.kind === "approval" || !prompt.requestId?.trim()) {
-    return null;
-  }
-  const toolName = normalizeInteractiveToolName(prompt.toolName);
-  if (toolName === "exitplanmode") {
-    return {
-      kind: "exit-plan",
-      requestId: prompt.requestId.trim(),
-      title: prompt.toolName?.trim() || "Exit plan mode"
-    };
-  }
-  if (toolName !== "askuserquestion") {
-    return null;
-  }
-  const questions = normalizeInteractiveQuestions(prompt.input?.questions);
-  if (questions.length === 0) {
-    return null;
-  }
-  return {
-    kind: "ask-user",
-    requestId: prompt.requestId.trim(),
-    title: prompt.toolName?.trim() || "Questions for you",
-    questions
-  };
-}
-
-function normalizeInteractiveToolName(toolName: string | undefined): string {
-  return (toolName?.trim() ?? "").replace(/[_\s-]+/g, "").toLowerCase();
-}
-
-function areAgentGUIUserProjectsEqual(
-  left: readonly AgentHostUserProject[],
-  right: readonly AgentHostUserProject[]
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((project, index) => {
-      const candidate = right[index];
-      return (
-        candidate !== undefined &&
-        project.id === candidate.id &&
-        project.path === candidate.path &&
-        project.label === candidate.label
-      );
-    })
-  );
-}
-
-function normalizeInteractiveQuestions(
-  value: unknown
-): AgentGUIInteractiveQuestion[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.flatMap((item, index) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) {
-      return [];
-    }
-    const record = item as Record<string, unknown>;
-    const options = Array.isArray(record.options)
-      ? record.options.flatMap((option) => {
-          if (!option || typeof option !== "object" || Array.isArray(option)) {
-            return [];
-          }
-          const candidate = option as Record<string, unknown>;
-          const label =
-            typeof candidate.label === "string" && candidate.label.trim()
-              ? candidate.label.trim()
-              : typeof candidate.name === "string" && candidate.name.trim()
-                ? candidate.name.trim()
-                : "";
-          if (!label) {
-            return [];
-          }
-          return [
-            {
-              label,
-              description:
-                typeof candidate.description === "string"
-                  ? candidate.description.trim()
-                  : ""
-            }
-          ];
-        })
-      : [];
-    const question =
-      typeof record.question === "string" && record.question.trim()
-        ? record.question.trim()
-        : typeof record.header === "string" && record.header.trim()
-          ? record.header.trim()
-          : "";
-    if (!question) {
-      return [];
-    }
-    return [
-      {
-        id:
-          typeof record.id === "string" && record.id.trim()
-            ? record.id.trim()
-            : `question-${index + 1}`,
-        header:
-          typeof record.header === "string" && record.header.trim()
-            ? record.header.trim()
-            : `Question ${index + 1}`,
-        question,
-        options,
-        multiSelect: Boolean(record.multiSelect),
-        isOther: Boolean(record.isOther)
-      }
-    ];
-  });
 }

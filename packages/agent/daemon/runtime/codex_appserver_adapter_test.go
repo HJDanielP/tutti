@@ -1591,3 +1591,36 @@ func TestCodexAppServerAdapterEmitsPlanItemAsTaggedMessage(t *testing.T) {
 		t.Fatalf("plan-tagged messages = %d, want exactly 1", planMessages)
 	}
 }
+
+func TestCodexAppServerAdapterReviewBannersEmitOnce(t *testing.T) {
+	t.Parallel()
+
+	adapter := &CodexAppServerAdapter{}
+	session := Session{Provider: "codex", AgentSessionID: "agent-review", RoomID: "room-review"}
+
+	countNotice := func(itemType, wantTitle string) int {
+		// Real app-server streams both item/started and item/completed for
+		// enteredReviewMode/exitedReviewMode items; the banner must appear once.
+		normalizer := newACPTurnNormalizer()
+		item := map[string]any{"type": itemType, "id": "item-1"}
+		events := adapter.appServerItemEvents(session, "turn-review", item, false, normalizer)
+		events = append(events, adapter.appServerItemEvents(session, "turn-review", item, true, normalizer)...)
+		count := 0
+		for _, event := range events {
+			if event.Payload.Content == wantTitle {
+				count++
+			}
+		}
+		return count
+	}
+
+	if got := countNotice("enteredReviewMode", "Code review started."); got != 1 {
+		t.Fatalf("entered review banners = %d, want exactly 1", got)
+	}
+	if got := countNotice("exitedReviewMode", "Code review finished."); got != 1 {
+		t.Fatalf("exited review banners = %d, want exactly 1", got)
+	}
+	if got := countNotice("contextCompaction", "Context compacted."); got != 1 {
+		t.Fatalf("context compaction banners = %d, want exactly 1", got)
+	}
+}

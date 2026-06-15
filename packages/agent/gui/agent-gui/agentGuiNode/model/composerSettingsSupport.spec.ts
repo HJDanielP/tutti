@@ -98,7 +98,8 @@ describe("composerSettingsSupportFromOptions", () => {
       model: false,
       reasoning: false,
       permission: false,
-      plan: false
+      plan: false,
+      browser: false
     });
   });
 

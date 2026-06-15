@@ -562,6 +562,7 @@ export type AgentSessionComposerSettings = {
   model?: string | null;
   permissionModeId?: string | null;
   planMode?: boolean | null;
+  browserUse?: boolean | null;
   reasoningEffort?: string | null;
 };
 
@@ -809,6 +810,7 @@ export type CreateWorkspaceAgentSessionRequest = {
   model?: string | null;
   reasoningEffort?: string | null;
   planMode?: boolean | null;
+  browserUse?: boolean | null;
   visible?: boolean | null;
 };
 

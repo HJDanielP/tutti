@@ -3914,6 +3914,9 @@ components:
         planMode:
           type: boolean
           nullable: true
+        browserUse:
+          type: boolean
+          nullable: true
         reasoningEffort:
           type: string
           nullable: true
@@ -4522,6 +4525,9 @@ components:
           type: string
           nullable: true
         planMode:
+          type: boolean
+          nullable: true
+        browserUse:
           type: boolean
           nullable: true
         visible:

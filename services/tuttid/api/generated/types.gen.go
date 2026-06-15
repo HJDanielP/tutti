@@ -1291,6 +1291,7 @@ type AgentProviderTerminalCommand struct {
 
 // AgentSessionComposerSettings defines model for AgentSessionComposerSettings.
 type AgentSessionComposerSettings struct {
+	BrowserUse       *bool   `json:"browserUse,omitempty"`
 	Model            *string `json:"model,omitempty"`
 	PermissionModeId *string `json:"permissionModeId,omitempty"`
 	PlanMode         *bool   `json:"planMode,omitempty"`
@@ -1522,6 +1523,7 @@ type CreateIssueManagerTopicRequest struct {
 // CreateWorkspaceAgentSessionRequest defines model for CreateWorkspaceAgentSessionRequest.
 type CreateWorkspaceAgentSessionRequest struct {
 	AgentSessionId   openapi_types.UUID        `json:"agentSessionId"`
+	BrowserUse       *bool                     `json:"browserUse,omitempty"`
 	Cwd              *string                   `json:"cwd,omitempty"`
 	InitialContent   []AgentPromptContentBlock `json:"initialContent"`
 	Model            *string                   `json:"model,omitempty"`

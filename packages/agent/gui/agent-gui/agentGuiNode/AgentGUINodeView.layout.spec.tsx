@@ -1163,6 +1163,7 @@ function createViewModel(): AgentGUINodeViewModel {
         model: null,
         reasoningEffort: null,
         planMode: false,
+        browserUse: true,
         permissionModeId: "preset"
       },
       supportsModel: false,

@@ -196,6 +196,7 @@ func (s *Service) prepareRuntime(ctx context.Context, workspaceID string, cwd st
 		Title:            value(input.Title),
 		PermissionModeID: value(input.PermissionModeID),
 		PlanMode:         clampComposerPlanModeForProvider(provider, valueBool(input.PlanMode)),
+		BrowserUse:       clampComposerBrowserUseForProvider(provider, input.BrowserUse),
 		Model:            clampComposerModelForProvider(provider, value(input.Model)),
 		ReasoningEffort: normalizeReasoningEffortForProvider(
 			provider,

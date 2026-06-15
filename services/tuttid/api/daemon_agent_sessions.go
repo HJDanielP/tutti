@@ -123,6 +123,7 @@ func (api DaemonAPI) CreateWorkspaceAgentSession(ctx context.Context, request tu
 		Model:            request.Body.Model,
 		PermissionModeID: request.Body.PermissionModeId,
 		PlanMode:         request.Body.PlanMode,
+		BrowserUse:       request.Body.BrowserUse,
 		Provider:         string(request.Body.Provider),
 		ReasoningEffort:  request.Body.ReasoningEffort,
 		Title:            request.Body.Title,
@@ -365,6 +366,7 @@ func composerSettingsFromGenerated(settings tuttigenerated.AgentSessionComposerS
 		Model:            optionalStringValue(settings.Model),
 		PermissionModeID: optionalStringValue(settings.PermissionModeId),
 		PlanMode:         settings.PlanMode != nil && *settings.PlanMode,
+		BrowserUse:       settings.BrowserUse,
 		ReasoningEffort:  optionalStringValue(settings.ReasoningEffort),
 	}
 }
