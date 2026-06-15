@@ -92,46 +92,6 @@ func TestValidateAppManifestRejectsInvalidLocalizationInfo(t *testing.T) {
 	}
 }
 
-func TestValidateAppManifestAcceptsReferencesSearchEndpoint(t *testing.T) {
-	t.Parallel()
-
-	manifest := validTestAppManifest()
-	manifest.References = &AppManifestReferences{
-		SearchEndpoint: "/tutti/references/search",
-	}
-
-	if err := ValidateAppManifest(manifest); err != nil {
-		t.Fatalf("ValidateAppManifest() error = %v, want nil", err)
-	}
-}
-
-func TestValidateAppManifestRejectsInvalidReferencesSearchEndpoint(t *testing.T) {
-	t.Parallel()
-
-	for _, endpoint := range []string{
-		"",
-		"tutti/references/search",
-		"//example.test/references",
-		"https://example.test/references",
-		"/tutti/references/search?query=1",
-		"/tutti/references/search#fragment",
-		"/%zz",
-		"/foo%20bar",
-		"/foo%2Fbar",
-		"/a%2e%2e/b",
-	} {
-		t.Run(endpoint, func(t *testing.T) {
-			manifest := validTestAppManifest()
-			manifest.References = &AppManifestReferences{
-				SearchEndpoint: endpoint,
-			}
-			if err := ValidateAppManifest(manifest); err == nil {
-				t.Fatal("ValidateAppManifest() error = nil, want invalid references error")
-			}
-		})
-	}
-}
-
 func TestAppPackageMinimizeBehaviorDefaultsToKeepMounted(t *testing.T) {
 	t.Parallel()
 
@@ -166,6 +126,22 @@ func TestAppPackageWindowMinimumSize(t *testing.T) {
 	}
 }
 
+func TestAppPackageReferenceListSupported(t *testing.T) {
+	t.Parallel()
+
+	appPackage := AppPackage{
+		Manifest: AppManifest{
+			References: &AppManifestReferences{
+				ListEndpoint: "/references/list",
+			},
+		},
+	}
+
+	if !appPackage.ReferenceListSupported() {
+		t.Fatal("ReferenceListSupported() = false, want true")
+	}
+}
+
 func TestValidateAppManifestRejectsInvalidWindowMinimizeBehavior(t *testing.T) {
 	t.Parallel()
 
@@ -190,6 +166,66 @@ func TestValidateAppManifestRejectsInvalidWindowMinimumSize(t *testing.T) {
 
 	if err := ValidateAppManifest(manifest); err == nil {
 		t.Fatal("ValidateAppManifest() error = nil, want invalid window minWidth error")
+	}
+}
+
+func TestValidateAppManifestRejectsInvalidReferencesListEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		listEndpoint string
+	}{
+		{
+			name:         "empty",
+			listEndpoint: "",
+		},
+		{
+			name:         "absolute",
+			listEndpoint: "https://example.com/references/list",
+		},
+		{
+			name:         "query",
+			listEndpoint: "/references/list?query=main",
+		},
+		{
+			name:         "fragment",
+			listEndpoint: "/references/list#results",
+		},
+		{
+			name:         "network path",
+			listEndpoint: "//example.com/references/list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			manifest := validTestAppManifest()
+			manifest.References = &AppManifestReferences{ListEndpoint: tt.listEndpoint}
+
+			if err := ValidateAppManifest(manifest); err == nil {
+				t.Fatal("ValidateAppManifest() error = nil, want invalid references.listEndpoint error")
+			}
+		})
+	}
+}
+
+func TestParseAppManifestJSONRejectsUnsupportedReferencesFields(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		`{"schemaVersion":"tutti.app.manifest.v1","appId":"test-app","version":"0.1.0","name":"Test App","description":"Test app","icon":{"type":"asset","src":"icon.png"},"runtime":{"bootstrap":"bootstrap.sh","healthcheckPath":"/healthz"},"references":null}`,
+		`{"schemaVersion":"tutti.app.manifest.v1","appId":"test-app","version":"0.1.0","name":"Test App","description":"Test app","icon":{"type":"asset","src":"icon.png"},"runtime":{"bootstrap":"bootstrap.sh","healthcheckPath":"/healthz"},"references":{"listEndpoint":"/references/list","searchEndpoint":"/references/search"}}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			if _, _, err := ParseAppManifestJSON([]byte(raw)); err == nil {
+				t.Fatal("ParseAppManifestJSON() error = nil, want invalid references error")
+			}
+		})
 	}
 }
 

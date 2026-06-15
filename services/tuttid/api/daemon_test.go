@@ -93,11 +93,19 @@ func (stubAppCenterService) Install(context.Context, string, string) (workspaceb
 	return workspacebiz.WorkspaceApp{}, nil
 }
 
+func (s stubAppCenterService) InstallWithOptions(ctx context.Context, workspaceID string, appID string, _ workspaceservice.InstallOptions) (workspacebiz.WorkspaceApp, error) {
+	return s.Install(ctx, workspaceID, appID)
+}
+
 func (s stubAppCenterService) Launch(ctx context.Context, workspaceID string, appID string) (workspacebiz.WorkspaceApp, error) {
 	if s.launchFn == nil {
 		return workspacebiz.WorkspaceApp{}, nil
 	}
 	return s.launchFn(ctx, workspaceID, appID)
+}
+
+func (stubAppCenterService) ListReferences(context.Context, string, string, workspacebiz.AppReferenceListInput) (workspacebiz.AppReferenceListResult, error) {
+	return workspacebiz.AppReferenceListResult{}, nil
 }
 
 func (stubAppCenterService) List(context.Context, string) ([]workspacebiz.WorkspaceApp, error) {
@@ -129,10 +137,6 @@ func (s stubAppCenterService) Retry(ctx context.Context, workspaceID string, app
 
 func (stubAppCenterService) Rollback(context.Context, string, string, string) (workspacebiz.WorkspaceApp, error) {
 	return workspacebiz.WorkspaceApp{}, nil
-}
-
-func (stubAppCenterService) SearchReferences(context.Context, string, string, workspacebiz.AppReferenceSearchInput) (workspacebiz.AppReferenceSearchResult, error) {
-	return workspacebiz.AppReferenceSearchResult{}, nil
 }
 
 func (stubAppCenterService) StartEnabled(context.Context, string) ([]workspacebiz.WorkspaceApp, error) {

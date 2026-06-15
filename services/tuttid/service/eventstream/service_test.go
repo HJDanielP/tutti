@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	preferencesbiz "github.com/tutti-os/tutti/services/tuttid/biz/preferences"
+	workspacebiz "github.com/tutti-os/tutti/services/tuttid/biz/workspace"
 	preferencesservice "github.com/tutti-os/tutti/services/tuttid/service/preferences"
 )
 
@@ -156,84 +157,6 @@ func TestAgentActivityUpdatedValidationRejectsSchemaDrift(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestWorkspaceAppUpdatedValidationRequiresReferences(t *testing.T) {
-	t.Parallel()
-
-	catalog := DefaultCatalog()
-	for _, tt := range []struct {
-		name string
-		app  map[string]any
-	}{
-		{
-			name: "missing references",
-			app:  workspaceAppUpdatedAppPayloadForTest(false),
-		},
-		{
-			name: "missing searchSupported",
-			app: func() map[string]any {
-				app := workspaceAppUpdatedAppPayloadForTest(false)
-				app["references"] = map[string]any{}
-				return app
-			}(),
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			payload, err := json.Marshal(map[string]any{"app": tt.app})
-			if err != nil {
-				t.Fatalf("marshal payload: %v", err)
-			}
-			err = catalog.ValidatePublish(
-				TopicWorkspaceAppUpdated,
-				DirectionServerToClient,
-				payload,
-			)
-			if err == nil {
-				t.Fatal("ValidatePublish() error = nil, want invalid payload")
-			}
-			validationErr, ok := err.(*ValidationError)
-			if !ok {
-				t.Fatalf("ValidatePublish() error type = %T, want *ValidationError", err)
-			}
-			if validationErr.Code != ValidationCodeInvalidPayload {
-				t.Fatalf("ValidatePublish() code = %q, want %q", validationErr.Code, ValidationCodeInvalidPayload)
-			}
-		})
-	}
-}
-
-func workspaceAppUpdatedAppPayloadForTest(includeReferences bool) map[string]any {
-	app := map[string]any{
-		"appId":            "docs",
-		"displayName":      "Docs",
-		"version":          "1.0.0",
-		"description":      "Docs app",
-		"iconUrl":          nil,
-		"installed":        true,
-		"enabled":          true,
-		"status":           "idle",
-		"stateRevision":    1,
-		"launchUrl":        nil,
-		"port":             nil,
-		"failureReason":    nil,
-		"lastError":        nil,
-		"startedAtUnixMs":  nil,
-		"updatedAtUnixMs":  nil,
-		"source":           "generated",
-		"exportable":       true,
-		"tags":             []string{},
-		"localizations":    []any{},
-		"minimizeBehavior": "keep-mounted",
-		"windowMinWidth":   nil,
-		"windowMinHeight":  nil,
-	}
-	if includeReferences {
-		app["references"] = map[string]any{"searchSupported": true}
-	}
-	return app
 }
 
 func TestPreferencesIntentHandlerUsesAuthoritativeMutationPath(t *testing.T) {
@@ -417,6 +340,110 @@ func TestAgentActivityPublisherPublishesScopedUpdate(t *testing.T) {
 	}
 	if event.Scope.WorkspaceID != "workspace-1" {
 		t.Fatalf("event scope workspace id = %q, want workspace-1", event.Scope.WorkspaceID)
+	}
+}
+
+func TestWorkspaceAppPublisherIncludesReferencesState(t *testing.T) {
+	t.Parallel()
+
+	service := NewService(DefaultCatalog(), nil)
+	session := service.OpenSession()
+	t.Cleanup(func() {
+		service.CloseSession(session)
+	})
+	if err := service.Subscribe(session, []string{TopicWorkspaceAppUpdated}, EventScope{WorkspaceID: "workspace-1"}); err != nil {
+		t.Fatalf("Subscribe() error = %v", err)
+	}
+
+	publisher := WorkspaceAppPublisher{Service: service}
+	if err := publisher.PublishWorkspaceAppUpdated(context.Background(), "workspace-1", workspacebiz.WorkspaceApp{
+		Package: workspacebiz.AppPackage{
+			AppID:   "docs",
+			Version: "1.0.0",
+			Manifest: workspacebiz.AppManifest{
+				Name:        "Docs",
+				Description: "Browse docs",
+				References: &workspacebiz.AppManifestReferences{
+					ListEndpoint: "/references/list",
+				},
+			},
+		},
+		Runtime: workspacebiz.AppRuntimeState{
+			Status: workspacebiz.AppRuntimeStatusIdle,
+		},
+	}); err != nil {
+		t.Fatalf("PublishWorkspaceAppUpdated() error = %v", err)
+	}
+
+	event := receiveEvent(t, session)
+	var payload struct {
+		App struct {
+			References struct {
+				ListSupported bool `json:"listSupported"`
+			} `json:"references"`
+		} `json:"app"`
+	}
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		t.Fatalf("decode published event payload: %v", err)
+	}
+	if !payload.App.References.ListSupported {
+		t.Fatal("published references.listSupported = false, want true")
+	}
+}
+
+func TestWorkspaceAppUpdatedValidationRequiresReferencesState(t *testing.T) {
+	t.Parallel()
+
+	catalog := DefaultCatalog()
+	tests := []struct {
+		name    string
+		payload string
+	}{
+		{
+			name: "missing references",
+			payload: `{"app":{
+				"appId":"docs",
+				"displayName":"Docs",
+				"version":"1.0.0",
+				"status":"idle",
+				"stateRevision":1,
+				"minimizeBehavior":"keep-mounted"
+			}}`,
+		},
+		{
+			name: "missing listSupported",
+			payload: `{"app":{
+				"appId":"docs",
+				"displayName":"Docs",
+				"version":"1.0.0",
+				"status":"idle",
+				"stateRevision":1,
+				"minimizeBehavior":"keep-mounted",
+				"references":{}
+			}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := catalog.ValidatePublish(
+				TopicWorkspaceAppUpdated,
+				DirectionServerToClient,
+				[]byte(tt.payload),
+			)
+			if err == nil {
+				t.Fatal("ValidatePublish() error = nil, want invalid payload")
+			}
+			validationErr, ok := err.(*ValidationError)
+			if !ok {
+				t.Fatalf("ValidatePublish() error type = %T, want *ValidationError", err)
+			}
+			if validationErr.Code != ValidationCodeInvalidPayload {
+				t.Fatalf("ValidatePublish() code = %q, want %q", validationErr.Code, ValidationCodeInvalidPayload)
+			}
+		})
 	}
 }
 

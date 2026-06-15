@@ -53,7 +53,7 @@ type AppManifestCLI struct {
 }
 
 type AppManifestReferences struct {
-	SearchEndpoint string `json:"searchEndpoint"`
+	ListEndpoint string `json:"listEndpoint"`
 }
 
 type AppManifestWindow struct {
@@ -107,8 +107,8 @@ func (p AppPackage) Description() string {
 	return p.Manifest.Description
 }
 
-func (p AppPackage) ReferenceSearchSupported() bool {
-	return p.Manifest.References != nil && strings.TrimSpace(p.Manifest.References.SearchEndpoint) != ""
+func (p AppPackage) ReferenceListSupported() bool {
+	return p.Manifest.References != nil && strings.TrimSpace(p.Manifest.References.ListEndpoint) != ""
 }
 
 func (p AppPackage) MinimizeBehavior() string {
@@ -273,19 +273,56 @@ type WorkspaceApp struct {
 }
 
 type AppReferencesState struct {
-	SearchSupported bool
+	ListSupported bool
 }
 
-type AppReferenceSearchInput struct {
-	Query  string
-	Limit  int
-	Cursor string
-	Kinds  []AppReferenceKind
+type AppReferenceListInput struct {
+	ParentGroupID string
+	FilterText    string
+	Limit         int
+	Cursor        string
+	Kinds         []AppReferenceKind
+	TimeRange     *AppReferenceListTimeRange
 }
 
-type AppReferenceSearchResult struct {
-	References []AppReference
+type AppReferenceListTimeRange struct {
+	FromMs *int64
+	ToMs   *int64
+}
+
+type AppReferenceListResult struct {
+	Items      []AppReferenceListItem
 	NextCursor *string
+}
+
+type AppReferenceListItem interface {
+	AppReferenceListItemType() AppReferenceListItemType
+}
+
+type AppReferenceListItemType string
+
+const (
+	AppReferenceListItemTypeGroup     AppReferenceListItemType = "group"
+	AppReferenceListItemTypeReference AppReferenceListItemType = "reference"
+)
+
+type AppReferenceGroup struct {
+	ID             string
+	DisplayName    string
+	Description    string
+	ReferenceCount int
+}
+
+func (AppReferenceGroup) AppReferenceListItemType() AppReferenceListItemType {
+	return AppReferenceListItemTypeGroup
+}
+
+type AppReferenceListReferenceItem struct {
+	Reference AppReference
+}
+
+func (AppReferenceListReferenceItem) AppReferenceListItemType() AppReferenceListItemType {
+	return AppReferenceListItemTypeReference
 }
 
 type AppReferenceKind string
@@ -386,6 +423,14 @@ type AppFactoryJob struct {
 }
 
 func ParseAppManifestJSON(data []byte) (AppManifest, string, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return AppManifest{}, "", fmt.Errorf("parse app manifest json: %w", err)
+	}
+	if err := validateAppManifestReferencesJSON(raw); err != nil {
+		return AppManifest{}, "", err
+	}
+
 	var manifest AppManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return AppManifest{}, "", fmt.Errorf("parse app manifest json: %w", err)
@@ -398,6 +443,26 @@ func ParseAppManifestJSON(data []byte) (AppManifest, string, error) {
 		return AppManifest{}, "", fmt.Errorf("serialize app manifest json: %w", err)
 	}
 	return manifest, string(normalized), nil
+}
+
+func validateAppManifestReferencesJSON(raw map[string]json.RawMessage) error {
+	referencesRaw, ok := raw["references"]
+	if !ok {
+		return nil
+	}
+	if strings.TrimSpace(string(referencesRaw)) == "null" {
+		return errors.New("app manifest references must be an object when provided")
+	}
+	var references map[string]json.RawMessage
+	if err := json.Unmarshal(referencesRaw, &references); err != nil {
+		return errors.New("app manifest references must be an object when provided")
+	}
+	for key := range references {
+		if key != "listEndpoint" {
+			return fmt.Errorf("app manifest references.%s is unsupported", key)
+		}
+	}
+	return nil
 }
 
 func ReadAppManifestFile(path string) (AppManifest, string, error) {
@@ -456,12 +521,12 @@ func ValidateAppManifest(manifest AppManifest) error {
 		}
 	}
 	if manifest.References != nil {
-		searchEndpoint := strings.TrimSpace(manifest.References.SearchEndpoint)
-		if searchEndpoint == "" {
-			return errors.New("app manifest references.searchEndpoint is required when references is provided")
+		listEndpoint := strings.TrimSpace(manifest.References.ListEndpoint)
+		if listEndpoint == "" {
+			return errors.New("app manifest references.listEndpoint is required when references is provided")
 		}
-		if !isRelativeURLPath(searchEndpoint) {
-			return errors.New("app manifest references.searchEndpoint must be a relative URL path without query or fragment")
+		if !isRelativeURLPath(listEndpoint) {
+			return errors.New("app manifest references.listEndpoint must be a relative URL path without query or fragment")
 		}
 	}
 	if manifest.Author != nil && strings.TrimSpace(manifest.Author.Name) == "" {

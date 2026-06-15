@@ -721,13 +721,13 @@ func validateWorkspaceAppUpdatedPayload(payload []byte) error {
 		return fmt.Errorf("app.references is required")
 	}
 	var references struct {
-		SearchSupported *bool `json:"searchSupported"`
+		ListSupported *bool `json:"listSupported"`
 	}
 	if err := json.Unmarshal(referencesRaw, &references); err != nil {
 		return fmt.Errorf("decode app.references: %w", err)
 	}
-	if references.SearchSupported == nil {
-		return fmt.Errorf("app.references.searchSupported is required")
+	if references.ListSupported == nil {
+		return fmt.Errorf("app.references.listSupported is required")
 	}
 
 	var decoded eventprotocol.WorkspaceAppUpdatedPayload

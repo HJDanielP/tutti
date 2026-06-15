@@ -50,6 +50,9 @@ export const appCenterEn = {
     uninstallAppDescriptionRecommended:
       "This uninstalls the app from this workspace and deletes this workspace's app data.",
     uninstallAppTitle: 'Uninstall "{{name}}"?',
+    updateAppTitle: 'Update "{{name}}"?',
+    updateRunningAppDescription:
+      "Updating will restart this app to apply the new version.",
     uninstallAndDeleteAppDescription:
       "This uninstalls the app, deletes its app data, and removes it from your local apps.",
     uninstallAndDeleteAppTitle: 'Uninstall and delete "{{name}}"?'
@@ -78,6 +81,8 @@ export const appCenterEn = {
     },
     messages: {
       factoryJobFailed:
+        "App creation failed. Open the agent session to view details.",
+      factoryJobFailedWithFix:
         "App creation failed. Open the agent session or try Fix to view details.",
       loadingConfiguration: "Loading configuration...",
       loadingProviders: "Loading agent providers...",
@@ -338,6 +343,8 @@ export const appCenterZhCN = {
     uninstallAppDescriptionRecommended:
       "这会从当前工作区卸载该应用，并删除此工作区中的应用数据。",
     uninstallAppTitle: "卸载“{{name}}”？",
+    updateAppTitle: "更新“{{name}}”？",
+    updateRunningAppDescription: "更新会重启应用以应用新版本。",
     uninstallAndDeleteAppDescription:
       "这会卸载该应用、删除应用数据，并从本地应用列表移除。",
     uninstallAndDeleteAppTitle: "卸载并删除“{{name}}”？"
@@ -365,7 +372,9 @@ export const appCenterZhCN = {
       templates: "选择起点"
     },
     messages: {
-      factoryJobFailed: "应用创建失败。打开 Agent 会话或使用修复操作查看详情。",
+      factoryJobFailed: "应用创建失败。打开 Agent 会话查看详情。",
+      factoryJobFailedWithFix:
+        "应用创建失败。打开 Agent 会话或使用修复操作查看详情。",
       loadingConfiguration: "正在加载配置...",
       loadingProviders: "正在加载 Agent Provider...",
       noAgentProviders: "暂无可用的 Agent Provider。",

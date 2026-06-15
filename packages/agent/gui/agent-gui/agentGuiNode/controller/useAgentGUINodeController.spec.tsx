@@ -3881,6 +3881,79 @@ describe("useAgentGUINodeController", () => {
     });
   });
 
+  it("does not mark a completed conversation unread when another controller has it active", async () => {
+    installAgentHostApi({
+      list: vi.fn(async () => ({
+        presences: [],
+        sessions: [
+          workspaceAgentSession("session-1"),
+          workspaceAgentSession("session-2")
+        ]
+      })),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn(() => vi.fn())
+    });
+
+    const { result } = renderHook(() => ({
+      first: useAgentGUINodeController({
+        nodeId: "node-active-session-1",
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: agentGuiData("session-1"),
+        onDataChange: vi.fn()
+      }),
+      second: useAgentGUINodeController({
+        nodeId: "node-active-session-2",
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: agentGuiData("session-2"),
+        onDataChange: vi.fn()
+      })
+    }));
+
+    await waitFor(() => {
+      expect(result.current.first.viewModel.activeConversationId).toBe(
+        "session-1"
+      );
+      expect(result.current.second.viewModel.activeConversationId).toBe(
+        "session-2"
+      );
+      expect(
+        result.current.first.viewModel.conversations.some(
+          (conversation) => conversation.id === "session-2"
+        )
+      ).toBe(true);
+    });
+
+    act(() => {
+      emitRuntimeSessionEventForTests?.({
+        eventType: "state_patch",
+        data: {
+          workspaceId: "room-1",
+          agentSessionId: "session-2",
+          lifecycleStatus: "completed",
+          occurredAtUnixMs: 20
+        }
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.first.viewModel.conversations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "session-2",
+            status: "completed",
+            hasUnreadCompletion: false
+          })
+        ])
+      );
+    });
+  });
+
   it("keeps a busy inactive conversation subscribed so its final state can settle in the list", async () => {
     const retainEventStream = vi
       .fn()
@@ -5935,6 +6008,7 @@ describe("useAgentGUINodeController", () => {
           composerOverrides: {
             model: "gpt-5",
             reasoningEffort: "high",
+            speed: null,
             planMode: true,
             permissionModeId: "full-access"
           }
@@ -5988,6 +6062,7 @@ describe("useAgentGUINodeController", () => {
         settings: {
           model: settings.model ?? "gpt-5",
           reasoningEffort: settings.reasoningEffort ?? "high",
+          speed: null,
           planMode: settings.planMode ?? true,
           permissionModeId: settings.permissionModeId ?? "full-access"
         }
@@ -6011,6 +6086,7 @@ describe("useAgentGUINodeController", () => {
           composerOverrides: {
             model: "gpt-5",
             reasoningEffort: "high",
+            speed: null,
             planMode: true,
             permissionModeId: "full-access"
           }
@@ -6082,6 +6158,7 @@ describe("useAgentGUINodeController", () => {
       result.current.actions.updateComposerSettings({
         model: "gpt-5",
         reasoningEffort: "high",
+        speed: null,
         planMode: true,
         permissionModeId: "full-access"
       });
@@ -6114,6 +6191,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-5",
             reasoningEffort: "high",
+            speed: null,
             // Sent as-is; tuttid clamps planMode for codex at session create.
             planMode: true,
             permissionModeId: "full-access"
@@ -6169,6 +6247,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: string | null;
             reasoningEffort: string | null;
+            speed?: string | null;
             planMode: boolean;
             permissionModeId: string;
           };
@@ -6189,6 +6268,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: string | null;
             reasoningEffort: string | null;
+            speed?: string | null;
             planMode: boolean;
             permissionModeId: string;
           };
@@ -6214,6 +6294,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-5",
             reasoningEffort: "medium",
+            speed: null,
             planMode: false,
             permissionModeId: "auto"
           },
@@ -6266,6 +6347,7 @@ describe("useAgentGUINodeController", () => {
       ).toMatchObject({
         model: "gpt-5",
         reasoningEffort: "medium",
+        speed: null,
         planMode: false,
         permissionModeId: "auto"
       });
@@ -6281,6 +6363,7 @@ describe("useAgentGUINodeController", () => {
       result.current.actions.updateComposerSettings({
         model: "gpt-5.1",
         reasoningEffort: "high",
+        speed: null,
         planMode: true
       });
     });
@@ -6320,6 +6403,7 @@ describe("useAgentGUINodeController", () => {
         settings: {
           model: "gpt-5.1",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "auto"
         }
@@ -6331,6 +6415,7 @@ describe("useAgentGUINodeController", () => {
       ).toMatchObject({
         model: "gpt-5.1",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "auto"
       });
@@ -6355,6 +6440,7 @@ describe("useAgentGUINodeController", () => {
           composerOverrides: {
             model: "gpt-5",
             reasoningEffort: "medium",
+            speed: null,
             planMode: false,
             permissionModeId: "preset"
           }
@@ -6378,6 +6464,7 @@ describe("useAgentGUINodeController", () => {
         settings: {
           model: string | null;
           reasoningEffort: string | null;
+          speed?: string | null;
           planMode: boolean;
           permissionModeId: string;
         };
@@ -6398,6 +6485,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: string | null;
             reasoningEffort: string | null;
+            speed?: string | null;
             planMode: boolean;
             permissionModeId: string;
           };
@@ -6407,6 +6495,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: settings.model ?? "gpt-5",
             reasoningEffort: settings.reasoningEffort ?? "medium",
+            speed: null,
             planMode: settings.planMode ?? false,
             permissionModeId: settings.permissionModeId ?? "preset"
           }
@@ -6421,6 +6510,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-5",
             reasoningEffort: "medium",
+            speed: null,
             planMode: false,
             permissionModeId: "auto"
           },
@@ -6503,6 +6593,7 @@ describe("useAgentGUINodeController", () => {
         settings: {
           model: "gpt-5.1",
           reasoningEffort: "medium",
+          speed: null,
           planMode: false,
           permissionModeId: "preset"
         }
@@ -6525,6 +6616,7 @@ describe("useAgentGUINodeController", () => {
         settings: {
           model: "gpt-5.2",
           reasoningEffort: "medium",
+          speed: null,
           planMode: false,
           permissionModeId: "preset"
         }
@@ -6568,6 +6660,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "sonnet",
             reasoningEffort: "medium",
+            speed: null,
             planMode: false,
             permissionModeId: "default"
           }
@@ -6671,6 +6764,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-5.4",
             reasoningEffort: "high",
+            speed: null,
             planMode: false,
             permissionModeId: "full-access"
           }
@@ -6743,6 +6837,7 @@ describe("useAgentGUINodeController", () => {
       effectiveSettings: {
         model: "haiku",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "preset"
       },
@@ -6792,6 +6887,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "haiku",
             reasoningEffort: "high",
+            speed: null,
             planMode: false,
             permissionModeId: "default"
           },
@@ -6871,6 +6967,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "haiku",
             reasoningEffort: "high",
+            speed: null,
             planMode: false,
             permissionModeId: "default"
           },
@@ -6910,6 +7007,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "opus",
             reasoningEffort: "xhigh",
+            speed: null,
             planMode: false,
             permissionModeId: "default"
           },
@@ -6957,6 +7055,7 @@ describe("useAgentGUINodeController", () => {
       settings: {
         model: "opus",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "preset"
       }
@@ -7100,6 +7199,7 @@ describe("useAgentGUINodeController", () => {
       effectiveSettings: {
         model: "haiku",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "preset"
       },
@@ -7149,6 +7249,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "haiku",
             reasoningEffort: "high",
+            speed: null,
             planMode: false,
             permissionModeId: "default"
           },
@@ -7459,6 +7560,7 @@ describe("useAgentGUINodeController", () => {
       effectiveSettings: {
         model: "gpt-5.5",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "full-access"
       },
@@ -7514,6 +7616,7 @@ describe("useAgentGUINodeController", () => {
       effectiveSettings: {
         model: "gpt-5.5",
         reasoningEffort: "high",
+        speed: null,
         planMode: false,
         permissionModeId: "full-access"
       },
@@ -7797,6 +7900,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-old",
             reasoningEffort: "low",
+            speed: null,
             planMode: false,
             permissionModeId: "auto"
           },
@@ -7817,6 +7921,7 @@ describe("useAgentGUINodeController", () => {
           settings: {
             model: "gpt-new",
             reasoningEffort: "medium",
+            speed: null,
             planMode: false,
             permissionModeId: "auto"
           },
@@ -11644,6 +11749,7 @@ function composerOptionsFromRuntimeResult(
     provider: normalizeConfigOptionValue(result.provider) ?? provider,
     models,
     reasoningEfforts,
+    speeds: [],
     modelConfigurable,
     reasoningConfigurable,
     permissionConfig: permissionConfigFromRuntimeResult(
