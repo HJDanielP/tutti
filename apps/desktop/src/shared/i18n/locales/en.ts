@@ -5,6 +5,7 @@ export const en = {
     defaultWorkspace: "default",
     loading: "Loading",
     neverOpened: "Never opened",
+    ok: "OK",
     selectFolder: "Select folder",
     unknownError: "Unknown error",
     unreachable: "unreachable",
@@ -99,6 +100,8 @@ export const en = {
       exportServiceLogs: "Export Service Logs...",
       file: "File",
       help: "Help",
+      upToDateDetail: "Tutti {{version}} is currently the latest version.",
+      upToDateMessage: "You're up to date!",
       view: "View",
       window: "Window"
     }

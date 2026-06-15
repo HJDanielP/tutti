@@ -1,4 +1,5 @@
-import type { MenuItemConstructorOptions } from "electron";
+import type { MenuItemConstructorOptions, MessageBoxOptions } from "electron";
+import type { AppUpdateState } from "../shared/contracts/ipc.ts";
 import { createTranslator, type DesktopLocale } from "../shared/i18n/index.ts";
 import type { DesktopLogger } from "./logging.ts";
 
@@ -9,6 +10,7 @@ export interface ApplicationMenuOptions {
   getLocale?: () => DesktopLocale;
   logger?: DesktopLogger;
   platform?: NodeJS.Platform;
+  showMessageBox?: (options: MessageBoxOptions) => Promise<unknown>;
 }
 
 function formatErrorDetail(error: unknown): string {
@@ -51,7 +53,26 @@ async function runCheckForUpdatesFromMenu(
   }
 
   try {
-    await options.checkForUpdates();
+    const result = await options.checkForUpdates();
+    if (isUpToDateUpdateState(result)) {
+      const translator = createTranslator(options.getLocale?.() ?? "en");
+      const showMessageBox =
+        options.showMessageBox ??
+        (async (messageBoxOptions: MessageBoxOptions) => {
+          const { dialog } = await import("electron");
+          await dialog.showMessageBox(messageBoxOptions);
+        });
+
+      await showMessageBox({
+        buttons: [translator.t("common.ok")],
+        detail: translator.t("desktop.menu.upToDateDetail", {
+          version: result.currentVersion
+        }),
+        message: translator.t("desktop.menu.upToDateMessage"),
+        title: "Tutti",
+        type: "info"
+      });
+    }
     options.logger?.info("menu check for updates completed");
   } catch (error) {
     options.logger?.warn("menu check for updates failed", {
@@ -60,13 +81,23 @@ async function runCheckForUpdatesFromMenu(
   }
 }
 
+function isUpToDateUpdateState(value: unknown): value is AppUpdateState {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { status?: unknown }).status === "up_to_date" &&
+    typeof (value as { currentVersion?: unknown }).currentVersion === "string"
+  );
+}
+
 export function createApplicationMenuTemplate({
   allowDeveloperTools = process.env.NODE_ENV === "development",
   checkForUpdates,
   exportDeveloperLogs,
   getLocale = () => "en",
   logger,
-  platform = process.platform
+  platform = process.platform,
+  showMessageBox
 }: ApplicationMenuOptions = {}): MenuItemConstructorOptions[] {
   const isMac = platform === "darwin";
   const translator = createTranslator(getLocale());
@@ -86,7 +117,8 @@ export function createApplicationMenuTemplate({
               exportDeveloperLogs,
               getLocale,
               logger,
-              platform
+              platform,
+              showMessageBox
             });
           }
         },
@@ -164,7 +196,8 @@ export function createApplicationMenuTemplate({
                     exportDeveloperLogs,
                     getLocale,
                     logger,
-                    platform
+                    platform,
+                    showMessageBox
                   });
                 }
               },

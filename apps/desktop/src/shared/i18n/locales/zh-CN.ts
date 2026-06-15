@@ -7,6 +7,7 @@ export const zhCN = {
     defaultWorkspace: "默认空间",
     loading: "加载中",
     neverOpened: "从未打开",
+    ok: "好",
     selectFolder: "选择文件夹",
     unknownError: "未知错误",
     unreachable: "不可达",
@@ -98,6 +99,8 @@ export const zhCN = {
       exportServiceLogs: "导出服务日志...",
       file: "文件",
       help: "帮助",
+      upToDateDetail: "Tutti {{version}} 是当前的最新版本。",
+      upToDateMessage: "您使用的就是最新版本！",
       view: "显示",
       window: "窗口"
     }
