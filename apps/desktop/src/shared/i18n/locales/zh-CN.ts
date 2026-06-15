@@ -349,7 +349,7 @@ export const zhCN = {
         openDesktopLog: "打开 desktop 日志",
         openLogsDirectory: "打开日志目录",
         visibilityDescription:
-          "在设置中隐藏此面板。连续点击「通用」七次即可重新显示。",
+          "在设置中隐藏此面板。在「通用」里连续点击版本号七次即可重新显示。",
         visibilityLabel: "显示开发者面板"
       },
       title: "设置",

@@ -365,7 +365,7 @@ export const en = {
         openDesktopLog: "Open desktop log",
         openLogsDirectory: "Open logs folder",
         visibilityDescription:
-          "Hide this panel from settings. Tap “General” seven times to bring it back.",
+          "Hide this panel from settings. Tap the version number in General seven times to bring it back.",
         visibilityLabel: "Show developer panel"
       },
       title: "Settings",

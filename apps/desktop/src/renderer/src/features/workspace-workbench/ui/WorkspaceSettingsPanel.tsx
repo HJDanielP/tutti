@@ -23,10 +23,7 @@ import { useDesktopPreferencesService } from "@renderer/features/desktop-prefere
 import { useTranslation } from "@renderer/i18n";
 import { cn } from "@renderer/lib/format";
 import { formatWorkspaceSettingsBytes } from "../services/workspaceSettingsFormat";
-import type {
-  WorkspaceSettingsDeveloperLogsSnapshotState,
-  WorkspaceSettingsSectionID
-} from "../services/workspaceSettingsTypes";
+import type { WorkspaceSettingsDeveloperLogsSnapshotState } from "../services/workspaceSettingsTypes";
 import type {
   WorkspaceManagedModel,
   WorkspaceManagedModelProviderDraft,
@@ -99,7 +96,7 @@ export function WorkspaceSettingsPanel({
   const { state: desktopPreferencesState } = useDesktopPreferencesService();
   const { service: settingsService, state: settingsState } =
     useWorkspaceSettingsService();
-  const generalTapCountRef = useRef(0);
+  const versionTapCountRef = useRef(0);
 
   useEffect(() => {
     if (settingsState.open) {
@@ -107,24 +104,17 @@ export function WorkspaceSettingsPanel({
     }
   }, [settingsService, settingsState.open, workspace.id]);
 
-  const handleSelectSection = (sectionID: WorkspaceSettingsSectionID) => {
-    if (sectionID !== "general") {
-      generalTapCountRef.current = 0;
-      settingsService.selectSection(sectionID);
+  const handleVersionTap = () => {
+    if (settingsState.developerPanelVisible) {
       return;
     }
 
-    if (!settingsState.developerPanelVisible) {
-      generalTapCountRef.current += 1;
-      if (generalTapCountRef.current >= developerPanelUnlockTaps) {
-        generalTapCountRef.current = 0;
-        settingsService.setDeveloperPanelVisible(true);
-        settingsService.selectSection("developer");
-        return;
-      }
+    versionTapCountRef.current += 1;
+    if (versionTapCountRef.current >= developerPanelUnlockTaps) {
+      versionTapCountRef.current = 0;
+      settingsService.setDeveloperPanelVisible(true);
+      settingsService.selectSection("developer");
     }
-
-    settingsService.selectSection("general");
   };
 
   if (!settingsState.open) {
@@ -205,7 +195,7 @@ export function WorkspaceSettingsPanel({
                     : "bg-transparent text-[var(--text-secondary)]"
                 )}
                 type="button"
-                onClick={() => handleSelectSection(section.id)}
+                onClick={() => settingsService.selectSection(section.id)}
               >
                 {section.label}
               </button>
@@ -238,6 +228,7 @@ export function WorkspaceSettingsPanel({
                 onSleepPreventionModeChange={(mode) => {
                   void settingsService.changeSleepPreventionMode(mode);
                 }}
+                onVersionTap={handleVersionTap}
                 sleepPreventionMode={
                   desktopPreferencesState.sleepPreventionMode
                 }
@@ -1189,6 +1180,7 @@ function WorkspaceGeneralSettingsSection({
   onDefaultAgentProviderChange,
   onLocaleChange,
   onSleepPreventionModeChange,
+  onVersionTap,
   sleepPreventionMode
 }: {
   changingDefaultAgentProvider: DesktopAgentProvider | null;
@@ -1200,6 +1192,7 @@ function WorkspaceGeneralSettingsSection({
   onDefaultAgentProviderChange: (provider: DesktopAgentProvider) => void;
   onLocaleChange: (locale: DesktopLocale) => void;
   onSleepPreventionModeChange: (mode: DesktopSleepPreventionMode) => void;
+  onVersionTap: () => void;
   sleepPreventionMode: DesktopSleepPreventionMode;
 }) {
   const { t } = useTranslation();
@@ -1342,11 +1335,15 @@ function WorkspaceGeneralSettingsSection({
             {t("workspace.settings.general.versionLabel")}
           </strong>
         </div>
-        <p className="m-0 text-right font-mono text-[13px] text-[var(--text-secondary)] max-[560px]:text-left">
+        <button
+          className="m-0 cursor-default select-none rounded-[5px] border-0 bg-transparent p-0 text-right font-mono text-[13px] text-[var(--text-secondary)] outline-none focus-visible:outline-none max-[560px]:text-left"
+          type="button"
+          onClick={onVersionTap}
+        >
           {developerLogs.loading && logs === null
             ? t("common.loading")
             : (logs?.desktopVersion ?? "0.0.0")}
-        </p>
+        </button>
       </div>
     </div>
   );
