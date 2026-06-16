@@ -205,17 +205,14 @@ function createAgentGUITestRichTextAtProviders(): readonly AgentRichTextAtProvid
         );
         const items = await Promise.all(
           sessions.map(async (session: any) => {
-            const summary =
-              session.sessionOrigin === "WORKSPACE_AGENT_SESSION_ORIGIN_HOOK"
-                ? null
-                : await Promise.resolve(
-                    mockGetWorkspaceAgentSessionSummary({
-                      workspaceId: workspaceId,
-                      agentSessionId: session.agentSessionId,
-                      agentReplyLimit: 1,
-                      recentTurnLimit: 1
-                    })
-                  ).catch(() => null);
+            const summary = await Promise.resolve(
+              mockGetWorkspaceAgentSessionSummary({
+                workspaceId: workspaceId,
+                agentSessionId: session.agentSessionId,
+                agentReplyLimit: 1,
+                recentTurnLimit: 1
+              })
+            ).catch(() => null);
             const userId = String(session.userId ?? "");
             const profile = profiles.get(userId) as any;
             const title =
