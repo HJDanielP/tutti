@@ -47,6 +47,25 @@ export function mergeWorkspaceAppCatalogFields(
   };
 }
 
+function areWorkspaceAppInstallProgressEqual(
+  left: WorkspaceAppCenterApp["installProgress"],
+  right: WorkspaceAppCenterApp["installProgress"]
+): boolean {
+  if (left == null && right == null) {
+    return true;
+  }
+  if (left == null || right == null) {
+    return false;
+  }
+  return (
+    left.userPhase === right.userPhase &&
+    left.overallPercent === right.overallPercent &&
+    left.downloadedBytes === right.downloadedBytes &&
+    left.totalBytes === right.totalBytes &&
+    left.indeterminate === right.indeterminate
+  );
+}
+
 export function areWorkspaceAppCenterAppsEqual(
   left: readonly WorkspaceAppCenterApp[],
   right: readonly WorkspaceAppCenterApp[]
@@ -67,6 +86,10 @@ export function areWorkspaceAppCenterAppsEqual(
       leftApp.exportable === rightApp.exportable &&
       leftApp.iconUrl === rightApp.iconUrl &&
       leftApp.installed === rightApp.installed &&
+      areWorkspaceAppInstallProgressEqual(
+        leftApp.installProgress,
+        rightApp.installProgress
+      ) &&
       leftApp.installationId === rightApp.installationId &&
       areWorkspaceAppCenterLocalizationsEqual(
         leftApp.localizations ?? [],
@@ -74,8 +97,7 @@ export function areWorkspaceAppCenterAppsEqual(
       ) &&
       leftApp.minimizeBehavior === rightApp.minimizeBehavior &&
       leftApp.name === rightApp.name &&
-      leftApp.references.searchSupported ===
-        rightApp.references.searchSupported &&
+      leftApp.references.listSupported === rightApp.references.listSupported &&
       leftApp.runtimeId === rightApp.runtimeId &&
       leftApp.runtimeStatus === rightApp.runtimeStatus &&
       leftApp.source === rightApp.source &&

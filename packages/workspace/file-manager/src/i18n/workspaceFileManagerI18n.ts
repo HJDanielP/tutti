@@ -26,7 +26,6 @@ const workspaceFileManagerEn = {
   arrangeLastOpenedLabel: "Last Opened",
   arrangeMenuLabel: "Arrange",
   arrangeNoneLabel: "None",
-  arrangeTagsLabel: "Tags",
   breadcrumbRootLabel: "workspace",
   cancelLabel: "Cancel",
   closeLabel: "Close",
@@ -114,7 +113,9 @@ const workspaceFileManagerEn = {
     "{{count}} import path conflicts with an existing file or folder using an incompatible type. Resolve it before retrying.",
   importTypeConflictTitle: "Import path conflict",
   layoutIconViewLabel: "Icon view",
-  layoutListViewLabel: "List view"
+  layoutIconViewTooltipLabel: "Icon mode",
+  layoutListViewLabel: "List view",
+  layoutListViewTooltipLabel: "List mode"
 } as const satisfies I18nDictionary;
 
 const workspaceFileManagerZhCN = {
@@ -126,7 +127,6 @@ const workspaceFileManagerZhCN = {
   arrangeLastOpenedLabel: "上次打开日期",
   arrangeMenuLabel: "排列方式",
   arrangeNoneLabel: "无",
-  arrangeTagsLabel: "标签",
   breadcrumbRootLabel: "工作区",
   cancelLabel: "取消",
   closeLabel: "关闭",
@@ -208,7 +208,9 @@ const workspaceFileManagerZhCN = {
     "这次导入里有 {{count}} 个路径与现有文件或文件夹的类型不兼容。请先处理后再重试。",
   importTypeConflictTitle: "导入路径冲突",
   layoutIconViewLabel: "图标",
-  layoutListViewLabel: "列表"
+  layoutIconViewTooltipLabel: "图标模式",
+  layoutListViewLabel: "列表",
+  layoutListViewTooltipLabel: "列表模式"
 } as const satisfies I18nDictionary;
 
 export type WorkspaceFileManagerI18nKey = keyof typeof workspaceFileManagerEn;

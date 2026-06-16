@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import type {
   WorkspaceAppCenterApp,
   WorkspaceAppCenterViewState,
@@ -14,7 +14,8 @@ import { createAppCenterI18nRuntime } from "@tutti-os/workspace-app-center/i18n"
 import type {
   AppCenterAppTab,
   AppCenterFactoryProviderConfiguration,
-  AppCenterFactoryProviderOption
+  AppCenterFactoryProviderOption,
+  AppCenterHostActions
 } from "@tutti-os/workspace-app-center/ui";
 import { AppCenterPanel } from "@tutti-os/workspace-app-center/ui";
 import { agentGuiDockIconUrls } from "@tutti-os/agent-gui";
@@ -35,86 +36,101 @@ import {
 import { shouldShowWorkspaceApp } from "../services/workspaceAppVisibility.ts";
 import { useWorkspaceAppCenterService } from "./useWorkspaceAppCenterService.ts";
 
+const catalogAppDisplayDefinitions = [
+  {
+    appIds: ["ai-media-canvas", "media-canvas"],
+    descriptionKey: "appCenter.catalogApps.aiMediaCanvas.description",
+    nameKey: "appCenter.catalogApps.aiMediaCanvas.name"
+  },
+  {
+    appIds: ["automation"],
+    descriptionKey: "appCenter.catalogApps.automation.description",
+    nameKey: "appCenter.catalogApps.automation.name"
+  },
+  {
+    appIds: ["daily-product-radar", "daily-tech-radar", "radar"],
+    descriptionKey: "appCenter.catalogApps.dailyProductRadar.description",
+    nameKey: "appCenter.catalogApps.dailyProductRadar.name"
+  },
+  {
+    appIds: ["group-chat"],
+    descriptionKey: "appCenter.catalogApps.groupChat.description",
+    nameKey: "appCenter.catalogApps.groupChat.name"
+  },
+  {
+    appIds: ["vibe-design"],
+    descriptionKey: "appCenter.catalogApps.vibeDesign.description",
+    nameKey: "appCenter.catalogApps.vibeDesign.name"
+  }
+] as const;
+
+type CatalogAppDisplayDefinition = {
+  descriptionKey: string;
+  nameKey: string;
+};
+
+const catalogAppDisplayById = new Map<string, CatalogAppDisplayDefinition>(
+  catalogAppDisplayDefinitions.flatMap((definition) =>
+    definition.appIds.map(
+      (appId) =>
+        [
+          appId,
+          {
+            descriptionKey: definition.descriptionKey,
+            nameKey: definition.nameKey
+          }
+        ] as const
+    )
+  )
+);
+
 const comingSoonWorkspaceAppDefinitions = [
   {
-    appId: "product-competition",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.productCompetition.primary",
-      "appCenter.comingSoonTags.productCompetition.secondary",
-      "appCenter.comingSoonTags.productCompetition.tertiary"
-    ],
-    tags: ["coming-soon", "product", "design"]
-  },
-  {
-    appId: "design-review",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.designReview.primary",
-      "appCenter.comingSoonTags.designReview.secondary",
-      "appCenter.comingSoonTags.designReview.tertiary"
-    ],
-    tags: ["coming-soon", "product", "design"]
-  },
-  {
-    appId: "group-chat",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.groupChat.primary",
-      "appCenter.comingSoonTags.groupChat.secondary",
-      "appCenter.comingSoonTags.groupChat.tertiary"
-    ],
-    tags: ["coming-soon", "productivity", "chat", "team"]
-  },
-  {
     appId: "ai-ppt",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.aiPpt.primary",
-      "appCenter.comingSoonTags.aiPpt.secondary",
-      "appCenter.comingSoonTags.aiPpt.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.aiPpt.description",
+    nameKey: "appCenter.comingSoonApps.aiPpt.name",
     tags: ["coming-soon", "office", "presentation"]
   },
   {
     appId: "ai-document",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.aiDocument.primary",
-      "appCenter.comingSoonTags.aiDocument.secondary",
-      "appCenter.comingSoonTags.aiDocument.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.aiDocument.description",
+    nameKey: "appCenter.comingSoonApps.aiDocument.name",
     tags: ["coming-soon", "office", "document"]
   },
   {
     appId: "ai-sheet",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.aiSheet.primary",
-      "appCenter.comingSoonTags.aiSheet.secondary",
-      "appCenter.comingSoonTags.aiSheet.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.aiSheet.description",
+    nameKey: "appCenter.comingSoonApps.aiSheet.name",
     tags: ["coming-soon", "office", "spreadsheet"]
   },
   {
     appId: "open-cut",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.openCut.primary",
-      "appCenter.comingSoonTags.openCut.secondary",
-      "appCenter.comingSoonTags.openCut.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.openCut.description",
+    nameKey: "appCenter.comingSoonApps.openCut.name",
     tags: ["coming-soon", "content", "creation", "video", "timeline", "editor"]
   },
   {
+    appId: "product-competition",
+    descriptionKey: "appCenter.comingSoonApps.productCompetition.description",
+    nameKey: "appCenter.comingSoonApps.productCompetition.name",
+    tags: ["coming-soon", "product", "design"]
+  },
+  {
+    appId: "design-review",
+    descriptionKey: "appCenter.comingSoonApps.designReview.description",
+    nameKey: "appCenter.comingSoonApps.designReview.name",
+    tags: ["coming-soon", "product", "design"]
+  },
+  {
     appId: "calendar",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.calendar.primary",
-      "appCenter.comingSoonTags.calendar.secondary",
-      "appCenter.comingSoonTags.calendar.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.calendar.description",
+    nameKey: "appCenter.comingSoonApps.calendar.name",
     tags: ["coming-soon", "productivity", "calendar", "schedule"]
   },
   {
     appId: "document-summarizer",
-    displayTagKeys: [
-      "appCenter.comingSoonTags.documentSummarizer.primary",
-      "appCenter.comingSoonTags.documentSummarizer.secondary",
-      "appCenter.comingSoonTags.documentSummarizer.tertiary"
-    ],
+    descriptionKey: "appCenter.comingSoonApps.documentSummarizer.description",
+    nameKey: "appCenter.comingSoonApps.documentSummarizer.name",
     tags: ["coming-soon", "productivity", "summary", "document"]
   }
 ] as const;
@@ -151,15 +167,6 @@ export function WorkspaceAppCenterPane({
       providers: [...workspaceAgentGuiProviders]
     });
   }, [agentProviderStatusService]);
-  useEffect(() => {
-    if (!state.error) {
-      return;
-    }
-    const error = service.consumeError();
-    if (error) {
-      Toast.Error(error);
-    }
-  }, [service, state.error]);
   const factoryProviderOptions = useMemo(
     () =>
       resolveAppCenterReadyAgentProviderOptions(agentProviderSnapshot.statuses),
@@ -186,198 +193,166 @@ export function WorkspaceAppCenterPane({
       },
     [service]
   );
-  const viewModel = useMemo(
-    () =>
-      createAppCenterViewModel({
-        apps: withComingSoonWorkspaceApps(state.apps, comingSoonApps)
-          .filter((app) => shouldShowWorkspaceApp(app.appId))
-          .map((app) =>
-            toWorkspaceAppRecord(
-              withWorkspaceAppIconOverride(app, resolveAppIconUrl),
-              resolveWorkspaceAppCategory(app.appId, categoryLabels)
-            )
-          ),
-        factoryJobs: state.factoryJobs.map((job) => ({
-          agentSessionId: job.agentSessionId,
-          appId: job.appId,
-          displayName: job.displayName,
-          failureReason: job.failureReason,
-          jobId: job.jobId,
-          prompt: job.prompt,
-          provider: job.provider,
-          publishedVersion: job.publishedVersion,
-          status: job.status,
-          updatedAtUnixMs: job.updatedAtUnixMs,
-          validationResult: job.validationResult
-        })),
-        locale,
-        replaceableIconAppIds: state.apps
-          .filter((app) => app.source === "generated")
-          .map((app) => app.appId),
-        runtimeStates: withComingSoonWorkspaceApps(state.apps, comingSoonApps)
-          .filter((app) => shouldShowWorkspaceApp(app.appId))
-          .map((app) =>
-            toWorkspaceAppRuntimeState(
-              withWorkspaceAppIconOverride(app, resolveAppIconUrl)
-            )
-          )
-      }),
-    [
-      categoryLabels,
-      comingSoonApps,
-      locale,
-      resolveAppIconUrl,
-      state.apps,
-      state.factoryJobs
-    ]
-  );
-
-  return (
-    <AppCenterPanel
-      actions={{
-        cancelFactoryJob: (jobId) =>
-          service.cancelFactoryJob({ jobId, workspaceId }),
-        createFactoryJob: (input) =>
-          service.createFactoryJob({ ...input, workspaceId }),
-        deleteFactoryJob: (jobId) =>
-          service.deleteFactoryJob({ jobId, workspaceId }),
-        deleteApp: (appId) => service.deleteApp({ appId, workspaceId }),
-        exportApp: (appId) => service.exportApp({ appId, workspaceId }),
-        fixFactoryJob: (jobId, prompt) =>
-          service.fixFactoryJob({ jobId, prompt, workspaceId }),
-        importApp: () => service.importApp({ workspaceId }),
-        installApp: (appId) => service.installApp({ appId, workspaceId }),
-        openApp: (appId) => service.openApp({ appId, workspaceId }),
-        openAppFolder: (appId) => service.openAppFolder({ appId, workspaceId }),
-        openAppPackageFolder: (appId) =>
-          service.openAppPackageFolder({ appId, workspaceId }),
-        openFactoryJobAgentSession: async (agentSessionId, provider) => {
-          await requestWorkspaceAgentGuiLaunch({
-            agentSessionId,
-            provider: normalizeDesktopAgentGUIProvider(provider),
-            workspaceId
-          });
-        },
-        modifyAppWithAgent: async (jobId, agentSessionId, provider) => {
-          const preparedJob = await service.prepareFactoryJobModification({
-            jobId,
-            workspaceId
-          });
-          if (!preparedJob) {
-            return;
-          }
-          await requestWorkspaceAgentGuiLaunch({
-            agentSessionId: preparedJob.agentSessionId ?? agentSessionId,
-            provider: normalizeDesktopAgentGUIProvider(
-              preparedJob.provider ?? provider
-            ),
-            workspaceId
-          });
-        },
-        publishFactoryJob: (jobId) =>
-          service.publishFactoryJob({ jobId, workspaceId }),
-        refreshCatalog: () => service.refreshCatalog(workspaceId),
-        retryFactoryValidation: (jobId) =>
-          service.retryFactoryValidation({ jobId, workspaceId }),
-        retryApp: (appId) => service.retryApp({ appId, workspaceId }),
-        replaceAppIcon: (appId) =>
-          service.replaceAppIcon({ appId, workspaceId }),
-        updateApp: (appId, trigger) =>
-          service.updateApp({ appId, trigger, workspaceId }),
-        uninstallApp: (appId) => service.uninstallApp({ appId, workspaceId })
-      }}
-      activeAppTab={viewState.activeAppTab}
-      catalogStatus={catalogPanelStatus}
-      copy={copy}
-      defaultAgentProvider={agentProviderSnapshot.defaultProvider}
-      loadProviderConfiguration={loadFactoryProviderConfiguration}
-      onActiveAppTabChange={(activeAppTab: AppCenterAppTab) => {
-        service.setViewState({
-          state: { activeAppTab },
+  const appCenterActions = useMemo<AppCenterHostActions>(
+    () => ({
+      cancelFactoryJob: (jobId) =>
+        service.cancelFactoryJob({ jobId, workspaceId }),
+      createFactoryJob: (input) =>
+        service.createFactoryJob({ ...input, workspaceId }),
+      deleteFactoryJob: (jobId) =>
+        service.deleteFactoryJob({ jobId, workspaceId }),
+      deleteApp: (appId) => service.deleteApp({ appId, workspaceId }),
+      exportApp: (appId) => service.exportApp({ appId, workspaceId }),
+      fixFactoryJob: (jobId, prompt) =>
+        service.fixFactoryJob({ jobId, prompt, workspaceId }),
+      importApp: () => service.importApp({ workspaceId }),
+      installApp: (appId) => service.installApp({ appId, workspaceId }),
+      openApp: (appId) => service.openApp({ appId, workspaceId }),
+      openAppFolder: (appId) => service.openAppFolder({ appId, workspaceId }),
+      openAppPackageFolder: (appId) =>
+        service.openAppPackageFolder({ appId, workspaceId }),
+      openFactoryJobAgentSession: async (agentSessionId, provider) => {
+        await requestWorkspaceAgentGuiLaunch({
+          agentSessionId,
+          provider: normalizeDesktopAgentGUIProvider(provider),
           workspaceId
         });
-      }}
-      providerErrorMessage={agentProviderSnapshot.error}
-      providerLoading={agentProviderSnapshot.isLoading}
-      providerOptions={factoryProviderOptions}
-      viewModel={viewModel}
-    />
+      },
+      modifyAppWithAgent: async (jobId, agentSessionId, provider) => {
+        const preparedJob = await service.prepareFactoryJobModification({
+          jobId,
+          workspaceId
+        });
+        if (!preparedJob) {
+          return;
+        }
+        await requestWorkspaceAgentGuiLaunch({
+          agentSessionId: preparedJob.agentSessionId ?? agentSessionId,
+          provider: normalizeDesktopAgentGUIProvider(
+            preparedJob.provider ?? provider
+          ),
+          workspaceId
+        });
+      },
+      publishFactoryJob: (jobId) =>
+        service.publishFactoryJob({ jobId, workspaceId }),
+      refreshCatalog: () => service.refreshCatalog(workspaceId),
+      retryFactoryValidation: (jobId) =>
+        service.retryFactoryValidation({ jobId, workspaceId }),
+      retryApp: (appId) => service.retryApp({ appId, workspaceId }),
+      replaceAppIcon: (appId) => service.replaceAppIcon({ appId, workspaceId }),
+      updateApp: (appId, trigger) =>
+        service.updateApp({ appId, trigger, workspaceId }),
+      uninstallApp: (appId) => service.uninstallApp({ appId, workspaceId })
+    }),
+    [service, workspaceId]
   );
+  const handleActiveAppTabChange = useCallback(
+    (activeAppTab: AppCenterAppTab) => {
+      service.setViewState({
+        state: { activeAppTab },
+        workspaceId
+      });
+    },
+    [service, workspaceId]
+  );
+  const viewModel = useMemo(() => {
+    const recommendedApps = withComingSoonWorkspaceApps(
+      state.apps,
+      comingSoonApps
+    )
+      .map((app) => withWorkspaceAppDisplayOverride(app, i18n, locale))
+      .filter((app) => shouldShowWorkspaceApp(app.appId));
+
+    return createAppCenterViewModel({
+      apps: recommendedApps.map((app) =>
+        toWorkspaceAppRecord(
+          withWorkspaceAppIconOverride(app, resolveAppIconUrl),
+          resolveWorkspaceAppCategory(app.appId, categoryLabels)
+        )
+      ),
+      factoryJobs: state.factoryJobs.map((job) => ({
+        agentSessionId: job.agentSessionId,
+        appId: job.appId,
+        displayName: job.displayName,
+        failureReason: job.failureReason,
+        jobId: job.jobId,
+        prompt: job.prompt,
+        provider: job.provider,
+        publishedVersion: job.publishedVersion,
+        status: job.status,
+        updatedAtUnixMs: job.updatedAtUnixMs,
+        validationResult: job.validationResult
+      })),
+      locale,
+      replaceableIconAppIds: state.apps
+        .filter((app) => app.source === "generated")
+        .map((app) => app.appId),
+      runtimeStates: recommendedApps.map((app) =>
+        toWorkspaceAppRuntimeState(
+          withWorkspaceAppIconOverride(app, resolveAppIconUrl)
+        )
+      )
+    });
+  }, [
+    categoryLabels,
+    comingSoonApps,
+    i18n,
+    locale,
+    resolveAppIconUrl,
+    state.apps,
+    state.factoryJobs
+  ]);
+
+  return (
+    <>
+      <WorkspaceAppCenterErrorToast />
+      <AppCenterPanel
+        actions={appCenterActions}
+        activeAppTab={viewState.activeAppTab}
+        catalogStatus={catalogPanelStatus}
+        copy={copy}
+        defaultAgentProvider={agentProviderSnapshot.defaultProvider}
+        loadProviderConfiguration={loadFactoryProviderConfiguration}
+        onActiveAppTabChange={handleActiveAppTabChange}
+        providerErrorMessage={agentProviderSnapshot.error}
+        providerLoading={agentProviderSnapshot.isLoading}
+        providerOptions={factoryProviderOptions}
+        viewModel={viewModel}
+      />
+    </>
+  );
+}
+
+function WorkspaceAppCenterErrorToast() {
+  const { service, state } = useWorkspaceAppCenterService();
+
+  useEffect(() => {
+    if (!state.error) {
+      return;
+    }
+    const error = service.consumeError();
+    if (error) {
+      Toast.Error(error);
+    }
+  }, [service, state.error]);
+
+  return null;
 }
 
 function createComingSoonWorkspaceApps(
   i18n: { readonly t: (key: string) => string },
   locale: string
 ): readonly WorkspaceAppCenterApp[] {
-  return [
+  return comingSoonWorkspaceAppDefinitions.map((definition) =>
     createComingSoonWorkspaceApp({
-      description: i18n.t(
-        "appCenter.comingSoonApps.productCompetition.description"
-      ),
-      definition: comingSoonWorkspaceAppDefinitions[0],
+      description: i18n.t(definition.descriptionKey),
+      definition,
       locale,
-      name: i18n.t("appCenter.comingSoonApps.productCompetition.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.designReview.description"),
-      definition: comingSoonWorkspaceAppDefinitions[1],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.designReview.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.groupChat.description"),
-      definition: comingSoonWorkspaceAppDefinitions[2],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.groupChat.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.aiPpt.description"),
-      definition: comingSoonWorkspaceAppDefinitions[3],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.aiPpt.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.aiDocument.description"),
-      definition: comingSoonWorkspaceAppDefinitions[4],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.aiDocument.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.aiSheet.description"),
-      definition: comingSoonWorkspaceAppDefinitions[5],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.aiSheet.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.openCut.description"),
-      definition: comingSoonWorkspaceAppDefinitions[6],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.openCut.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t("appCenter.comingSoonApps.calendar.description"),
-      definition: comingSoonWorkspaceAppDefinitions[7],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.calendar.name"),
-      t: i18n.t
-    }),
-    createComingSoonWorkspaceApp({
-      description: i18n.t(
-        "appCenter.comingSoonApps.documentSummarizer.description"
-      ),
-      definition: comingSoonWorkspaceAppDefinitions[8],
-      locale,
-      name: i18n.t("appCenter.comingSoonApps.documentSummarizer.name"),
+      name: i18n.t(definition.nameKey),
       t: i18n.t
     })
-  ];
+  );
 }
 
 function createComingSoonWorkspaceApp(input: {
@@ -399,12 +374,12 @@ function createComingSoonWorkspaceApp(input: {
         description: input.description,
         locale: input.locale,
         name: input.name,
-        tags: input.definition.displayTagKeys.map((key) => input.t(key))
+        tags: []
       }
     ],
     minimizeBehavior: "keep-mounted",
     name: input.name,
-    references: { searchSupported: false },
+    references: { listSupported: false },
     runtimeStatus: "idle",
     source: "builtin",
     stateRevision: 0,
@@ -413,17 +388,57 @@ function createComingSoonWorkspaceApp(input: {
   };
 }
 
+function withWorkspaceAppDisplayOverride(
+  app: WorkspaceAppCenterApp,
+  i18n: { readonly t: (key: string) => string },
+  locale: string
+): WorkspaceAppCenterApp {
+  const definition = catalogAppDisplayById.get(app.appId.trim().toLowerCase());
+  if (!definition) {
+    return app;
+  }
+  const name = i18n.t(definition.nameKey);
+  const description = i18n.t(definition.descriptionKey);
+  return {
+    ...app,
+    description,
+    name,
+    localizations: [
+      {
+        description,
+        locale,
+        name,
+        tags: []
+      }
+    ]
+  };
+}
+
 function withComingSoonWorkspaceApps(
   apps: readonly WorkspaceAppCenterApp[],
   comingSoonApps: readonly WorkspaceAppCenterApp[]
 ): readonly WorkspaceAppCenterApp[] {
-  const existingAppIds = new Set(apps.map((app) => app.appId));
-  const missingComingSoonApps = comingSoonApps.filter(
-    (app) => !existingAppIds.has(app.appId)
+  const comingSoonByAppId = new Map(
+    comingSoonApps.map((app) => [app.appId, app] as const)
   );
-  return missingComingSoonApps.length > 0
-    ? [...apps, ...missingComingSoonApps]
-    : apps;
+  const mergedApps = apps.map((app) => {
+    const comingSoonApp = comingSoonByAppId.get(app.appId);
+    if (!comingSoonApp) {
+      return app;
+    }
+    comingSoonByAppId.delete(app.appId);
+    return {
+      ...comingSoonApp,
+      ...(app.iconUrl ? { iconUrl: app.iconUrl } : {}),
+      ...(app.availableIconUrl
+        ? { availableIconUrl: app.availableIconUrl }
+        : {})
+    };
+  });
+  const remainingComingSoonApps = [...comingSoonByAppId.values()];
+  return remainingComingSoonApps.length > 0
+    ? [...mergedApps, ...remainingComingSoonApps]
+    : mergedApps;
 }
 
 function withWorkspaceAppIconOverride(
@@ -586,6 +601,7 @@ function toWorkspaceAppRuntimeState(
       : {}),
     appId: app.appId,
     launchUrl: app.launchUrl ?? null,
+    ...(app.installProgress ? { installProgress: app.installProgress } : {}),
     ...(cliIssue
       ? {
           error: {
@@ -594,6 +610,9 @@ function toWorkspaceAppRuntimeState(
           }
         }
       : {}),
-    status: app.runtimeStatus
+    status:
+      app.installProgress != null || app.runtimeStatus === "installing"
+        ? "installing"
+        : app.runtimeStatus
   };
 }

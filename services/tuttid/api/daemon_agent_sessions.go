@@ -126,6 +126,7 @@ func (api DaemonAPI) CreateWorkspaceAgentSession(ctx context.Context, request tu
 		BrowserUse:       request.Body.BrowserUse,
 		Provider:         string(request.Body.Provider),
 		ReasoningEffort:  request.Body.ReasoningEffort,
+		Speed:            request.Body.Speed,
 		Title:            request.Body.Title,
 		Visible:          request.Body.Visible,
 	})
@@ -368,6 +369,7 @@ func composerSettingsFromGenerated(settings tuttigenerated.AgentSessionComposerS
 		PlanMode:         settings.PlanMode != nil && *settings.PlanMode,
 		BrowserUse:       settings.BrowserUse,
 		ReasoningEffort:  optionalStringValue(settings.ReasoningEffort),
+		Speed:            optionalStringValue(settings.Speed),
 	}
 }
 
@@ -411,6 +413,9 @@ func mergeComposerSettings(base agentservice.ComposerSettings, override agentser
 	if strings.TrimSpace(override.ReasoningEffort) != "" {
 		base.ReasoningEffort = override.ReasoningEffort
 	}
+	if strings.TrimSpace(override.Speed) != "" {
+		base.Speed = override.Speed
+	}
 	return base
 }
 
@@ -421,6 +426,7 @@ func composerSettingsPatchFromGenerated(settings tuttigenerated.AgentSessionComp
 		PlanMode:         settings.PlanMode,
 		BrowserUse:       settings.BrowserUse,
 		ReasoningEffort:  settings.ReasoningEffort,
+		Speed:            settings.Speed,
 	}
 }
 
@@ -432,6 +438,7 @@ func generatedAgentProviderComposerOptions(options agentservice.ComposerOptions)
 		PermissionConfig:  generatedPermissionConfig(options.PermissionConfig),
 		Provider:          tuttigenerated.WorkspaceAgentProvider(options.Provider),
 		ReasoningConfig:   generatedComposerConfigOption(options.ReasoningConfig),
+		SpeedConfig:       generatedComposerConfigOptionPointer(options.SpeedConfig),
 		RuntimeContext:    options.RuntimeContext,
 		Skills:            generatedAgentProviderSkillOptions(options.Skills),
 	}
@@ -463,6 +470,17 @@ func generatedAgentProviderSkillOptions(options []agentservice.ComposerSkillOpti
 		result = append(result, generated)
 	}
 	return result
+}
+
+// generatedComposerConfigOptionPointer projects an optional composer config
+// (the orthogonal speed dimension) and omits it entirely for providers that do
+// not expose it, so the GUI hides the control.
+func generatedComposerConfigOptionPointer(config agentservice.ComposerConfigOption) *tuttigenerated.AgentProviderComposerConfig {
+	if !config.Configurable && len(config.Options) == 0 {
+		return nil
+	}
+	generated := generatedComposerConfigOption(config)
+	return &generated
 }
 
 func generatedComposerConfigOption(config agentservice.ComposerConfigOption) tuttigenerated.AgentProviderComposerConfig {
@@ -502,6 +520,7 @@ func generatedAgentSessionComposerSettings(settings agentservice.ComposerSetting
 		PermissionModeId: optionalStringPointer(strings.TrimSpace(settings.PermissionModeID)),
 		PlanMode:         boolPointer(settings.PlanMode),
 		ReasoningEffort:  optionalStringPointer(strings.TrimSpace(settings.ReasoningEffort)),
+		Speed:            optionalStringPointer(strings.TrimSpace(settings.Speed)),
 	}
 	if settings.BrowserUse != nil {
 		result.BrowserUse = settings.BrowserUse

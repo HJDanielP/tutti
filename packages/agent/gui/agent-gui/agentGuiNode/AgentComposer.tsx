@@ -12,6 +12,8 @@ import {
 import { createPortal } from "react-dom";
 import type { AgentSessionCommand } from "../../shared/agentSessionTypes";
 import type {
+  AgentComposerDraft,
+  AgentComposerDraftImage,
   AgentGUIComposerSettingsVM,
   AgentGUIProviderSkillOption,
   AgentGUIQueuedPromptVM
@@ -29,13 +31,7 @@ import {
 } from "../../app/renderer/components/ui/tooltip";
 import type { AgentConversationPromptVM } from "../../shared/agentConversation/contracts/agentConversationVM";
 import { cn } from "../../app/renderer/lib/utils";
-import {
-  AddIcon,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger
-} from "@tutti-os/ui-system";
+import { AddIcon, Select, SelectTrigger } from "@tutti-os/ui-system";
 import { X } from "lucide-react";
 import type { WorkspaceFileReference } from "@tutti-os/workspace-file-reference/contracts";
 import type { WorkspaceUserProjectI18nRuntime } from "@tutti-os/workspace-user-project/i18n";
@@ -51,10 +47,16 @@ import {
   filterProviderSkills,
   getProviderSkillQueryMatch,
   labelForProviderSkill,
-  promptForProviderSkills,
   skillDescriptionForDisplay,
   skillTriggerForPrefix
 } from "./model/agentSkillOptions";
+import {
+  agentComposerDraftHasContent,
+  agentComposerDraftToPromptContent,
+  emptyAgentComposerDraft,
+  MAX_AGENT_COMPOSER_DRAFT_IMAGES,
+  textPromptContent
+} from "./model/agentComposerDraft";
 import {
   resolveSlashCommandsForProvider,
   resolveSlashCommandSelectionEffect,
@@ -126,7 +128,7 @@ export interface AgentComposerProps {
   currentUserId?: string | null;
   provider: string;
   slashStatus?: AgentComposerSlashStatus | null;
-  draftPrompt: string;
+  draftContent: AgentComposerDraft;
   availableCommands: readonly AgentSessionCommand[];
   hasCompactableContext?: boolean;
   compactSupported?: boolean | null;
@@ -166,6 +168,10 @@ export interface AgentComposerProps {
     reasoningOptionMedium: string;
     reasoningOptionHigh: string;
     reasoningOptionXHigh: string;
+    speedLabel: string;
+    speedSelectionLabel: string;
+    speedOptionStandard: string;
+    speedOptionFast: string;
     permissionLabel: string;
     permissionModeReadOnly: string;
     permissionModeAuto: string;
@@ -238,7 +244,7 @@ export interface AgentComposerProps {
     promptTipsPrefix: string;
   };
   workspaceUserProjectI18n: WorkspaceUserProjectI18nRuntime;
-  onDraftChange: (prompt: string) => void;
+  onDraftContentChange: (draftContent: AgentComposerDraft) => void;
   onProjectPathChange?: (
     path: string | null,
     metadata?: AgentProjectPathChangeMetadata
@@ -246,6 +252,7 @@ export interface AgentComposerProps {
   onSettingsChange: (settings: {
     model?: string | null;
     reasoningEffort?: string | null;
+    speed?: string | null;
     planMode?: boolean;
     browserUse?: boolean;
     permissionModeId?: string | null;
@@ -315,7 +322,6 @@ const EMPTY_PROMPT_TIPS: readonly AgentComposerPromptTip[] = [];
 const EMPTY_PROVIDER_SKILLS: readonly AgentGUIProviderSkillOption[] = [];
 const EMPTY_WORKSPACE_APP_ICONS: readonly AgentMessageMarkdownWorkspaceAppIcon[] =
   [];
-const MAX_PROMPT_IMAGES = 8;
 const PROMPT_TIP_CYCLE_STEP_MS = 5_200;
 const MENTION_PALETTE_DISMISS_INTERACTION_SELECTOR = [
   "[data-node-drag-handle]",
@@ -332,14 +338,6 @@ interface MentionPaletteFrame {
   top: number;
   width: number;
   zIndex: number | string;
-}
-
-interface AgentPromptImageDraft {
-  id: string;
-  name: string;
-  mimeType: "image/png" | "image/jpeg" | "image/webp";
-  data: string;
-  previewUrl: string;
 }
 
 function resolveMentionPalettePortalTarget(anchor: HTMLElement): Element {
@@ -542,7 +540,7 @@ export function AgentComposer({
   currentUserId,
   provider,
   slashStatus = null,
-  draftPrompt,
+  draftContent,
   availableCommands,
   hasCompactableContext = true,
   compactSupported = null,
@@ -570,7 +568,7 @@ export function AgentComposer({
   showProjectSelector = true,
   labels,
   workspaceUserProjectI18n,
-  onDraftChange,
+  onDraftContentChange,
   onProjectPathChange = () => {},
   onSettingsChange,
   onSubmit,
@@ -585,6 +583,8 @@ export function AgentComposer({
   richTextAtProviders = EMPTY_RICH_TEXT_AT_PROVIDERS
 }: AgentComposerProps): React.JSX.Element {
   "use memo";
+  const draftPrompt = draftContent.prompt;
+  const draftImages = draftContent.images;
   const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [mentionHighlightedKey, setMentionHighlightedKey] = useState<
@@ -601,9 +601,8 @@ export function AgentComposer({
     useState<AgentFileMentionSuggestionState | null>(null);
   const [isSelectedProjectMissing, setIsSelectedProjectMissing] =
     useState(false);
-  const [draftImages, setDraftImages] = useState<AgentPromptImageDraft[]>([]);
   const [submittedImagePreview, setSubmittedImagePreview] = useState<
-    AgentPromptImageDraft[]
+    AgentComposerDraftImage[]
   >([]);
   const [isSlashStatusPanelOpen, setIsSlashStatusPanelOpen] = useState(false);
   const slashStatusAgentSessionId = slashStatus?.agentSessionId ?? null;
@@ -830,10 +829,9 @@ export function AgentComposer({
   const clearSlashCommandDraft = useCallback((): void => {
     draftPromptRef.current = "";
     setPaletteDraftPrompt("");
-    setDraftImages([]);
     setIsPaletteOpen(false);
-    onDraftChange("");
-  }, [onDraftChange]);
+    onDraftContentChange(emptyAgentComposerDraft());
+  }, [onDraftContentChange]);
 
   const closeSlashStatusPanel = useCallback((): void => {
     setIsSlashStatusPanelOpen(false);
@@ -872,24 +870,40 @@ export function AgentComposer({
         const nextDraft = effect.draft;
         draftPromptRef.current = nextDraft;
         setPaletteDraftPrompt(nextDraft);
-        onDraftChange(nextDraft);
+        onDraftContentChange({ ...draftContent, prompt: nextDraft });
         setIsPaletteOpen(false);
         if (!settingsControlsDisabled) {
           onSettingsChange({ browserUse: true });
         }
         return;
       }
+      if (effect.kind === "toggleSpeed") {
+        clearSlashCommandDraft();
+        if (composerSettings.supportsSpeed) {
+          const currentSpeed =
+            composerSettings.selectedSpeedValue ??
+            composerSettings.draftSettings.speed ??
+            "standard";
+          onSettingsChange({
+            speed: currentSpeed === "fast" ? "standard" : "fast"
+          });
+        }
+        return;
+      }
       const nextDraft = effect.draft;
       draftPromptRef.current = nextDraft;
       setPaletteDraftPrompt(nextDraft);
-      onDraftChange(nextDraft);
+      onDraftContentChange({ ...draftContent, prompt: nextDraft });
       setIsPaletteOpen(false);
     },
     [
       clearSlashCommandDraft,
       composerSettings.draftSettings.planMode,
-      composerSettings.sessionSettings,
-      onDraftChange,
+      composerSettings.draftSettings.speed,
+      composerSettings.selectedSpeedValue,
+      composerSettings.supportsSpeed,
+      draftContent,
+      onDraftContentChange,
       onSettingsChange,
       onSubmit,
       settingsControlsDisabled
@@ -935,13 +949,13 @@ export function AgentComposer({
         draftForProviderSkill(skill, draftPromptRef.current, skillQueryMatch);
       draftPromptRef.current = nextDraft;
       setPaletteDraftPrompt(nextDraft);
-      onDraftChange(nextDraft);
+      onDraftContentChange({ ...draftContent, prompt: nextDraft });
       setIsPaletteOpen(false);
     },
-    [onDraftChange, promptBeforeSelection, skillQueryMatch]
+    [draftContent, onDraftContentChange, promptBeforeSelection, skillQueryMatch]
   );
 
-  const submitCurrentPrompt = (): void => {
+  const submitCurrentPrompt = useStableEventCallback((): void => {
     const canSubmitWhileSending = canQueueWhileBusy && isSendingTurn;
     if (
       isSelectedProjectMissing ||
@@ -952,7 +966,8 @@ export function AgentComposer({
       return;
     }
     const nextPrompt = draftPromptRef.current;
-    if (nextPrompt.trim() === "" && draftImages.length === 0) {
+    const nextDraftContent = { ...draftContent, prompt: nextPrompt };
+    if (!agentComposerDraftHasContent(nextDraftContent)) {
       return;
     }
     if (draftImages.length > 0 && !promptImagesSupported) {
@@ -979,31 +994,33 @@ export function AgentComposer({
     }
     setIsPaletteOpen(false);
     onSubmit(
-      promptContentFromDraft({
-        prompt: promptForProviderSkills({
-          prompt: nextPrompt,
-          provider,
-          skills: availableSkills
-        }),
-        images: draftImages
+      agentComposerDraftToPromptContent({
+        draft: nextDraftContent,
+        provider,
+        skills: availableSkills
       })
     );
-    if (draftImages.length > 0) {
+    if (draftImages.length > 0 && !canQueueWhileBusy) {
       setSubmittedImagePreview(draftImages);
       submittedImagePreviewObservedBusyRef.current = false;
     } else {
       setSubmittedImagePreview([]);
       submittedImagePreviewObservedBusyRef.current = false;
     }
-    setDraftImages([]);
-  };
+    draftPromptRef.current = "";
+    setPaletteDraftPrompt("");
+    onDraftContentChange(emptyAgentComposerDraft());
+  });
 
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    submitCurrentPrompt();
-  };
+  const submit = useCallback(
+    (event: FormEvent<HTMLFormElement>): void => {
+      event.preventDefault();
+      submitCurrentPrompt();
+    },
+    [submitCurrentPrompt]
+  );
 
-  const handleSlashPaletteKeyDown = useCallback(
+  const handleSlashPaletteKeyDown = useStableEventCallback(
     (event: KeyboardEvent): boolean => {
       if (!showSlashPalette) {
         return false;
@@ -1040,15 +1057,7 @@ export function AgentComposer({
         return true;
       }
       return false;
-    },
-    [
-      activeHighlight,
-      selectCapability,
-      selectCommand,
-      selectSkill,
-      showSlashPalette,
-      slashPaletteEntries
-    ]
+    }
   );
 
   const selectFileMention = useCallback(
@@ -1194,13 +1203,6 @@ export function AgentComposer({
           mentionControllerRef.current?.setFilter(activeEntry.categoryId);
         } else if (activeEntry.type === "expand" && activeEntry.groupId) {
           mentionControllerRef.current?.expandGroup(activeEntry.groupId);
-        } else if (
-          activeEntry.type === "app-reference-expand" &&
-          activeEntry.appId
-        ) {
-          mentionControllerRef.current?.expandWorkspaceAppReferences(
-            activeEntry.appId
-          );
         } else if (activeEntry.type === "item" && activeEntry.item) {
           selectFileMention(activeEntry.item);
         }
@@ -1286,16 +1288,11 @@ export function AgentComposer({
     ]
   );
 
-  const handlePaletteKeyDown = useCallback(
+  const handlePaletteKeyDown = useStableEventCallback(
     (event: KeyboardEvent): boolean =>
       handleFileMentionKeyDown(event) ||
       handleSlashPaletteKeyDown(event) ||
-      handleModeCycleKeyDown(event),
-    [
-      handleFileMentionKeyDown,
-      handleSlashPaletteKeyDown,
-      handleModeCycleKeyDown
-    ]
+      handleModeCycleKeyDown(event)
   );
 
   useEffect(() => {
@@ -1343,10 +1340,11 @@ export function AgentComposer({
       mentionControllerRef.current?.updateQuery({
         workspaceId,
         currentUserId,
-        query: state.query
+        query: state.query,
+        sessionCwd: selectedProjectPath || null
       });
     },
-    [currentUserId, workspaceId]
+    [currentUserId, selectedProjectPath, workspaceId]
   );
 
   const handleLinkClick = useCallback(
@@ -1399,14 +1397,16 @@ export function AgentComposer({
     };
   }, [closeOpenPalette, showPalette]);
 
-  const handleDraftChange = (nextDraft: string): void => {
-    draftPromptRef.current = nextDraft;
-    setPaletteDraftPrompt(nextDraft);
-    setIsPaletteOpen(true);
-    setSubmittedImagePreview([]);
-    submittedImagePreviewObservedBusyRef.current = false;
-    onDraftChange(nextDraft);
-  };
+  const handleDraftChange = useStableEventCallback(
+    (nextDraft: string): void => {
+      draftPromptRef.current = nextDraft;
+      setPaletteDraftPrompt(nextDraft);
+      setIsPaletteOpen(true);
+      setSubmittedImagePreview([]);
+      submittedImagePreviewObservedBusyRef.current = false;
+      onDraftContentChange({ ...draftContent, prompt: nextDraft });
+    }
+  );
 
   const addDraftImages = useCallback(
     (images: AgentRichTextPastedImage[]): void => {
@@ -1419,22 +1419,31 @@ export function AgentComposer({
       }
       setSubmittedImagePreview([]);
       submittedImagePreviewObservedBusyRef.current = false;
-      setDraftImages((current) => {
-        const remainingSlots = Math.max(0, MAX_PROMPT_IMAGES - current.length);
-        if (remainingSlots === 0) {
-          return current;
-        }
-        const nextImages = images.slice(0, remainingSlots).map((image) => ({
-          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-          name: image.name,
-          mimeType: image.mimeType,
-          data: image.data,
-          previewUrl: `data:${image.mimeType};base64,${image.data}`
-        }));
-        return [...current, ...nextImages];
+      const remainingSlots = Math.max(
+        0,
+        MAX_AGENT_COMPOSER_DRAFT_IMAGES - draftImages.length
+      );
+      if (remainingSlots === 0) {
+        return;
+      }
+      const nextImages = images.slice(0, remainingSlots).map((image) => ({
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+        name: image.name,
+        mimeType: image.mimeType,
+        data: image.data,
+        previewUrl: `data:${image.mimeType};base64,${image.data}`
+      }));
+      onDraftContentChange({
+        prompt: draftPromptRef.current,
+        images: [...draftImages, ...nextImages]
       });
     },
-    [onPromptImagesUnsupported, promptImagesSupported]
+    [
+      draftImages,
+      onDraftContentChange,
+      onPromptImagesUnsupported,
+      promptImagesSupported
+    ]
   );
 
   const handlePastedImages = useCallback(
@@ -1444,9 +1453,15 @@ export function AgentComposer({
     [addDraftImages]
   );
 
-  const removeDraftImage = useCallback((id: string): void => {
-    setDraftImages((current) => current.filter((image) => image.id !== id));
-  }, []);
+  const removeDraftImage = useCallback(
+    (id: string): void => {
+      onDraftContentChange({
+        prompt: draftPromptRef.current,
+        images: draftImages.filter((image) => image.id !== id)
+      });
+    },
+    [draftImages, onDraftContentChange]
+  );
 
   const insertWorkspaceReferences = useCallback(
     (items: readonly WorkspaceFileReference[]) => {
@@ -1831,14 +1846,15 @@ export function AgentComposer({
     () => (showPalette ? { zIndex: composerPaletteZIndex } : undefined),
     [showPalette]
   );
-  const isQueueMode =
-    canQueueWhileBusy && (draftPrompt.trim() !== "" || draftImages.length > 0);
-  const sendButtonState = showStopButton
-    ? isInterrupting
-      ? "stopping"
-      : "interrupt"
-    : isQueueMode
-      ? "queue"
+  const hasDraftContent = agentComposerDraftHasContent(draftContent);
+  const isQueueMode = canQueueWhileBusy && hasDraftContent;
+  const shouldShowStopButton = showStopButton && !isQueueMode;
+  const sendButtonState = isQueueMode
+    ? "queue"
+    : shouldShowStopButton
+      ? isInterrupting
+        ? "stopping"
+        : "interrupt"
       : isSendingTurn
         ? "loading"
         : "send";
@@ -1880,7 +1896,16 @@ export function AgentComposer({
     }
     previousSelectedProjectPathRef.current = selectedProjectPath;
     setIsSelectedProjectMissing(false);
-  }, [selectedProjectPath]);
+    if (!fileMentionSuggestion) {
+      return;
+    }
+    mentionControllerRef.current?.updateQuery({
+      workspaceId,
+      currentUserId,
+      query: fileMentionSuggestion.query,
+      sessionCwd: selectedProjectPath || null
+    });
+  }, [currentUserId, fileMentionSuggestion, selectedProjectPath, workspaceId]);
 
   useEffect(() => {
     setDismissedPromptRequestId(null);
@@ -2138,11 +2163,6 @@ export function AgentComposer({
                       onExpandGroup={(groupId) =>
                         mentionControllerRef.current?.expandGroup(groupId)
                       }
-                      onExpandWorkspaceAppReferences={(appId) =>
-                        mentionControllerRef.current?.expandWorkspaceAppReferences(
-                          appId
-                        )
-                      }
                       onCycleFilter={cycleFileMentionFilter}
                       onMoveSelection={moveFileMentionSelection}
                     />
@@ -2224,20 +2244,6 @@ export function AgentComposer({
                     data-agent-reference-add-icon="true"
                   />
                 </SelectTrigger>
-                <SelectContent
-                  align="start"
-                  side="top"
-                  sideOffset={8}
-                  collisionPadding={16}
-                  className={cn(styles.composerMenuContent, "min-w-[180px]")}
-                >
-                  <SelectItem
-                    value={workspaceReferenceOptionValue}
-                    className={styles.composerMenuItem}
-                  >
-                    {labels.referenceWorkspaceFiles}
-                  </SelectItem>
-                </SelectContent>
               </Select>
             </div>
             <div className={composerStyles.footerGroupRight}>
@@ -2269,6 +2275,10 @@ export function AgentComposer({
                     reasoningOptionMedium: labels.reasoningOptionMedium,
                     reasoningOptionHigh: labels.reasoningOptionHigh,
                     reasoningOptionXHigh: labels.reasoningOptionXHigh,
+                    speedLabel: labels.speedLabel,
+                    speedSelectionLabel: labels.speedSelectionLabel,
+                    speedOptionStandard: labels.speedOptionStandard,
+                    speedOptionFast: labels.speedOptionFast,
                     permissionLabel: labels.permissionLabel,
                     modelDescriptions: labels.modelDescriptions,
                     defaultModel: labels.defaultModel,
@@ -2278,7 +2288,7 @@ export function AgentComposer({
                   onSettingsChange={onSettingsChange}
                 />
               ) : null}
-              {showStopButton ? (
+              {shouldShowStopButton ? (
                 <button
                   type="button"
                   className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-[var(--text-primary)] transition-[color,opacity] duration-150 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--text-primary)_34%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background-panel)] active:bg-transparent disabled:cursor-not-allowed disabled:opacity-45"
@@ -2306,7 +2316,10 @@ export function AgentComposer({
                   className={styles.composerSendButton}
                   data-state={sendButtonState}
                   disabled={
-                    isSelectedProjectMissing || submitDisabled || sendButtonBusy
+                    isSelectedProjectMissing ||
+                    submitDisabled ||
+                    !hasDraftContent ||
+                    sendButtonBusy
                   }
                   aria-label={labels.send}
                   title={labels.send}
@@ -2381,24 +2394,12 @@ function isSlashCommandCapability(
   return "kind" in command && command.kind === "capability";
 }
 
-function textPromptContent(prompt: string): AgentPromptContentBlock[] {
-  const text = prompt.trim();
-  return text ? [{ type: "text", text }] : [];
-}
-
-function promptContentFromDraft(input: {
-  prompt: string;
-  images: readonly AgentPromptImageDraft[];
-}): AgentPromptContentBlock[] {
-  return [
-    ...textPromptContent(input.prompt),
-    ...input.images.map((image) => ({
-      type: "image" as const,
-      mimeType: image.mimeType,
-      data: image.data,
-      name: image.name
-    }))
-  ];
+function useStableEventCallback<Args extends unknown[], Result>(
+  callback: (...args: Args) => Result
+): (...args: Args) => Result {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  return useCallback((...args: Args) => callbackRef.current(...args), []);
 }
 
 function SendFilledIcon(): React.JSX.Element {

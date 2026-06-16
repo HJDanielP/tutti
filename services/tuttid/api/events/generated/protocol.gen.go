@@ -6,7 +6,7 @@ import "encoding/json"
 
 const (
 	BusinessEventProtocolVersion = 1
-	BusinessEventCatalogRevision = "sha256:04e54516637f2b5e"
+	BusinessEventCatalogRevision = "sha256:c026d2862f49818f"
 )
 
 type Topic string
@@ -98,6 +98,8 @@ type PreferencesDesktopPreferences struct {
 	Locale                   string  `json:"locale"`
 	SleepPreventionMode      string  `json:"sleepPreventionMode"`
 	ThemeSource              string  `json:"themeSource"`
+	UpdateChannel            string  `json:"updateChannel"`
+	UpdatePolicy             string  `json:"updatePolicy"`
 }
 
 type WorkspaceWorkspaceAppFactoryJob struct {
@@ -148,8 +150,15 @@ type WorkspaceWorkspaceApp struct {
 	WindowMinWidth   *int   `json:"windowMinWidth"`
 	WindowMinHeight  *int   `json:"windowMinHeight"`
 	References       struct {
-		SearchSupported bool `json:"searchSupported"`
+		ListSupported bool `json:"listSupported"`
 	} `json:"references"`
+	InstallProgress *struct {
+		UserPhase       string  `json:"userPhase"`
+		OverallPercent  float64 `json:"overallPercent"`
+		DownloadedBytes *int64  `json:"downloadedBytes"`
+		TotalBytes      *int64  `json:"totalBytes"`
+		Indeterminate   bool    `json:"indeterminate"`
+	} `json:"installProgress,omitempty"`
 }
 
 type AgentActivityUpdatedPayload struct {

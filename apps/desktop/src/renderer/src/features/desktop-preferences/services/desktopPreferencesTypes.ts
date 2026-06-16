@@ -5,7 +5,9 @@ import type {
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
-  DesktopSleepPreventionMode
+  DesktopSleepPreventionMode,
+  DesktopUpdateChannel,
+  DesktopUpdatePolicy
 } from "@shared/preferences";
 import type { DesktopThemeSource, DesktopThemeState } from "@shared/theme";
 
@@ -17,6 +19,8 @@ export interface DesktopPreferencesStoreState {
   changingLocale: DesktopLocale | null;
   changingSleepPreventionMode: DesktopSleepPreventionMode | null;
   changingThemeSource: DesktopThemeSource | null;
+  changingUpdateChannel: DesktopUpdateChannel | null;
+  changingUpdatePolicy: DesktopUpdatePolicy | null;
   agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
   browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   defaultAgentProvider: DesktopAgentProvider;
@@ -25,6 +29,8 @@ export interface DesktopPreferencesStoreState {
   locale: DesktopLocale;
   sleepPreventionMode: DesktopSleepPreventionMode;
   theme: DesktopThemeState;
+  updateChannel: DesktopUpdateChannel;
+  updatePolicy: DesktopUpdatePolicy;
 }
 
 export interface DesktopPreferencesReadableStoreState {
@@ -35,6 +41,8 @@ export interface DesktopPreferencesReadableStoreState {
   readonly changingLocale: DesktopLocale | null;
   readonly changingSleepPreventionMode: DesktopSleepPreventionMode | null;
   readonly changingThemeSource: DesktopThemeSource | null;
+  readonly changingUpdateChannel: DesktopUpdateChannel | null;
+  readonly changingUpdatePolicy: DesktopUpdatePolicy | null;
   readonly agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
   readonly browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   readonly defaultAgentProvider: DesktopAgentProvider;
@@ -43,4 +51,6 @@ export interface DesktopPreferencesReadableStoreState {
   readonly locale: DesktopLocale;
   readonly sleepPreventionMode: DesktopSleepPreventionMode;
   readonly theme: DesktopThemeState;
+  readonly updateChannel: DesktopUpdateChannel;
+  readonly updatePolicy: DesktopUpdatePolicy;
 }

@@ -394,6 +394,7 @@ func normalizeSessionSettings(settings *SessionSettings, provider string, defaul
 	}
 	normalized.Model = strings.TrimSpace(settings.Model)
 	normalized.ReasoningEffort = strings.TrimSpace(settings.ReasoningEffort)
+	normalized.Speed = strings.TrimSpace(settings.Speed)
 	normalized.PlanMode = settings.PlanMode
 	if settings.BrowserUse != nil {
 		value := *settings.BrowserUse
@@ -819,6 +820,7 @@ func (c *Controller) State(roomID, agentSessionID string) (SessionStateSnapshot,
 	if snapshot.Settings != nil {
 		snapshot.RuntimeContext["model"] = snapshot.Settings.Model
 		snapshot.RuntimeContext["reasoningEffort"] = snapshot.Settings.ReasoningEffort
+		snapshot.RuntimeContext["speed"] = snapshot.Settings.Speed
 		snapshot.RuntimeContext["planMode"] = snapshot.Settings.PlanMode
 	}
 	if stateAdapter, ok := adapter.(StateAdapter); ok {
@@ -869,6 +871,7 @@ func (c *Controller) State(roomID, agentSessionID string) (SessionStateSnapshot,
 	if snapshot.Settings != nil {
 		snapshot.RuntimeContext["model"] = snapshot.Settings.Model
 		snapshot.RuntimeContext["reasoningEffort"] = snapshot.Settings.ReasoningEffort
+		snapshot.RuntimeContext["speed"] = snapshot.Settings.Speed
 		snapshot.RuntimeContext["planMode"] = snapshot.Settings.PlanMode
 	}
 	return snapshot, nil

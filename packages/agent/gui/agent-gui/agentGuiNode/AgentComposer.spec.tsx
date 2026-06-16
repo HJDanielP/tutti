@@ -15,28 +15,19 @@ import {
 } from "@tutti-os/workspace-user-project/i18n";
 import { AgentComposer } from "./AgentComposer";
 import type {
+  AgentComposerDraft,
   AgentGUIComposerSettingsVM,
   AgentGUIQueuedPromptVM
 } from "./model/agentGuiNodeTypes";
 import type { AgentHostAgentSessionCommand } from "../../shared/contracts/dto";
 
-const {
-  mockMentionControllerInstances,
-  mockMentionPaletteEntries,
-  mockProjectMissingState
-} = vi.hoisted(() => ({
-  mockMentionControllerInstances: [] as any[],
-  mockMentionPaletteEntries: {
-    current: [] as any[]
-  },
+const { mockProjectMissingState } = vi.hoisted(() => ({
   mockProjectMissingState: {
     current: false
   }
 }));
 
 afterEach(() => {
-  mockMentionControllerInstances.length = 0;
-  mockMentionPaletteEntries.current = [];
   mockProjectMissingState.current = false;
 });
 
@@ -45,6 +36,13 @@ const workspaceUserProjectI18n = createWorkspaceUserProjectI18nRuntime(
     dictionaries: [workspaceUserProjectI18nResources["zh-CN"]]
   })
 );
+
+function createDraft(
+  prompt: string,
+  images: AgentComposerDraft["images"] = []
+): AgentComposerDraft {
+  return { prompt, images };
+}
 
 function createImageDataTransfer(file: File): DataTransfer {
   return {
@@ -77,13 +75,11 @@ vi.mock("../../app/renderer/components/ui/popover", () => ({
 vi.mock("./agentRichText/AgentRichTextEditor", () => ({
   AgentRichTextEditor: ({
     disabled,
-    onFileMentionSuggestionChange,
     onPasteImages,
     value,
     placeholder
   }: {
     disabled?: boolean;
-    onFileMentionSuggestionChange?: (state: unknown) => void;
     onPasteImages?: (images: unknown[]) => void;
     value: string;
     placeholder: string;
@@ -109,19 +105,6 @@ vi.mock("./agentRichText/AgentRichTextEditor", () => ({
         }
       >
         paste image
-      </button>
-      <button
-        type="button"
-        data-testid="mock-open-file-mention"
-        onClick={() =>
-          onFileMentionSuggestionChange?.({
-            query: "guide",
-            editor: {},
-            command: vi.fn()
-          })
-        }
-      >
-        open file mention
       </button>
     </>
   )
@@ -237,25 +220,19 @@ vi.mock("./AgentQueuedPromptPanel", () => ({
 
 vi.mock("./AgentFileMentionPalette", () => ({
   AgentFileMentionPalette: () => null,
-  flattenAgentMentionPaletteEntries: () => mockMentionPaletteEntries.current
+  flattenAgentMentionPaletteEntries: () => []
 }));
 
 vi.mock("./AgentMentionSearchController", () => ({
   AgentMentionSearchController: class {
-    close = vi.fn();
-    dispose = vi.fn();
-    enterCategory = vi.fn();
-    expandGroup = vi.fn();
-    expandWorkspaceAppReferences = vi.fn();
-    selectAgentGeneratedMentionItem = vi.fn();
-    setFilter = vi.fn();
-    updateQuery = vi.fn();
-    constructor() {
-      mockMentionControllerInstances.push(this);
-    }
     subscribe() {
       return () => undefined;
     }
+    dispose() {}
+    close() {}
+    updateQuery() {}
+    setFilter() {}
+    expandGroup() {}
   }
 }));
 
@@ -266,7 +243,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -282,7 +259,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -298,70 +275,13 @@ describe("AgentComposer", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("expands workspace app reference entries from the file mention palette with Enter", async () => {
-    mockMentionPaletteEntries.current = [
-      {
-        key: "apps:workspace-app-reference-expand:docs",
-        type: "app-reference-expand",
-        appId: "docs",
-        groupId: "apps"
-      }
-    ];
-    render(
-      <AgentComposer
-        workspaceId="workspace-1"
-        currentUserId="user-1"
-        provider="codex"
-        draftPrompt=""
-        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
-        disabled={false}
-        submitDisabled={false}
-        placeholder="placeholder"
-        composerSettings={createComposerSettings()}
-        queuedPrompts={[]}
-        drainingQueuedPromptId={null}
-        canQueueWhileBusy={false}
-        showStopButton={false}
-        activePrompt={null}
-        isInterrupting={false}
-        isSendingTurn={false}
-        isSubmittingPrompt={false}
-        labels={createLabels()}
-        workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
-        onSettingsChange={vi.fn()}
-        onSubmit={vi.fn()}
-        onSendQueuedPromptNext={vi.fn()}
-        onRemoveQueuedPrompt={vi.fn()}
-        onEditQueuedPrompt={vi.fn()}
-        onInterruptCurrentTurn={vi.fn()}
-        onSubmitInteractivePrompt={vi.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByTestId("mock-open-file-mention"));
-    await waitFor(() =>
-      expect(mockMentionControllerInstances[0]?.updateQuery).toHaveBeenCalled()
-    );
-    fireEvent.keyDown(screen.getByPlaceholderText("placeholder"), {
-      key: "Enter"
-    });
-
-    expect(
-      mockMentionControllerInstances[0]?.expandWorkspaceAppReferences
-    ).toHaveBeenCalledWith("docs");
-    expect(
-      mockMentionControllerInstances[0]?.expandGroup
-    ).not.toHaveBeenCalled();
-  });
-
   it("renders the permission dropdown when only plan mode is supported", () => {
     render(
       <AgentComposer
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -379,7 +299,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -403,7 +323,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -421,7 +341,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -439,14 +359,14 @@ describe("AgentComposer", () => {
   });
 
   it("exposes browser-use through the slash capability group", async () => {
-    const onDraftChange = vi.fn();
+    const onDraftContentChange = vi.fn();
     const onSettingsChange = vi.fn();
     render(
       <AgentComposer
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt="/浏览"
+        draftContent={createDraft("/浏览")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -455,6 +375,7 @@ describe("AgentComposer", () => {
           draftSettings: {
             model: null,
             reasoningEffort: null,
+            speed: null,
             planMode: false,
             browserUse: false,
             permissionModeId: "preset"
@@ -471,7 +392,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={onDraftChange}
+        onDraftContentChange={onDraftContentChange}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -490,7 +411,7 @@ describe("AgentComposer", () => {
 
     fireEvent.click(browserCapability);
 
-    expect(onDraftChange).toHaveBeenCalledWith("/browser ");
+    expect(onDraftContentChange).toHaveBeenCalledWith(createDraft("/browser "));
     expect(screen.getByRole("textbox")).toHaveValue("/browser ");
     expect(onSettingsChange).toHaveBeenCalledWith({ browserUse: true });
   });
@@ -503,7 +424,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt="/browser inspect this page"
+        draftContent={createDraft("/browser inspect this page")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -521,7 +442,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -549,7 +470,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt="/browser"
+        draftContent={createDraft("/browser")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -567,7 +488,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -591,7 +512,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -600,6 +521,7 @@ describe("AgentComposer", () => {
           draftSettings: {
             model: null,
             reasoningEffort: null,
+            speed: null,
             planMode: true,
             permissionModeId: "preset"
           },
@@ -615,7 +537,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -639,7 +561,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="claude-code"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -648,6 +570,7 @@ describe("AgentComposer", () => {
           draftSettings: {
             model: null,
             reasoningEffort: null,
+            speed: null,
             planMode: false,
             permissionModeId: "preset"
           },
@@ -664,7 +587,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -682,7 +605,7 @@ describe("AgentComposer", () => {
   });
 
   it("blocks Claude Code plan slash command submissions", () => {
-    const onDraftChange = vi.fn();
+    const onDraftContentChange = vi.fn();
     const onSettingsChange = vi.fn();
     const onSubmit = vi.fn();
     const { container, unmount } = render(
@@ -690,7 +613,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="claude-code"
-        draftPrompt="/plan"
+        draftContent={createDraft("/plan")}
         availableCommands={
           [
             { name: "plan", description: "provider plan" }
@@ -712,7 +635,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={onDraftChange}
+        onDraftContentChange={onDraftContentChange}
         onSettingsChange={onSettingsChange}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -725,12 +648,12 @@ describe("AgentComposer", () => {
 
     fireEvent.submit(container.querySelector("form")!);
 
-    expect(onDraftChange).toHaveBeenCalledWith("");
+    expect(onDraftContentChange).toHaveBeenCalledWith(createDraft(""));
     expect(onSettingsChange).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
 
     unmount();
-    onDraftChange.mockClear();
+    onDraftContentChange.mockClear();
     onSettingsChange.mockClear();
     onSubmit.mockClear();
     const secondRender = render(
@@ -738,7 +661,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="claude-code"
-        draftPrompt="/plan refactor auth"
+        draftContent={createDraft("/plan refactor auth")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -754,7 +677,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={onDraftChange}
+        onDraftContentChange={onDraftContentChange}
         onSettingsChange={onSettingsChange}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -767,9 +690,61 @@ describe("AgentComposer", () => {
 
     fireEvent.submit(secondRender.container.querySelector("form")!);
 
-    expect(onDraftChange).toHaveBeenCalledWith("");
+    expect(onDraftContentChange).toHaveBeenCalledWith(createDraft(""));
     expect(onSettingsChange).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears the visible draft immediately after a normal prompt submit", () => {
+    let draftContent = createDraft("run the tests");
+    const onDraftContentChange = vi.fn((nextDraft: AgentComposerDraft) => {
+      draftContent = nextDraft;
+    });
+    const onSubmit = vi.fn();
+    const renderComposer = () => (
+      <AgentComposer
+        workspaceId="workspace-1"
+        currentUserId="user-1"
+        provider="codex"
+        draftContent={draftContent}
+        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
+        disabled={false}
+        submitDisabled={false}
+        placeholder="placeholder"
+        composerSettings={createComposerSettings()}
+        queuedPrompts={[]}
+        drainingQueuedPromptId={null}
+        canQueueWhileBusy={false}
+        showStopButton={false}
+        activePrompt={null}
+        isInterrupting={false}
+        isSendingTurn={false}
+        isSubmittingPrompt={false}
+        labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
+        onDraftContentChange={onDraftContentChange}
+        onSettingsChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendQueuedPromptNext={vi.fn()}
+        onRemoveQueuedPrompt={vi.fn()}
+        onEditQueuedPrompt={vi.fn()}
+        onInterruptCurrentTurn={vi.fn()}
+        onSubmitInteractivePrompt={vi.fn()}
+      />
+    );
+    const { container, rerender } = render(renderComposer());
+
+    const editor = screen.getByPlaceholderText("placeholder");
+    expect(editor).toHaveValue("run the tests");
+
+    fireEvent.submit(container.querySelector("form")!);
+
+    expect(onSubmit).toHaveBeenCalledWith([
+      { type: "text", text: "run the tests" }
+    ]);
+    expect(onDraftContentChange).toHaveBeenCalledWith(createDraft(""));
+    rerender(renderComposer());
+    expect(editor).toHaveValue("");
   });
 
   it("toggles a persistent status panel for the local status slash command", () => {
@@ -799,7 +774,7 @@ describe("AgentComposer", () => {
             }
           ]
         }}
-        draftPrompt="/status"
+        draftContent={createDraft("/status")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -815,7 +790,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -858,7 +833,7 @@ describe("AgentComposer", () => {
             }
           ]
         }}
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -874,7 +849,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -904,7 +879,7 @@ describe("AgentComposer", () => {
             }
           ]
         }}
-        draftPrompt="/status"
+        draftContent={createDraft("/status")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -920,7 +895,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -953,7 +928,7 @@ describe("AgentComposer", () => {
             }
           ]
         }}
-        draftPrompt="/status"
+        draftContent={createDraft("/status")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -969,7 +944,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1005,7 +980,7 @@ describe("AgentComposer", () => {
         currentUserId="user-1"
         provider="codex"
         slashStatus={{ agentSessionId: "agent-session-a" }}
-        draftPrompt="/status"
+        draftContent={createDraft("/status")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1021,7 +996,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1042,7 +1017,7 @@ describe("AgentComposer", () => {
         currentUserId="user-1"
         provider="codex"
         slashStatus={{ agentSessionId: "agent-session-b" }}
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1058,7 +1033,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1080,7 +1055,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1096,7 +1071,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1114,13 +1089,24 @@ describe("AgentComposer", () => {
     );
   });
 
+  it("keeps footer action spacing and chevron slots consistent", () => {
+    const css = readFileSync(resolve("app/renderer/agentactivity.css"), "utf8");
+
+    expect(css).toMatch(
+      /\.agent-gui-node__composer-footer-right\s*{[^}]*gap:\s*2px/s
+    );
+    expect(css).toMatch(
+      /\.agent-gui-node__composer-footer-right\s+\.agent-gui-node__composer-menu-trigger\s+>\s+svg\s*{[^}]*width:\s*16px[^}]*height:\s*16px[^}]*flex:\s*0 0 16px[^}]*margin-left:\s*0/s
+    );
+  });
+
   it("does not render the project dropdown below the dock input shell", () => {
     const { container } = render(
       <AgentComposer
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1136,7 +1122,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1192,7 +1178,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1208,7 +1194,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1233,7 +1219,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1252,7 +1238,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -1300,7 +1286,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1317,7 +1303,7 @@ describe("AgentComposer", () => {
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
         layoutMode="hero"
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1352,7 +1338,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1377,7 +1363,7 @@ describe("AgentComposer", () => {
         workspaceUserProjectI18n={workspaceUserProjectI18n}
         layoutMode="hero"
         showProjectSelector={false}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1425,7 +1411,7 @@ describe("AgentComposer", () => {
   });
 
   it("renders hero prompt tips as a CSS ticker without editing the draft", () => {
-    const onDraftChange = vi.fn();
+    const onDraftContentChange = vi.fn();
     const onSubmit = vi.fn();
     const firstPrompt = "让 Agent 知道在哪里读文件、运行命令和理解代码";
     const secondPrompt = "让上下文接力更完整，减少关键信息丢失";
@@ -1435,7 +1421,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1464,7 +1450,7 @@ describe("AgentComposer", () => {
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
         layoutMode="hero"
-        onDraftChange={onDraftChange}
+        onDraftContentChange={onDraftContentChange}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -1483,7 +1469,7 @@ describe("AgentComposer", () => {
     expect(tips).toHaveTextContent(
       `Tips：引用其他 Agent 对话历史 · ${secondPrompt}`
     );
-    expect(onDraftChange).not.toHaveBeenCalled();
+    expect(onDraftContentChange).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
@@ -1508,7 +1494,7 @@ describe("AgentComposer", () => {
           workspaceId="workspace-1"
           currentUserId="user-1"
           provider="codex"
-          draftPrompt=""
+          draftContent={createDraft("")}
           availableCommands={
             [] satisfies readonly AgentHostAgentSessionCommand[]
           }
@@ -1534,7 +1520,7 @@ describe("AgentComposer", () => {
           labels={createLabels()}
           workspaceUserProjectI18n={workspaceUserProjectI18n}
           layoutMode="hero"
-          onDraftChange={vi.fn()}
+          onDraftContentChange={vi.fn()}
           onSettingsChange={vi.fn()}
           onSubmit={vi.fn()}
           onSendQueuedPromptNext={vi.fn()}
@@ -1563,7 +1549,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1579,7 +1565,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1601,7 +1587,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1617,7 +1603,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1638,6 +1624,15 @@ describe("AgentComposer", () => {
       /\.agent-gui-node__composer-textarea\s*{[^}]*font-size:\s*13px/s
     );
     expect(css).toMatch(
+      /\.agent-gui-node__composer-textarea\s*{[^}]*max-height:\s*72px;[^}]*overflow-y:\s*auto;[^}]*scrollbar-width:\s*thin;[^}]*scrollbar-gutter:\s*stable/s
+    );
+    expect(css).toMatch(
+      /\.agent-gui-node__composer-textarea::-webkit-scrollbar\s*{[^}]*display:\s*block;[^}]*width:\s*4px/s
+    );
+    expect(css).toMatch(
+      /\.agent-gui-node__composer-textarea::-webkit-scrollbar-thumb\s*{[^}]*background:\s*var\(--transparency-hover\)/s
+    );
+    expect(css).toMatch(
       /\.agent-gui-node__composer-textarea p\s*{[^}]*font-size:\s*13px/s
     );
     expect(css).toMatch(
@@ -1646,13 +1641,17 @@ describe("AgentComposer", () => {
   });
 
   it("adds dropped system images on the AgentGUI detail panel to draft images", async () => {
-    const { container } = render(
+    let draftContent = createDraft("");
+    const onDraftContentChange = vi.fn((nextDraft: AgentComposerDraft) => {
+      draftContent = nextDraft;
+    });
+    const renderComposer = () => (
       <div id="agent-gui-detail">
         <AgentComposer
           workspaceId="workspace-1"
           currentUserId="user-1"
           provider="codex"
-          draftPrompt=""
+          draftContent={draftContent}
           availableCommands={
             [] satisfies readonly AgentHostAgentSessionCommand[]
           }
@@ -1670,7 +1669,7 @@ describe("AgentComposer", () => {
           isSubmittingPrompt={false}
           labels={createLabels()}
           workspaceUserProjectI18n={workspaceUserProjectI18n}
-          onDraftChange={vi.fn()}
+          onDraftContentChange={onDraftContentChange}
           onSettingsChange={vi.fn()}
           onSubmit={vi.fn()}
           onSendQueuedPromptNext={vi.fn()}
@@ -1681,6 +1680,7 @@ describe("AgentComposer", () => {
         />
       </div>
     );
+    const { container, rerender } = render(renderComposer());
 
     const detailPanel = container.querySelector("#agent-gui-detail");
     expect(detailPanel).not.toBeNull();
@@ -1691,6 +1691,8 @@ describe("AgentComposer", () => {
     fireEvent.dragOver(detailPanel!, { dataTransfer });
     expect(dataTransfer.dropEffect).toBe("copy");
     fireEvent.drop(detailPanel!, { dataTransfer });
+    await waitFor(() => expect(onDraftContentChange).toHaveBeenCalled());
+    rerender(renderComposer());
 
     const drafts = await screen.findByTestId("agent-gui-composer-image-drafts");
     await waitFor(() =>
@@ -1707,7 +1709,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt="hello"
+        draftContent={createDraft("hello")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1723,7 +1725,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -1749,7 +1751,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt="queue while loading"
+        draftContent={createDraft("queue while loading")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1765,7 +1767,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -1785,14 +1787,93 @@ describe("AgentComposer", () => {
     ]);
   });
 
-  it("keeps pasted image previews visible while the prompt is submitting", () => {
+  it("lets a busy composer queue an image-only draft instead of showing stop", () => {
+    let draftContent = createDraft("");
+    const onDraftContentChange = vi.fn((nextDraft: AgentComposerDraft) => {
+      draftContent = nextDraft;
+    });
     const onSubmit = vi.fn();
-    const { container, rerender } = render(
+    const renderComposer = () => (
       <AgentComposer
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="codex"
-        draftPrompt=""
+        draftContent={draftContent}
+        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
+        disabled={false}
+        submitDisabled={false}
+        placeholder="placeholder"
+        composerSettings={createComposerSettings()}
+        queuedPrompts={[]}
+        drainingQueuedPromptId={null}
+        canQueueWhileBusy={true}
+        showStopButton={true}
+        activePrompt={null}
+        isInterrupting={false}
+        isSendingTurn={true}
+        isSubmittingPrompt={false}
+        labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
+        onDraftContentChange={onDraftContentChange}
+        onSettingsChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendQueuedPromptNext={vi.fn()}
+        onRemoveQueuedPrompt={vi.fn()}
+        onEditQueuedPrompt={vi.fn()}
+        onInterruptCurrentTurn={vi.fn()}
+        onSubmitInteractivePrompt={vi.fn()}
+      />
+    );
+    const { rerender } = render(renderComposer());
+
+    fireEvent.click(screen.getByTestId("mock-paste-image"));
+    rerender(renderComposer());
+
+    const sendButton = screen.getByRole("button", { name: "发送" });
+    expect(sendButton).not.toBeDisabled();
+    expect(sendButton).toHaveAttribute("data-state", "queue");
+    expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
+    fireEvent.click(sendButton);
+    expect(onSubmit).toHaveBeenCalledWith([
+      {
+        type: "image",
+        mimeType: "image/png",
+        data: "aW1hZ2U=",
+        name: "screen.png"
+      }
+    ]);
+    rerender(renderComposer());
+    expect(
+      screen.queryByTestId("agent-gui-composer-image-drafts")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders controlled text and image draft content", () => {
+    const onSubmit = vi.fn();
+    const draftContent = createDraft("describe this", [
+      {
+        id: "queued-image-1",
+        name: "panel.png",
+        mimeType: "image/png",
+        data: "aW1hZ2U=",
+        previewUrl: "data:image/png;base64,aW1hZ2U="
+      }
+    ]);
+    const expectedContent = [
+      { type: "text" as const, text: "describe this" },
+      {
+        type: "image" as const,
+        mimeType: "image/png" as const,
+        data: "aW1hZ2U=",
+        name: "panel.png"
+      }
+    ];
+    render(
+      <AgentComposer
+        workspaceId="workspace-1"
+        currentUserId="user-1"
+        provider="codex"
+        draftContent={draftContent}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1808,7 +1889,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
         onSendQueuedPromptNext={vi.fn()}
@@ -1819,7 +1900,57 @@ describe("AgentComposer", () => {
       />
     );
 
+    expect(screen.getByDisplayValue("describe this")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "panel.png" })).toHaveAttribute(
+      "src",
+      "data:image/png;base64,aW1hZ2U="
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    expect(onSubmit).toHaveBeenCalledWith(expectedContent);
+  });
+
+  it("keeps pasted image previews visible while the prompt is submitting", () => {
+    let draftContent = createDraft("");
+    const onDraftContentChange = vi.fn((nextDraft: AgentComposerDraft) => {
+      draftContent = nextDraft;
+    });
+    const onSubmit = vi.fn();
+    const renderComposer = (isSubmittingPrompt: boolean) => (
+      <AgentComposer
+        workspaceId="workspace-1"
+        currentUserId="user-1"
+        provider="codex"
+        draftContent={draftContent}
+        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
+        disabled={false}
+        submitDisabled={false}
+        placeholder="placeholder"
+        composerSettings={createComposerSettings()}
+        queuedPrompts={[]}
+        drainingQueuedPromptId={null}
+        canQueueWhileBusy={false}
+        showStopButton={false}
+        activePrompt={null}
+        isInterrupting={false}
+        isSendingTurn={false}
+        isSubmittingPrompt={isSubmittingPrompt}
+        labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
+        onDraftContentChange={onDraftContentChange}
+        onSettingsChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendQueuedPromptNext={vi.fn()}
+        onRemoveQueuedPrompt={vi.fn()}
+        onEditQueuedPrompt={vi.fn()}
+        onInterruptCurrentTurn={vi.fn()}
+        onSubmitInteractivePrompt={vi.fn()}
+      />
+    );
+    const { container, rerender } = render(renderComposer(false));
+
     fireEvent.click(screen.getByTestId("mock-paste-image"));
+    rerender(renderComposer(false));
     expect(
       screen.getByTestId("agent-gui-composer-image-drafts")
     ).not.toHaveAttribute("data-submitted-preview");
@@ -1838,37 +1969,7 @@ describe("AgentComposer", () => {
       }
     ]);
 
-    rerender(
-      <AgentComposer
-        workspaceId="workspace-1"
-        currentUserId="user-1"
-        provider="codex"
-        draftPrompt=""
-        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
-        disabled={false}
-        submitDisabled={false}
-        placeholder="placeholder"
-        composerSettings={createComposerSettings()}
-        queuedPrompts={[]}
-        drainingQueuedPromptId={null}
-        canQueueWhileBusy={false}
-        showStopButton={false}
-        activePrompt={null}
-        isInterrupting={false}
-        isSendingTurn={false}
-        isSubmittingPrompt={true}
-        labels={createLabels()}
-        workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
-        onSettingsChange={vi.fn()}
-        onSubmit={onSubmit}
-        onSendQueuedPromptNext={vi.fn()}
-        onRemoveQueuedPrompt={vi.fn()}
-        onEditQueuedPrompt={vi.fn()}
-        onInterruptCurrentTurn={vi.fn()}
-        onSubmitInteractivePrompt={vi.fn()}
-      />
-    );
+    rerender(renderComposer(true));
 
     const submittedPreview = screen.getByTestId(
       "agent-gui-composer-image-drafts"
@@ -1891,7 +1992,7 @@ describe("AgentComposer", () => {
         workspaceId="workspace-1"
         currentUserId="user-1"
         provider="claude-code"
-        draftPrompt=""
+        draftContent={createDraft("")}
         availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
         disabled={false}
         submitDisabled={false}
@@ -1908,7 +2009,7 @@ describe("AgentComposer", () => {
         promptImagesSupported={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftContentChange={vi.fn()}
         onSettingsChange={vi.fn()}
         onSubmit={onSubmit}
         onPromptImagesUnsupported={onPromptImagesUnsupported}
@@ -1939,11 +2040,15 @@ function createComposerSettings(
     draftSettings: {
       model: null,
       reasoningEffort: null,
+      speed: null,
       planMode: false,
       permissionModeId: "preset"
     },
     supportsModel: true,
     supportsReasoningEffort: true,
+    supportsSpeed: true,
+    speedUnavailable: false,
+    availableSpeeds: [],
     supportsPlanMode: false,
     isSettingsLoading: false,
     modelUnavailable: false,
@@ -1970,6 +2075,10 @@ function createLabels(): Parameters<typeof AgentComposer>[0]["labels"] {
     reasoningOptionMedium: "中",
     reasoningOptionHigh: "高",
     reasoningOptionXHigh: "超高",
+    speedLabel: "Speed",
+    speedSelectionLabel: "Speed",
+    speedOptionStandard: "Standard",
+    speedOptionFast: "Fast",
     permissionLabel: "运行权限",
     permissionModeReadOnly: "请求批准",
     permissionModeAuto: "代我批准",

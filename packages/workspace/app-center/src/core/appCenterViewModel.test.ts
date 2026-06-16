@@ -457,6 +457,64 @@ describe("createAppCenterViewModel", () => {
     assert.equal(viewModel.apps[0]?.primaryAction, "none");
   });
 
+  it("preserves runtime phases while install progress is active", () => {
+    const viewModel = createAppCenterViewModel({
+      apps: [
+        {
+          catalog: {
+            manifest: {
+              appId: "remote",
+              description: "Remote app",
+              runtime: {
+                bootstrap: "bootstrap.sh",
+                healthcheckPath: "/"
+              },
+              schemaVersion: workspaceAppManifestSchemaVersion,
+              name: "Remote",
+              version: "0.1.0"
+            },
+            source: {
+              kind: "local"
+            }
+          },
+          install: { appId: "remote" },
+          manifest: {
+            appId: "remote",
+            description: "Remote app",
+            runtime: {
+              bootstrap: "bootstrap.sh",
+              healthcheckPath: "/"
+            },
+            schemaVersion: workspaceAppManifestSchemaVersion,
+            name: "Remote",
+            version: "0.1.0"
+          }
+        }
+      ],
+      runtimeStates: [
+        {
+          appId: "remote",
+          installProgress: {
+            downloadedBytes: null,
+            indeterminate: false,
+            overallPercent: 96,
+            totalBytes: null,
+            userPhase: "starting"
+          },
+          status: "starting"
+        }
+      ]
+    });
+
+    assert.equal(viewModel.apps[0]?.status, "starting");
+    assert.equal(viewModel.apps[0]?.statusLabelKey, "status.starting");
+    assert.equal(viewModel.apps[0]?.primaryAction, "none");
+    assert.equal(viewModel.apps[0]?.canOpenFolder, false);
+    assert.equal(viewModel.apps[0]?.canOpenPackageFolder, false);
+    assert.equal(viewModel.apps[0]?.canUninstall, false);
+    assert.equal(viewModel.apps[0]?.installProgress?.overallPercent, 96);
+  });
+
   it("keeps catalog source kind for recommended and user-owned grouping", () => {
     const viewModel = createAppCenterViewModel({
       apps: [
@@ -848,6 +906,7 @@ describe("createAppCenterViewModel", () => {
     assert.equal(viewModel.apps[0]?.factoryJobId, "job-1");
     assert.equal(viewModel.apps[0]?.factoryAgentSessionId, "agent-session-1");
     assert.equal(viewModel.apps[0]?.factoryProvider, "codex");
+    assert.equal(viewModel.apps[0]?.factoryEditAction, "prepare_modification");
     assert.equal(viewModel.apps[0]?.canOpenFactorySession, true);
     assert.equal(viewModel.apps[0]?.canPublishFactoryUpdate, false);
   });
@@ -887,7 +946,51 @@ describe("createAppCenterViewModel", () => {
     });
 
     assert.equal(viewModel.factoryJobs?.length, 0);
+    assert.equal(viewModel.apps[0]?.canOpenFactorySession, true);
     assert.equal(viewModel.apps[0]?.canPublishFactoryUpdate, true);
+    assert.equal(viewModel.apps[0]?.factoryEditAction, "open_session");
+  });
+
+  it("opens existing agent sessions for failed republish factory jobs", () => {
+    const viewModel = createAppCenterViewModel({
+      apps: [
+        {
+          install: { appId: "app_1" },
+          manifest: {
+            appId: "app_1",
+            description: "Generated app",
+            runtime: {
+              bootstrap: "bootstrap.sh",
+              healthcheckPath: "/"
+            },
+            schemaVersion: workspaceAppManifestSchemaVersion,
+            name: "Generated Tool",
+            version: "0.1.0"
+          }
+        }
+      ],
+      factoryJobs: [
+        {
+          agentSessionId: "agent-session-1",
+          appId: "app_1",
+          displayName: "Generated Tool",
+          failureReason: 'app manifest version must be "0.1.0"',
+          jobId: "job-1",
+          prompt: "Build a tool",
+          provider: "codex",
+          publishedVersion: "0.1.0",
+          status: "failed",
+          updatedAtUnixMs: 11,
+          validationResult: {}
+        }
+      ]
+    });
+
+    assert.equal(viewModel.factoryJobs?.length, 0);
+    assert.equal(viewModel.apps[0]?.factoryJobId, "job-1");
+    assert.equal(viewModel.apps[0]?.canOpenFactorySession, true);
+    assert.equal(viewModel.apps[0]?.canPublishFactoryUpdate, false);
+    assert.equal(viewModel.apps[0]?.factoryEditAction, "open_session");
   });
 
   it("exposes icon replacement only for replaceable app ids", () => {
@@ -931,7 +1034,7 @@ describe("createAppCenterViewModel", () => {
     assert.equal(builtinApp?.canReplaceIcon, false);
   });
 
-  it("only exposes factory validation retry after failure", () => {
+  it("exposes factory fix after validation failure without a manual validation action", () => {
     const viewModel = createAppCenterViewModel({
       apps: [],
       factoryJobs: [
@@ -950,7 +1053,7 @@ describe("createAppCenterViewModel", () => {
       ]
     });
 
-    assert.equal(viewModel.factoryJobs?.[0]?.canRetryValidation, true);
+    assert.equal(viewModel.factoryJobs?.[0]?.canRetryValidation, false);
     assert.equal(viewModel.factoryJobs?.[0]?.canFix, true);
     assert.equal(viewModel.factoryJobs?.[0]?.canCancel, false);
     assert.equal(viewModel.factoryJobs?.[0]?.canDelete, true);

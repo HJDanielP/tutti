@@ -35,6 +35,31 @@ func GeneratedAppFromBiz(app workspacebiz.WorkspaceApp) tuttigenerated.Workspace
 		WindowMinHeight:  app.Package.WindowMinHeight(),
 		Cli:              generatedAppCLIState(app.CLI),
 		References:       generatedAppReferencesStateFromBiz(app),
+		InstallProgress:  generatedAppInstallProgressFromBiz(app.InstallProgress),
+	}
+}
+
+func generatedAppInstallProgressFromBiz(progress *workspacebiz.AppInstallProgress) *tuttigenerated.WorkspaceAppInstallProgress {
+	if progress == nil {
+		return nil
+	}
+	return &tuttigenerated.WorkspaceAppInstallProgress{
+		UserPhase:       generatedAppInstallUserPhase(progress.UserPhase),
+		OverallPercent:  float32(progress.OverallPercent),
+		DownloadedBytes: progress.DownloadedBytes,
+		TotalBytes:      progress.TotalBytes,
+		Indeterminate:   progress.Indeterminate,
+	}
+}
+
+func generatedAppInstallUserPhase(phase workspacebiz.AppInstallUserPhase) tuttigenerated.WorkspaceAppInstallUserPhase {
+	switch phase {
+	case workspacebiz.AppInstallUserPhaseInstalling:
+		return tuttigenerated.WorkspaceAppInstallUserPhaseInstalling
+	case workspacebiz.AppInstallUserPhaseStarting:
+		return tuttigenerated.WorkspaceAppInstallUserPhaseStarting
+	default:
+		return tuttigenerated.WorkspaceAppInstallUserPhaseDownloading
 	}
 }
 
@@ -46,11 +71,11 @@ func GeneratedAppsFromBiz(apps []workspacebiz.WorkspaceApp) []tuttigenerated.Wor
 	return result
 }
 
-func GeneratedAppReferenceSearchResultFromBiz(workspaceID string, appID string, result workspacebiz.AppReferenceSearchResult) tuttigenerated.AppReferenceSearchResponse {
-	return tuttigenerated.AppReferenceSearchResponse{
+func GeneratedAppReferenceListResultFromBiz(workspaceID string, appID string, result workspacebiz.AppReferenceListResult) tuttigenerated.AppReferenceListResponse {
+	return tuttigenerated.AppReferenceListResponse{
 		WorkspaceId: workspaceID,
 		AppId:       appID,
-		References:  generatedAppReferencesFromBiz(result.References),
+		Items:       generatedAppReferenceListItemsFromBiz(result.Items),
 		NextCursor:  result.NextCursor,
 	}
 }
@@ -78,19 +103,51 @@ func GeneratedAppCatalogLoadStateFromBiz(state workspacebiz.AppCatalogLoadState)
 
 func generatedAppReferencesStateFromBiz(app workspacebiz.WorkspaceApp) tuttigenerated.WorkspaceAppReferencesState {
 	return tuttigenerated.WorkspaceAppReferencesState{
-		SearchSupported: app.Package.ReferenceSearchSupported(),
+		ListSupported: app.Package.ReferenceListSupported(),
 	}
 }
 
-func generatedAppReferencesFromBiz(references []workspacebiz.AppReference) []tuttigenerated.AppReference {
-	result := make([]tuttigenerated.AppReference, 0, len(references))
-	for _, reference := range references {
-		generated, ok := generatedAppReferenceFromBiz(reference)
+func generatedAppReferenceListItemsFromBiz(items []workspacebiz.AppReferenceListItem) []tuttigenerated.AppReferenceListItem {
+	result := make([]tuttigenerated.AppReferenceListItem, 0, len(items))
+	for _, item := range items {
+		generated, ok := generatedAppReferenceListItemFromBiz(item)
 		if ok {
 			result = append(result, generated)
 		}
 	}
 	return result
+}
+
+func generatedAppReferenceListItemFromBiz(item workspacebiz.AppReferenceListItem) (tuttigenerated.AppReferenceListItem, bool) {
+	switch typed := item.(type) {
+	case workspacebiz.AppReferenceGroup:
+		var generated tuttigenerated.AppReferenceListItem
+		if err := generated.FromAppReferenceGroup(tuttigenerated.AppReferenceGroup{
+			Type:           tuttigenerated.AppReferenceGroupTypeGroup,
+			Id:             typed.ID,
+			DisplayName:    typed.DisplayName,
+			Description:    nullableString(typed.Description),
+			ReferenceCount: typed.ReferenceCount,
+		}); err != nil {
+			return tuttigenerated.AppReferenceListItem{}, false
+		}
+		return generated, true
+	case workspacebiz.AppReferenceListReferenceItem:
+		reference, ok := generatedAppReferenceFromBiz(typed.Reference)
+		if !ok {
+			return tuttigenerated.AppReferenceListItem{}, false
+		}
+		var generated tuttigenerated.AppReferenceListItem
+		if err := generated.FromAppReferenceListReferenceItem(tuttigenerated.AppReferenceListReferenceItem{
+			Type:      tuttigenerated.AppReferenceListReferenceItemTypeReference,
+			Reference: reference,
+		}); err != nil {
+			return tuttigenerated.AppReferenceListItem{}, false
+		}
+		return generated, true
+	default:
+		return tuttigenerated.AppReferenceListItem{}, false
+	}
 }
 
 func generatedAppReferenceFromBiz(reference workspacebiz.AppReference) (tuttigenerated.AppReference, bool) {
@@ -107,7 +164,6 @@ func generatedAppReferenceFromBiz(reference workspacebiz.AppReference) (tuttigen
 }
 
 func generatedAppFileReferenceFromBiz(reference workspacebiz.AppFileReference) tuttigenerated.AppFileReference {
-	score := nullableFloat32(reference.Score)
 	return tuttigenerated.AppFileReference{
 		Kind:        tuttigenerated.AppFileReferenceKindFile,
 		DisplayName: nullableString(reference.DisplayName),
@@ -116,7 +172,7 @@ func generatedAppFileReferenceFromBiz(reference workspacebiz.AppFileReference) t
 		SizeBytes:   reference.SizeBytes,
 		MtimeMs:     reference.MtimeMs,
 		MimeType:    nullableString(reference.MimeType),
-		Score:       score,
+		Score:       nullableFloat32(reference.Score),
 	}
 }
 

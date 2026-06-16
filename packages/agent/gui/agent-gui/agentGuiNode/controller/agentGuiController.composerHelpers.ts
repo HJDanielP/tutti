@@ -5,7 +5,8 @@ import type {
   AgentSessionComposerSettings,
   AgentSessionPermissionConfig,
   AgentSessionPermissionModeOption,
-  AgentSessionReasoningEffort
+  AgentSessionReasoningEffort,
+  AgentSessionSpeed
 } from "../../../shared/agentSessionTypes";
 import type { AgentGUINodeData } from "../../../types";
 import { translate } from "../../../i18n/index";
@@ -58,6 +59,19 @@ export function reasoningSelectionFromComposerOptions(
   }
   return {
     options: composerSettingOptionsFromActivity(options.reasoningEfforts),
+    currentValue
+  };
+}
+
+export function speedSelectionFromComposerOptions(
+  options: AgentActivityComposerOptions | null,
+  currentValue: AgentSessionSpeed | null
+): ACPConfigOptionSelection | null {
+  if (!options) {
+    return null;
+  }
+  return {
+    options: composerSettingOptionsFromActivity(options.speeds ?? []),
     currentValue
   };
 }

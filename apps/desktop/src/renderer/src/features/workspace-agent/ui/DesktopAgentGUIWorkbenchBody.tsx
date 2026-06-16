@@ -32,12 +32,14 @@ import type {
   IAgentProviderStatusService
 } from "../services/agentProviderStatusService.interface";
 import { useDesktopPreferencesService } from "@renderer/features/desktop-preferences/ui/useDesktopPreferencesService";
+import { Toast } from "@renderer/lib/toast";
 import type { DesktopAgentComposerDefaults } from "@shared/preferences";
 import type { DesktopRuntimeApi } from "@preload/types";
 import {
   areDesktopAgentGUINodeStatesEqual,
   areDesktopAgentGUIWorkbenchStatesEqual,
   desktopAgentGUIProviderFromInstanceId,
+  desktopAgentGUIPrefillPromptActivationType,
   normalizeDesktopAgentGUINodeState,
   normalizeDesktopAgentGUIWorkbenchState,
   projectDesktopAgentGUIWorkbenchState,
@@ -47,6 +49,10 @@ import {
   type DesktopAgentGUIProvider
 } from "../desktopAgentGUINodeState";
 import { consumeDesktopAgentGUIOpenSessionActivation } from "../services/desktopAgentGUIOpenSessionActivation.ts";
+import {
+  consumeDesktopAgentGUIPrefillPromptActivation,
+  type DesktopAgentGUIPrefillPromptRequest
+} from "../services/desktopAgentGUIPrefillPromptActivation.ts";
 import {
   ensureDesktopManagedAgentProviderStatuses,
   isDesktopManagedAgentProvider,
@@ -343,9 +349,15 @@ export function DesktopAgentGUIWorkbenchBody({
   >({});
   const [workspaceAgentProbes, setWorkspaceAgentProbes] =
     useState<DesktopAgentProbeState | null>(null);
+  const [openSessionRequest, setOpenSessionRequest] = useState<NonNullable<
+    AgentGUIProps["openSessionRequest"]
+  > | null>(null);
+  const [prefillPromptRequest, setPrefillPromptRequest] =
+    useState<DesktopAgentGUIPrefillPromptRequest | null>(null);
   const lastRequestedWorkbenchStateRef =
     useRef<DesktopAgentGUIWorkbenchState | null>(null);
   const handledOpenSessionActivationSequenceRef = useRef<number | null>(null);
+  const handledPrefillPromptActivationSequenceRef = useRef<number | null>(null);
   const pendingComposerDefaultsWriteRef =
     useRef<DesktopAgentComposerDefaultsWriteIntent | null>(null);
   const agentProbeProviders = useMemo(
@@ -374,6 +386,24 @@ export function DesktopAgentGUIWorkbenchBody({
       };
     });
   }, []);
+  const handleOpenSessionActivationError = useCallback(
+    (input: { agentSessionId: string; error: unknown }) => {
+      Toast.Error(
+        i18n.t("workspace.agentGui.openSessionUnavailableTitle"),
+        i18n.t("workspace.agentGui.openSessionUnavailableDescription")
+      );
+      void runtimeApi?.logTerminalDiagnostic({
+        details: {
+          agentSessionId: input.agentSessionId,
+          error: stringifyDiagnosticError(input.error)
+        },
+        event: "agent.gui.open_session_activation_failed",
+        level: "warn",
+        workspaceId
+      });
+    },
+    [i18n, runtimeApi, workspaceId]
+  );
 
   useEffect(() => {
     if (previewMode) {
@@ -465,6 +495,8 @@ export function DesktopAgentGUIWorkbenchBody({
         handledOpenSessionActivationSequenceRef.current = sequence;
       },
       nodeId: context.node.id,
+      onActivationError: handleOpenSessionActivationError,
+      onOpenSessionRequest: setOpenSessionRequest,
       onStateChange,
       provider,
       workspaceId,
@@ -475,10 +507,29 @@ export function DesktopAgentGUIWorkbenchBody({
     context.activation,
     context.host,
     context.node.id,
+    handleOpenSessionActivationError,
     onStateChange,
     provider,
     workspaceId
   ]);
+
+  useEffect(() => {
+    if (previewMode) {
+      return;
+    }
+    const request = consumeDesktopAgentGUIPrefillPromptActivation({
+      activation: context.activation,
+      clearNodeActivation: context.host.clearNodeActivation?.bind(context.host),
+      handledSequence: handledPrefillPromptActivationSequenceRef.current,
+      markHandled: (sequence) => {
+        handledPrefillPromptActivationSequenceRef.current = sequence;
+      },
+      nodeId: context.node.id
+    });
+    if (request) {
+      setPrefillPromptRequest(request);
+    }
+  }, [context.activation, context.host, context.node.id, previewMode]);
 
   useEffect(() => {
     const handleOptimisticConversationRailToggle = (event: Event) => {
@@ -644,9 +695,10 @@ export function DesktopAgentGUIWorkbenchBody({
     [frame.height, frame.width, frame.x, frame.y]
   );
   const composerFocusRequestSequence =
-    context.activation?.type === workbenchFocusInputActivationType
+    context.activation?.type === workbenchFocusInputActivationType ||
+    context.activation?.type === desktopAgentGUIPrefillPromptActivationType
       ? context.activation.sequence
-      : null;
+      : (prefillPromptRequest?.sequence ?? null);
 
   return (
     <AgentGUI
@@ -662,6 +714,8 @@ export function DesktopAgentGUIWorkbenchBody({
       isMaximized={context.displayMode === "fullscreen"}
       isActive={context.isFocused}
       composerFocusRequestSequence={composerFocusRequestSequence}
+      openSessionRequest={openSessionRequest}
+      prefillPromptRequest={prefillPromptRequest}
       managedAgentsState={managedAgentsState}
       nodeId={context.node.id}
       workspaceAgentProbes={workspaceAgentProbes}

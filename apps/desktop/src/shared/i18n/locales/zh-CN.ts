@@ -7,6 +7,7 @@ export const zhCN = {
     defaultWorkspace: "默认空间",
     loading: "加载中",
     neverOpened: "从未打开",
+    ok: "好",
     selectFolder: "选择文件夹",
     unknownError: "未知错误",
     unreachable: "不可达",
@@ -57,14 +58,14 @@ export const zhCN = {
     workspaceCountNote: "当前记录了 {{count}} 个最近工作区"
   },
   updates: {
-    availableTitle: "发现新版本 {{version}}",
+    availableTitle: "发现可用新版本",
     badge: "更新",
     checkingTitle: "正在检查更新",
-    downloadAction: "下载",
-    downloadedTitle: "版本 {{version}} 已准备好安装",
-    downloadingTitle: "正在下载 {{version}} {{percent}}",
+    downloadAction: "更新",
+    downloadedTitle: "更新完成，立即安装",
+    downloadingTitle: "正在下载 {{percent}}",
     errorTitle: "无法检查更新",
-    restartAction: "重启",
+    restartAction: "安装",
     retryAction: "重试"
   },
   desktop: {
@@ -91,12 +92,15 @@ export const zhCN = {
       title: "导出日志"
     },
     menu: {
+      checkForUpdates: "检查更新...",
       edit: "编辑",
       exportLogsFailed: "无法导出日志",
       exportLogsTitle: "导出日志",
       exportServiceLogs: "导出服务日志...",
       file: "文件",
       help: "帮助",
+      upToDateDetail: "Tutti {{version}} 是当前的最新版本。",
+      upToDateMessage: "您使用的就是最新版本！",
       view: "显示",
       window: "窗口"
     }
@@ -122,7 +126,9 @@ export const zhCN = {
     agentGui: {
       collapseConversationRail: "收起会话列表",
       expandConversationRail: "展开会话列表",
-      fallbackAgentLabel: "Agent"
+      fallbackAgentLabel: "Agent",
+      openSessionUnavailableDescription: "这个 Agent 会话已不存在或无法打开。",
+      openSessionUnavailableTitle: "会话不可用"
     },
     agentMessageCenter: {
       openAria: "打开 Agent 消息",
@@ -159,7 +165,7 @@ export const zhCN = {
       title: "埋点事件"
     },
     appCenter: {
-      dockLabel: "应用"
+      dockLabel: "应用中心"
     },
     info: {
       idDescription: "用于 preload 和 daemon 协调的稳定标识。",
@@ -198,35 +204,18 @@ export const zhCN = {
         custom: "自定义",
         default: "默认",
         dunes: "星夜沙丘",
-        galaxy: "星系",
         ocean: "海面",
         orbit: "地球夜景",
         peaks: "雪峰夜空",
         sand: "流沙纹理",
-        sky: "云层"
+        sky: "云层",
+        tutti: "Tutti"
       }
     },
     settings: {
       close: "关闭设置",
-      agent: {
-        skills: {
-          empty: "未发现技能",
-          loadFailed: "暂时无法加载该 provider 的技能。",
-          projectScopeNote: "项目级技能以会话内为准。",
-          sourceKinds: {
-            bundled: "内置",
-            tuttiInjected: "Tutti",
-            personal: "个人",
-            plugin: "插件",
-            project: "项目",
-            system: "系统"
-          },
-          sourceLabel: "来源",
-          title: "技能（只读）"
-        }
-      },
       appearance: {
-        dockPlacementDescription: "控制工作区 dock 栏停靠的位置。",
+        dockPlacementDescription: "控制工作区 dock 栏停靠的位置",
         dockPlacementLabel: "Dock 布局",
         dockPlacementOptions: {
           bottom: "底部",
@@ -260,7 +249,7 @@ export const zhCN = {
       },
       general: {
         defaultAgentProviderDescription:
-          "用于新的 App Factory 任务、Issue 任务，以及读取宿主默认值的工作区应用。",
+          "用于新的 App Factory 任务、Issue 任务，以及读取宿主默认值的工作区应用",
         defaultAgentProviderLabel: "默认 Provider",
         defaultAgentProviderSaveFailed: "暂时无法更新默认 Provider。",
         browserUseConnectionModeDescription:
@@ -278,17 +267,19 @@ export const zhCN = {
           zhCN: "简体中文"
         },
         localeSaveFailed: "暂时无法切换应用语言。",
-        preventSleepDescription: "控制 Tutti 何时保持这台电脑不进入睡眠。",
+        preventSleepDescription: "可控制系统是否进入休眠",
         preventSleepLabel: "防止休眠",
         preventSleepOptions: {
-          always: "始终阻止",
-          never: "不阻止",
-          whileAgentRunning: "Agent 运行时阻止"
+          always: "始终防止休眠",
+          never: "允许电脑休眠",
+          whileAgentRunning: "仅 Agent 运行时防止休眠"
         },
-        preventSleepSaveFailed: "暂时无法更新防止休眠设置。"
+        preventSleepSaveFailed: "暂时无法更新防止休眠设置。",
+        updateChannelSaveFailed: "暂时无法更新发布渠道。",
+        updatePolicySaveFailed: "暂时无法更新更新方式。",
+        versionLabel: "桌面版本"
       },
       nav: {
-        agent: "Agent",
         apps: "应用",
         sectionsLabel: "设置分区",
         appearance: "外观",
@@ -297,28 +288,33 @@ export const zhCN = {
       },
       apps: {
         managedModels: {
-          apiKey: "API Key",
-          baseUrl: "Base URL",
-          customProvider: "自定义 provider",
-          delete: "删除",
-          deleting: "删除中...",
-          deleteFailed: "暂时无法删除这个托管 provider。",
-          deleteSucceeded: "托管 provider 已删除。",
+          apiKey: "API 密钥",
           addModel: "添加",
+          addProvider: "添加",
+          baseUrl: "Base URL",
+          collapse: "收起",
+          customProvider: "自定义",
+          delete: "删除",
+          deleteConfirm: "删除此配置？",
+          deleteFailed: "删除失败，请重试。",
+          deleting: "删除中...",
           description:
-            "在 Tutti 中保存 provider 凭证，并允许工作区应用申请短期访问。",
-          detectModels: "检测模型",
-          detectingModels: "检测中...",
-          detectModelsEmpty: "这个 provider 没有返回可用模型。",
-          detectModelsFailed: "暂时无法检测这个 provider 的模型。",
-          detectModelsSucceeded: "已检测到 provider 模型。",
+            "用你自己的 API 密钥接入模型，供工作区的应用和 Agent 使用",
+          detectModels: "获取可用模型",
+          detectingModels: "获取中...",
+          detectModelsEmpty: "没有找到可用模型。",
+          detectModelsFailed: "获取模型失败，请重试。",
+          emptyDescription:
+            "点「添加」用你的 API 密钥接入 Agnes、OpenAI 或 Anthropic",
+          emptyTitle: "还没有接入模型供应商",
           enabled: "启用 {{provider}}",
-          getApiKey: "获取 {{provider}} API Key",
-          hideApiKey: "隐藏 API key",
-          keyConfigured: "API key 已保存在 Tutti",
-          keyMissing: "尚未配置 API key",
-          keepExistingKey: "留空则继续使用已保存的 key",
-          loadFailed: "暂时无法加载托管模型 provider。",
+          expand: "展开",
+          getApiKey: "获取 {{provider}} API 密钥",
+          hideApiKey: "隐藏密钥",
+          keyConfigured: "密钥已保存",
+          keyMissing: "还没填密钥",
+          keepExistingKey: "留空则继续使用已保存的密钥",
+          loadFailed: "暂时无法加载模型供应商。",
           modelId: "模型 ID",
           modelIdPlaceholder: "model-id",
           models: "模型",
@@ -334,22 +330,23 @@ export const zhCN = {
             openaiOfficial: "OpenAI official"
           },
           removeModel: "移除模型",
-          quickFillProvider: "快速填充 provider",
+          requiredFieldsMissing: "请先填写 API 密钥和 Base URL。",
+          quickFillProvider: "选择服务商预设",
           save: "保存",
-          saveFailed: "暂时无法保存这个托管 provider。",
-          saveSucceeded: "托管 provider 已保存。",
+          saveFailed: "保存失败，请重试。",
           saving: "保存中...",
-          showApiKey: "显示 API key",
-          test: "测试",
-          testFailed: "Provider 测试失败。",
-          testSucceeded: "Provider 测试通过。",
+          showApiKey: "显示密钥",
+          test: "测试连接",
+          testFailed: "连接失败，请检查密钥或地址。",
+          testSucceeded: "连接正常。",
           testing: "测试中...",
-          title: "托管模型"
+          modelCount: "{{count}} 个模型",
+          title: "模型供应商"
         }
       },
       developer: {
         actionsLabel: "操作",
-        analyticsDebugDescription: "在开发版本中显示本地埋点事件悬浮面板。",
+        analyticsDebugDescription: "在开发版本中显示本地埋点事件悬浮面板",
         analyticsDebugLabel: "埋点事件面板",
         clearLogs: "清理日志",
         clearingLogs: "清理中...",
@@ -373,7 +370,9 @@ export const zhCN = {
         openDaemonLog: "打开 daemon 日志",
         openDesktopLog: "打开 desktop 日志",
         openLogsDirectory: "打开日志目录",
-        versionLabel: "桌面版本"
+        visibilityDescription:
+          "在设置中隐藏此面板。在「通用」里连续点击版本号七次即可重新显示",
+        visibilityLabel: "显示开发者面板"
       },
       title: "设置",
       trigger: "设置"
@@ -394,7 +393,7 @@ export const zhCN = {
       },
       nodes: {
         agent: "Agent",
-        appCenter: "应用",
+        appCenter: "应用中心",
         appWebview: "工作区应用",
         browser: "浏览器",
         files: "文件",

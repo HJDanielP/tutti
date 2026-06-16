@@ -12,10 +12,12 @@ import type {
   AgentSessionComposerSettings,
   AgentSessionPermissionConfig,
   AgentSessionReasoningEffort,
+  AgentSessionSpeed,
   AgentSessionState
 } from "../../../shared/agentSessionTypes";
 import type { AgentConversationVM } from "../../../shared/agentConversation/contracts/agentConversationVM";
 import type { WorkspaceAgentSessionDetailViewModel } from "../../../shared/workspaceAgentSessionDetailViewModel";
+import type { AgentPromptContentBlock } from "../../../shared/contracts/dto";
 
 export interface AgentGUISessionChrome {
   auth: {
@@ -69,11 +71,25 @@ export interface AgentGUIProviderSkillOption {
   pluginName?: string;
 }
 
+export interface AgentComposerDraftImage {
+  id: string;
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  data: string;
+  previewUrl: string;
+}
+
+export interface AgentComposerDraft {
+  prompt: string;
+  images: AgentComposerDraftImage[];
+}
+
 export interface AgentGUIComposerSettingsVM {
   sessionSettings: AgentSessionComposerSettings | null;
   draftSettings: {
     model: string | null;
     reasoningEffort: AgentSessionReasoningEffort | null;
+    speed: AgentSessionSpeed | null;
     planMode: boolean;
     // Optional like permissionModeId: the controller always sets it, fixtures
     // and consumers default an unset value to on.
@@ -83,28 +99,32 @@ export interface AgentGUIComposerSettingsVM {
   effectivePlanMode?: boolean;
   supportsModel: boolean;
   supportsReasoningEffort: boolean;
+  supportsSpeed: boolean;
   supportsPermissionMode?: boolean;
   supportsPlanMode: boolean;
   supportsBrowser?: boolean;
   isSettingsLoading: boolean;
   modelUnavailable: boolean;
   reasoningUnavailable: boolean;
+  speedUnavailable: boolean;
   permissionModeUnavailable?: boolean;
   planUnavailable: boolean;
   selectedModelValue?: string | null;
   selectedReasoningEffortValue?: AgentSessionReasoningEffort | null;
+  selectedSpeedValue?: AgentSessionSpeed | null;
   selectedPermissionModeValue?: string | null;
   permissionConfig?: AgentSessionPermissionConfig | null;
   selectedProjectPath?: string | null;
   projectLocked?: boolean;
   availableModels: AgentGUIComposerSettingOption[];
   availableReasoningEfforts: AgentGUIComposerSettingOption[];
+  availableSpeeds: AgentGUIComposerSettingOption[];
   availablePermissionModes?: AgentGUIComposerSettingOption[];
 }
 
 export interface AgentGUIQueuedPromptVM {
   id: string;
-  prompt: string;
+  content: AgentPromptContentBlock[];
   createdAtUnixMs: number;
 }
 
@@ -120,6 +140,7 @@ export interface AgentGUINodeViewModel {
   availableCommands: AgentSessionCommand[];
   availableSkills: AgentGUIProviderSkillOption[];
   draftPrompt: string;
+  draftContent: AgentComposerDraft;
   isLoadingConversations: boolean;
   isLoadingMessages: boolean;
   isCreatingConversation: boolean;

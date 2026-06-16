@@ -1,15 +1,11 @@
-import { useEffect } from "react";
-import {
-  Badge,
-  Button,
-  CapabilityIcon,
-  LaunchIcon,
-  LoadingIcon,
-  WarningLinedIcon
-} from "@tutti-os/ui-system";
+import { useEffect, useState } from "react";
+import { Button, LoadingIcon } from "@tutti-os/ui-system";
 import { useTranslation } from "@renderer/i18n";
 import { cn } from "@renderer/lib/format";
 import { useAppUpdateService } from "./useAppUpdateService";
+
+const updateIconUrl = new URL("../assets/update.png", import.meta.url).href;
+const tuttiIconUrl = new URL("../assets/tutti.png", import.meta.url).href;
 
 export function AppUpdateStatus({
   density = "default"
@@ -19,10 +15,6 @@ export function AppUpdateStatus({
   const { t } = useTranslation();
   const { service, state } = useAppUpdateService();
 
-  useEffect(() => {
-    void service.load();
-  }, [service]);
-
   const view = state.view;
 
   if (!view.visible || !view.titleKey) {
@@ -31,64 +23,21 @@ export function AppUpdateStatus({
 
   const label = t(view.titleKey, view.titleParams);
   const compact = density === "compact";
-  const isError = view.tone === "error";
 
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between rounded-lg border",
+        "inline-flex h-7 max-w-[min(18rem,30vw)] items-center justify-between",
         compact
-          ? "max-w-[min(13rem,34vw)] gap-2 px-2.5 py-1.5 text-[11px]"
-          : "gap-3 px-4 py-3 text-[13px]",
-        isError
-          ? "border-[var(--state-danger)] bg-[var(--on-danger)] text-[var(--state-danger)]"
-          : "border-border/70 bg-[var(--background-fronted)] text-foreground"
+          ? "gap-1.5 text-[13px]"
+          : "gap-2.5 text-[13px] max-[700px]:max-w-[calc(100vw-12rem)] max-[700px]:gap-2"
       )}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-lg",
-            compact ? "size-6" : "size-8",
-            isError
-              ? "bg-[var(--on-danger-hover)] text-[var(--state-danger)]"
-              : "bg-transparency-block text-primary"
-          )}
-        >
-          {view.icon === "loading" ? (
-            <LoadingIcon className="size-4 animate-spin" />
-          ) : view.icon === "alert" ? (
-            <WarningLinedIcon className="size-4" />
-          ) : (
-            <CapabilityIcon className="size-4" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Badge
-              variant={isError ? "destructive" : "outline"}
-              className={cn(compact && "px-1.5 py-0 text-[0.68rem]")}
-            >
-              {t("updates.badge")}
-            </Badge>
-            <p className="truncate font-medium">{label}</p>
-          </div>
-          {view.progressPercent !== null ? (
-            <div
-              className={cn(
-                "max-w-full overflow-hidden rounded-full bg-background",
-                compact ? "mt-1 h-1 w-28" : "mt-2 h-1.5 w-52"
-              )}
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{
-                  width: `${view.progressPercent}%`
-                }}
-              />
-            </div>
-          ) : null}
-        </div>
+      <div className="flex h-7 min-w-0 items-center gap-1.5">
+        <RotatingUpdateIcon />
+        <span className="inline-flex h-7 min-w-0 items-center truncate whitespace-nowrap text-[13px] font-semibold text-[var(--workbench-chrome-foreground)]">
+          {label}
+        </span>
       </div>
 
       {view.action && view.actionKey ? (
@@ -99,15 +48,95 @@ export function AppUpdateStatus({
           }}
           size={compact ? "xs" : "sm"}
           variant="secondary"
+          className={cn(
+            "text-[var(--workbench-chrome-foreground)] hover:text-[var(--workbench-chrome-foreground)] disabled:opacity-60",
+            compact
+              ? "h-7 rounded-[4px] px-2 text-[13px] font-semibold"
+              : "h-7 rounded-[4px] px-2.5 text-[13px] font-semibold max-[700px]:px-2"
+          )}
         >
           {state.isActing ? (
-            <LoadingIcon className="size-4 animate-spin" />
-          ) : (
-            <LaunchIcon className="size-4" />
-          )}
-          {t(view.actionKey)}
+            <LoadingIcon
+              className={cn(
+                "animate-spin",
+                compact ? "size-3" : "size-4 max-[700px]:size-3.5"
+              )}
+            />
+          ) : null}
+          <span>{t(view.actionKey)}</span>
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function RotatingUpdateIcon() {
+  const [previousUrl, setPreviousUrl] = useState(updateIconUrl);
+  const [currentUrl, setCurrentUrl] = useState(updateIconUrl);
+  const [rolling, setRolling] = useState(false);
+
+  useEffect(() => {
+    let settleTimeout: number | null = null;
+    const interval = window.setInterval(() => {
+      setCurrentUrl((current) => {
+        const next = current === updateIconUrl ? tuttiIconUrl : updateIconUrl;
+        setPreviousUrl(current);
+        setRolling(true);
+
+        if (settleTimeout !== null) {
+          window.clearTimeout(settleTimeout);
+        }
+
+        settleTimeout = window.setTimeout(() => {
+          setRolling(false);
+        }, 260);
+
+        return next;
+      });
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+      if (settleTimeout !== null) {
+        window.clearTimeout(settleTimeout);
+      }
+    };
+  }, []);
+
+  return (
+    <span className="inline-flex h-7 w-5 shrink-0 items-center justify-center">
+      <span className="relative inline-flex size-5 overflow-hidden [perspective:80px]">
+        <img
+          aria-hidden="true"
+          alt=""
+          className={cn(
+            "absolute inset-0 size-5 object-contain [backface-visibility:hidden] [transform-origin:center_bottom] motion-reduce:transition-none",
+            rolling
+              ? "transition-[opacity,transform] duration-[260ms] ease-out"
+              : "transition-none",
+            rolling
+              ? "opacity-0 [transform:rotateX(-88deg)]"
+              : "opacity-100 [transform:rotateX(0deg)]"
+          )}
+          draggable={false}
+          src={rolling ? previousUrl : currentUrl}
+        />
+        <img
+          aria-hidden="true"
+          alt=""
+          className={cn(
+            "absolute inset-0 size-5 object-contain [backface-visibility:hidden] [transform-origin:center_top] motion-reduce:transition-none",
+            rolling
+              ? "transition-[opacity,transform] duration-[260ms] ease-out"
+              : "transition-none",
+            rolling
+              ? "opacity-100 [transform:rotateX(0deg)]"
+              : "opacity-0 [transform:rotateX(88deg)]"
+          )}
+          draggable={false}
+          src={currentUrl}
+        />
+      </span>
+    </span>
   );
 }

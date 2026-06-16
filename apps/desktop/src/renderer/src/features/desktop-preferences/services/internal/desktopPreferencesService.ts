@@ -10,6 +10,8 @@ import {
   defaultDesktopDockIconStyle,
   defaultDesktopDockPlacement,
   defaultDesktopSleepPreventionMode,
+  defaultDesktopUpdateChannel,
+  defaultDesktopUpdatePolicy,
   mergeDesktopAgentComposerDefaultsByProvider,
   normalizeDesktopAgentComposerDefaults,
   normalizeDesktopAgentComposerDefaultsByProvider,
@@ -19,7 +21,9 @@ import {
   type DesktopBrowserUseConnectionMode,
   type DesktopDockIconStyle,
   type DesktopDockPlacement,
-  type DesktopSleepPreventionMode
+  type DesktopSleepPreventionMode,
+  type DesktopUpdateChannel,
+  type DesktopUpdatePolicy
 } from "../../../../../../shared/preferences/index.ts";
 
 export interface DesktopPreferencesServiceDependencies {
@@ -51,7 +55,9 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
         this.dependencies.initialDockPlacement ?? defaultDesktopDockPlacement,
       locale: this.dependencies.initialLocale,
       sleepPreventionMode: defaultDesktopSleepPreventionMode,
-      theme: this.dependencies.initialTheme
+      theme: this.dependencies.initialTheme,
+      updateChannel: defaultDesktopUpdateChannel,
+      updatePolicy: defaultDesktopUpdatePolicy
     });
     this.unsubscribePreferencesUpdates =
       this.dependencies.client.subscribeToDesktopPreferencesUpdated(
@@ -262,6 +268,62 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
     }
   }
 
+  async setUpdatePolicy(
+    policy: DesktopUpdatePolicy
+  ): Promise<DesktopUpdatePolicy> {
+    if (this.store.changingUpdatePolicy === policy) {
+      return policy;
+    }
+
+    const previousPolicy = this.store.updatePolicy;
+    this.store.changingUpdatePolicy = policy;
+    this.store.updatePolicy = policy;
+    try {
+      const authoritativePreferences =
+        await this.dependencies.client.updateDesktopPreferences({
+          preferences: this.currentPreferences({
+            updatePolicy: policy
+          })
+        });
+      return authoritativePreferences.updatePolicy;
+    } catch (error) {
+      this.store.updatePolicy = previousPolicy;
+      throw error;
+    } finally {
+      if (this.store.changingUpdatePolicy === policy) {
+        this.store.changingUpdatePolicy = null;
+      }
+    }
+  }
+
+  async setUpdateChannel(
+    channel: DesktopUpdateChannel
+  ): Promise<DesktopUpdateChannel> {
+    if (this.store.changingUpdateChannel === channel) {
+      return channel;
+    }
+
+    const previousChannel = this.store.updateChannel;
+    this.store.changingUpdateChannel = channel;
+    this.store.updateChannel = channel;
+    try {
+      const authoritativePreferences =
+        await this.dependencies.client.updateDesktopPreferences({
+          preferences: this.currentPreferences({
+            updateChannel: channel
+          })
+        });
+      return authoritativePreferences.updateChannel;
+    } catch (error) {
+      this.store.updateChannel = previousChannel;
+      throw error;
+    } finally {
+      if (this.store.changingUpdateChannel === channel) {
+        this.store.changingUpdateChannel = null;
+      }
+    }
+  }
+
   async rememberAgentComposerDefaults(
     provider: DesktopAgentProvider,
     defaults: DesktopAgentComposerDefaults | null
@@ -346,6 +408,8 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
     locale: DesktopLocale;
     sleepPreventionMode: DesktopSleepPreventionMode;
     themeSource: DesktopThemeSource;
+    updateChannel: DesktopUpdateChannel;
+    updatePolicy: DesktopUpdatePolicy;
   }): void {
     this.store.agentComposerDefaultsByProvider =
       normalizeDesktopAgentComposerDefaultsByProvider(
@@ -360,6 +424,8 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
     this.applyLocale(preferences.locale);
     this.store.sleepPreventionMode = preferences.sleepPreventionMode;
     this.applyTheme(this.dependencies.resolveTheme(preferences.themeSource));
+    this.store.updateChannel = preferences.updateChannel;
+    this.store.updatePolicy = preferences.updatePolicy;
   }
 
   private currentPreferences(
@@ -372,6 +438,8 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
       locale: DesktopLocale;
       sleepPreventionMode: DesktopSleepPreventionMode;
       themeSource: DesktopThemeSource;
+      updateChannel: DesktopUpdateChannel;
+      updatePolicy: DesktopUpdatePolicy;
     }> = {}
   ): {
     agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
@@ -382,6 +450,8 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
     locale: DesktopLocale;
     sleepPreventionMode: DesktopSleepPreventionMode;
     themeSource: DesktopThemeSource;
+    updateChannel: DesktopUpdateChannel;
+    updatePolicy: DesktopUpdatePolicy;
   } {
     return {
       agentComposerDefaultsByProvider:
@@ -399,7 +469,9 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
       locale: overrides.locale ?? this.store.locale,
       sleepPreventionMode:
         overrides.sleepPreventionMode ?? this.store.sleepPreventionMode,
-      themeSource: overrides.themeSource ?? this.store.theme.source
+      themeSource: overrides.themeSource ?? this.store.theme.source,
+      updateChannel: overrides.updateChannel ?? this.store.updateChannel,
+      updatePolicy: overrides.updatePolicy ?? this.store.updatePolicy
     };
   }
 }

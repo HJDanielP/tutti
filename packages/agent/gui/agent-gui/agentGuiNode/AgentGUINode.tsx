@@ -27,6 +27,10 @@ import { WorkspaceNodeWindow } from "../shared/WorkspaceNodeWindow";
 import { CanvasNodeGhostIconButton } from "../shared/CanvasNodeGhostIconButton";
 import { CanvasNodePanelLinedIcon } from "../shared/canvasNodeChromeIcons";
 import { useAgentGUINodeController } from "./controller/useAgentGUINodeController";
+import type {
+  AgentGUIOpenSessionRequest,
+  AgentGUIPrefillPromptRequest
+} from "./controller/useAgentGUINodeController";
 import { AgentGUINodeView, type AgentGUIViewLabels } from "./AgentGUINodeView";
 import {
   normalizeAgentGUIProviderIdentity,
@@ -118,6 +122,8 @@ export interface AgentGUINodeProps {
   isMaximized?: boolean;
   isActive: boolean;
   composerFocusRequestSequence?: number | null;
+  openSessionRequest?: AgentGUIOpenSessionRequest | null;
+  prefillPromptRequest?: AgentGUIPrefillPromptRequest | null;
   showProjectSelector?: boolean;
   isMuted?: boolean;
   onMinimize?: () => void;
@@ -426,7 +432,10 @@ function areAgentGUINodePropsEqual(
     previous.previewMode === next.previewMode &&
     previous.isActive === next.isActive &&
     previous.showProjectSelector === next.showProjectSelector &&
-    previous.composerFocusRequestSequence === next.composerFocusRequestSequence
+    previous.composerFocusRequestSequence ===
+      next.composerFocusRequestSequence &&
+    previous.openSessionRequest === next.openSessionRequest &&
+    previous.prefillPromptRequest === next.prefillPromptRequest
   );
 }
 
@@ -452,6 +461,8 @@ export const AgentGUINode = memo(function AgentGUINode({
   isMaximized = false,
   isActive,
   composerFocusRequestSequence = null,
+  openSessionRequest = null,
+  prefillPromptRequest = null,
   showProjectSelector = true,
   isMuted = false,
   onMinimize,
@@ -599,6 +610,8 @@ export const AgentGUINode = memo(function AgentGUINode({
     workspacePath,
     avoidGroupingEdits: agentSettings.avoidGroupingEdits,
     data: state,
+    openSessionRequest,
+    prefillPromptRequest,
     previewMode,
     onDataChange: handleDataChange,
     onShowMessage
@@ -646,6 +659,10 @@ export const AgentGUINode = memo(function AgentGUINode({
       reasoningOptionMedium: t("agentHost.agentGui.reasoningOptionMedium"),
       reasoningOptionHigh: t("agentHost.agentGui.reasoningOptionHigh"),
       reasoningOptionXHigh: t("agentHost.agentGui.reasoningOptionXHigh"),
+      speedLabel: t("agentHost.agentGui.speedLabel"),
+      speedSelectionLabel: t("agentHost.agentGui.speedSelectionLabel"),
+      speedOptionStandard: t("agentHost.agentGui.speedOptionStandard"),
+      speedOptionFast: t("agentHost.agentGui.speedOptionFast"),
       permissionLabel: t("agentHost.agentGui.permissionLabel"),
       permissionModeReadOnly: t("agentHost.agentGui.permissionModeReadOnly"),
       permissionModeAuto: t("agentHost.agentGui.permissionModeAuto"),

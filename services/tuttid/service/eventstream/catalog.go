@@ -266,6 +266,8 @@ type desktopPreferencesMutationPayload struct {
 		Locale                          string                                        `json:"locale"`
 		SleepPreventionMode             string                                        `json:"sleepPreventionMode"`
 		ThemeSource                     string                                        `json:"themeSource"`
+		UpdateChannel                   string                                        `json:"updateChannel"`
+		UpdatePolicy                    string                                        `json:"updatePolicy"`
 	} `json:"preferences"`
 }
 
@@ -383,6 +385,8 @@ type desktopPreferencesSettingsPayload struct {
 	Locale                          string                                        `json:"locale"`
 	SleepPreventionMode             string                                        `json:"sleepPreventionMode"`
 	ThemeSource                     string                                        `json:"themeSource"`
+	UpdateChannel                   string                                        `json:"updateChannel"`
+	UpdatePolicy                    string                                        `json:"updatePolicy"`
 }
 
 type desktopAgentComposerDefaultsByProviderPayload map[string]desktopAgentComposerDefaultsPayload
@@ -463,6 +467,18 @@ func validateDesktopPreferencesUpdateRequestedPayload(payload []byte) error {
 	if !preferencesbiz.IsDesktopThemeSource(decoded.ThemeSource) {
 		return fmt.Errorf("preferences.themeSource is unsupported")
 	}
+	if decoded.UpdateChannel == "" {
+		return fmt.Errorf("preferences.updateChannel is required")
+	}
+	if !preferencesbiz.IsDesktopUpdateChannel(decoded.UpdateChannel) {
+		return fmt.Errorf("preferences.updateChannel is unsupported")
+	}
+	if decoded.UpdatePolicy == "" {
+		return fmt.Errorf("preferences.updatePolicy is required")
+	}
+	if !preferencesbiz.IsDesktopUpdatePolicy(decoded.UpdatePolicy) {
+		return fmt.Errorf("preferences.updatePolicy is unsupported")
+	}
 	return nil
 }
 
@@ -510,6 +526,18 @@ func validateDesktopPreferencesUpdatedPayload(payload []byte) error {
 	}
 	if !preferencesbiz.IsDesktopThemeSource(decoded.Preferences.ThemeSource) {
 		return fmt.Errorf("preferences.themeSource is unsupported")
+	}
+	if decoded.Preferences.UpdateChannel == "" {
+		return fmt.Errorf("preferences.updateChannel is required")
+	}
+	if !preferencesbiz.IsDesktopUpdateChannel(decoded.Preferences.UpdateChannel) {
+		return fmt.Errorf("preferences.updateChannel is unsupported")
+	}
+	if decoded.Preferences.UpdatePolicy == "" {
+		return fmt.Errorf("preferences.updatePolicy is required")
+	}
+	if !preferencesbiz.IsDesktopUpdatePolicy(decoded.Preferences.UpdatePolicy) {
+		return fmt.Errorf("preferences.updatePolicy is unsupported")
 	}
 	return nil
 }
@@ -703,13 +731,13 @@ func validateWorkspaceAppUpdatedPayload(payload []byte) error {
 		return fmt.Errorf("app.references is required")
 	}
 	var references struct {
-		SearchSupported *bool `json:"searchSupported"`
+		ListSupported *bool `json:"listSupported"`
 	}
 	if err := json.Unmarshal(referencesRaw, &references); err != nil {
 		return fmt.Errorf("decode app.references: %w", err)
 	}
-	if references.SearchSupported == nil {
-		return fmt.Errorf("app.references.searchSupported is required")
+	if references.ListSupported == nil {
+		return fmt.Errorf("app.references.listSupported is required")
 	}
 
 	var decoded eventprotocol.WorkspaceAppUpdatedPayload

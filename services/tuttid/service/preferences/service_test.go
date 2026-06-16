@@ -47,6 +47,8 @@ func TestServiceGetReturnsStoredDesktopPreferences(t *testing.T) {
 				Locale:                   "zh-CN",
 				SleepPreventionMode:      "whileAgentRunning",
 				ThemeSource:              "dark",
+				UpdateChannel:            "rc",
+				UpdatePolicy:             "auto",
 			},
 		},
 	}
@@ -75,6 +77,12 @@ func TestServiceGetReturnsStoredDesktopPreferences(t *testing.T) {
 	}
 	if preferences.BrowserUseConnectionMode != "autoConnect" {
 		t.Fatalf("Get() browserUseConnectionMode = %q, want autoConnect", preferences.BrowserUseConnectionMode)
+	}
+	if preferences.UpdateChannel != "rc" {
+		t.Fatalf("Get() updateChannel = %q, want rc", preferences.UpdateChannel)
+	}
+	if preferences.UpdatePolicy != "auto" {
+		t.Fatalf("Get() updatePolicy = %q, want auto", preferences.UpdatePolicy)
 	}
 }
 
@@ -105,6 +113,8 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 		Locale:                   " zh-CN ",
 		SleepPreventionMode:      "whileAgentRunning",
 		ThemeSource:              " dark ",
+		UpdateChannel:            " rc ",
+		UpdatePolicy:             " auto ",
 	})
 	if err != nil {
 		t.Fatalf("Put() error = %v", err)
@@ -130,6 +140,12 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 	if store.putInput.BrowserUseConnectionMode != "autoConnect" {
 		t.Fatalf("stored browserUseConnectionMode = %q, want autoConnect", store.putInput.BrowserUseConnectionMode)
 	}
+	if store.putInput.UpdateChannel != "rc" {
+		t.Fatalf("stored updateChannel = %q, want rc", store.putInput.UpdateChannel)
+	}
+	if store.putInput.UpdatePolicy != "auto" {
+		t.Fatalf("stored updatePolicy = %q, want auto", store.putInput.UpdatePolicy)
+	}
 	claudeDefaults := store.putInput.AgentComposerDefaultsByProvider["claude-code"]
 	if claudeDefaults.Model != "claude-3-5" ||
 		claudeDefaults.PermissionModeID != "full-access" ||
@@ -147,8 +163,10 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 		publisher.published[0].DefaultAgentProvider != "claude-code" ||
 		publisher.published[0].ThemeSource != "dark" ||
 		publisher.published[0].SleepPreventionMode != "whileAgentRunning" ||
-		publisher.published[0].BrowserUseConnectionMode != "autoConnect" {
-		t.Fatalf("published preferences = %#v, want left/zh-CN/dark/prevent-sleep", publisher.published[0])
+		publisher.published[0].BrowserUseConnectionMode != "autoConnect" ||
+		publisher.published[0].UpdateChannel != "rc" ||
+		publisher.published[0].UpdatePolicy != "auto" {
+		t.Fatalf("published preferences = %#v, want left/zh-CN/dark/prevent-sleep/autoConnect/rc/auto", publisher.published[0])
 	}
 }
 
@@ -170,6 +188,8 @@ func TestServicePutReturnsStoredPreferencesWhenPublishFails(t *testing.T) {
 		Locale:              "zh-CN",
 		SleepPreventionMode: "whileAgentRunning",
 		ThemeSource:         "dark",
+		UpdateChannel:       "stable",
+		UpdatePolicy:        "prompt",
 	})
 	if err != nil {
 		t.Fatalf("Put() error = %v, want nil", err)
@@ -181,8 +201,10 @@ func TestServicePutReturnsStoredPreferencesWhenPublishFails(t *testing.T) {
 		store.putInput.Locale != "zh-CN" ||
 		store.putInput.DefaultAgentProvider != "codex" ||
 		store.putInput.ThemeSource != "dark" ||
-		store.putInput.SleepPreventionMode != "whileAgentRunning" {
-		t.Fatalf("stored preferences = %#v, want left/zh-CN/dark/prevent-sleep", store.putInput)
+		store.putInput.SleepPreventionMode != "whileAgentRunning" ||
+		store.putInput.UpdateChannel != "stable" ||
+		store.putInput.UpdatePolicy != "prompt" {
+		t.Fatalf("stored preferences = %#v, want left/zh-CN/dark/prevent-sleep/stable/prompt", store.putInput)
 	}
 	if len(publisher.published) != 1 {
 		t.Fatalf("published len = %d, want 1", len(publisher.published))

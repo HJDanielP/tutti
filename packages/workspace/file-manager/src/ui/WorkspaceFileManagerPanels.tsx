@@ -1,8 +1,6 @@
 import {
   FileCodeIcon,
   FileTextIcon,
-  FolderFilledIcon,
-  ImageFileIcon,
   LoadingIcon,
   ScrollArea,
   VideoFileIcon,
@@ -39,7 +37,11 @@ import type {
   WorkspaceFilePreviewState
 } from "../services/workspaceFileManagerTypes.ts";
 import { WorkspaceFileManagerIconGrid } from "./WorkspaceFileManagerIconGrid.tsx";
-import { WorkspaceFileEntryIcon } from "./WorkspaceFileEntryIcon.tsx";
+import {
+  WorkspaceFileEntryIcon,
+  WorkspaceFolderFallbackIcon,
+  WorkspaceImageFallbackIcon
+} from "./WorkspaceFileEntryIcon.tsx";
 import {
   resolveWorkspaceFileEntryArrangeDateMs,
   type WorkspaceFileManagerArrangeMode
@@ -957,8 +959,8 @@ function MoveDragPreview({
     >
       <WorkspaceFileEntryIcon
         entry={preview.entry}
-        frameClassName="size-[18px]"
-        iconClassName="size-4"
+        frameClassName="size-7"
+        iconClassName="size-6"
         iconUrlByCacheKey={iconUrlByCacheKey}
         onViewportLeave={onEntryIconViewportLeave}
         onViewportEnter={onEntryIconViewportEnter}
@@ -1140,8 +1142,8 @@ function EntryNameCell({
       <span className="flex min-w-0 items-center gap-2">
         <WorkspaceFileEntryIcon
           entry={entry}
-          frameClassName="size-[18px]"
-          iconClassName="size-4"
+          frameClassName="size-7"
+          iconClassName="size-6"
           iconUrlByCacheKey={iconUrlByCacheKey}
           onViewportLeave={onEntryIconViewportLeave}
           onViewportEnter={onEntryIconViewportEnter}
@@ -1205,8 +1207,8 @@ function EntryNameCell({
     <span className="flex min-w-0 items-center gap-2">
       <WorkspaceFileEntryIcon
         entry={entry}
-        frameClassName="size-[18px]"
-        iconClassName="size-4"
+        frameClassName="size-7"
+        iconClassName="size-6"
         iconUrlByCacheKey={iconUrlByCacheKey}
         isEnteringDirectory={isEnteringDirectory}
         onViewportLeave={onEntryIconViewportLeave}
@@ -1235,9 +1237,9 @@ function EntryIcon({
 }): ReactElement {
   switch (visualKind) {
     case "directory":
-      return <FolderFilledIcon className={className} />;
+      return <WorkspaceFolderFallbackIcon className={className} />;
     case "image":
-      return <ImageFileIcon className={className} />;
+      return <WorkspaceImageFallbackIcon className={className} />;
     case "video":
       return <VideoFileIcon className={className} />;
     case "markdown":

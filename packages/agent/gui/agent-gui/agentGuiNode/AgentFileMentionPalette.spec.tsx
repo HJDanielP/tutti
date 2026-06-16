@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  AgentFileMentionPalette,
-  flattenAgentMentionPaletteEntries
-} from "./AgentFileMentionPalette";
+import { AgentFileMentionPalette } from "./AgentFileMentionPalette";
 import type { AgentMentionSearchState } from "./AgentMentionSearchController";
 
 vi.mock("../../i18n/index", async () => {
@@ -60,160 +57,6 @@ vi.mock("../../i18n/index", async () => {
 });
 
 describe("AgentFileMentionPalette", () => {
-  it("flattens and renders workspace app child reference rows as selectable file items", () => {
-    const referenceItem = {
-      kind: "file" as const,
-      href: "guide.md",
-      path: "guide.md",
-      name: "Guide",
-      entryKind: "unknown" as const,
-      directoryPath: "",
-      sourceKey: "docs:app-data-relative:guide.md"
-    };
-    const packageReferenceItem = {
-      ...referenceItem,
-      sourceKey: "docs:app-package-relative:guide.md:1.0.0"
-    };
-    const state: AgentMentionSearchState = {
-      status: "ready",
-      query: "",
-      mode: "results",
-      filter: "app",
-      categories: [],
-      groups: [
-        {
-          id: "apps",
-          items: [
-            {
-              kind: "workspace-app",
-              href: "mention://workspace-app?workspaceId=workspace-1&appId=docs",
-              workspaceId: "workspace-1",
-              targetId: "docs",
-              appId: "docs",
-              name: "Docs",
-              referenceItems: [referenceItem, packageReferenceItem]
-            }
-          ],
-          totalCount: 1,
-          visibleCount: 1,
-          hasMore: false
-        }
-      ],
-      error: null
-    };
-    const entries = flattenAgentMentionPaletteEntries(state);
-    expect(entries).toHaveLength(3);
-    expect(entries[1]?.item).toBe(referenceItem);
-    expect(entries[1]?.key).not.toEqual(entries[2]?.key);
-    const onSelectItem = vi.fn();
-
-    render(
-      <AgentFileMentionPalette
-        state={state}
-        highlightedKey={entries[1]?.key ?? null}
-        label="mention palette"
-        loadingLabel="loading"
-        emptyLabel="empty"
-        errorLabel="error"
-        tabHintLabel="hint"
-        maxHeightPx={320}
-        onHighlightChange={vi.fn()}
-        onSelectItem={onSelectItem}
-        onSelectCategory={vi.fn()}
-        onSelectFilter={vi.fn()}
-        onExpandGroup={vi.fn()}
-        onCycleFilter={vi.fn()}
-        onMoveSelection={vi.fn()}
-      />
-    );
-
-    const guideOption = screen.getAllByRole("option", { name: /Guide/u })[0];
-    expect(guideOption).toBeDefined();
-    fireEvent.click(guideOption!);
-
-    expect(onSelectItem).toHaveBeenCalledWith(referenceItem);
-  });
-
-  it("flattens and renders workspace app child reference expand rows", () => {
-    const referenceItem = {
-      kind: "file" as const,
-      href: "guide.md",
-      path: "guide.md",
-      name: "Guide",
-      entryKind: "unknown" as const,
-      directoryPath: "",
-      sourceKey: "docs:guide.md"
-    };
-    const state: AgentMentionSearchState = {
-      status: "ready",
-      query: "guide",
-      mode: "results",
-      filter: "app",
-      categories: [],
-      groups: [
-        {
-          id: "apps",
-          items: [
-            {
-              kind: "workspace-app",
-              href: "mention://workspace-app?workspaceId=workspace-1&appId=docs",
-              workspaceId: "workspace-1",
-              targetId: "docs",
-              appId: "docs",
-              name: "Docs",
-              referenceItems: [referenceItem],
-              referenceNextCursor: "cursor-1"
-            }
-          ],
-          totalCount: 1,
-          visibleCount: 1,
-          hasMore: false
-        }
-      ],
-      error: null
-    };
-    const entries = flattenAgentMentionPaletteEntries(state);
-    expect(entries.map((entry) => entry.type)).toEqual([
-      "item",
-      "item",
-      "app-reference-expand"
-    ]);
-    expect(entries[2]).toMatchObject({
-      appId: "docs",
-      groupId: "apps"
-    });
-    const onExpandWorkspaceAppReferences = vi.fn();
-
-    render(
-      <AgentFileMentionPalette
-        state={state}
-        highlightedKey={entries[2]?.key ?? null}
-        label="mention palette"
-        loadingLabel="loading"
-        emptyLabel="empty"
-        errorLabel="error"
-        tabHintLabel="hint"
-        maxHeightPx={320}
-        onHighlightChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onSelectCategory={vi.fn()}
-        onSelectFilter={vi.fn()}
-        onExpandGroup={vi.fn()}
-        onExpandWorkspaceAppReferences={onExpandWorkspaceAppReferences}
-        onCycleFilter={vi.fn()}
-        onMoveSelection={vi.fn()}
-      />
-    );
-
-    const expandButton = screen.getByRole("button", {
-      name: "展开更多 5 条"
-    });
-    expect(expandButton).toBeVisible();
-    fireEvent.click(expandButton);
-
-    expect(onExpandWorkspaceAppReferences).toHaveBeenCalledWith("docs");
-  });
-
   it("renders issue mentions with room issue status labels instead of agent session labels", () => {
     const state: AgentMentionSearchState = {
       status: "ready",
@@ -1890,6 +1733,9 @@ describe("AgentFileMentionPalette", () => {
   it("insets bottom dock chrome notices further when stacked above composer notices", () => {
     const css = readFileSync(resolve("app/renderer/agentactivity.css"), "utf8");
 
+    expect(css).toMatch(
+      /\.agent-gui-node__bottom-dock\s*{[^}]*align-self:\s*stretch[^}]*width:\s*min\(\s*100%,\s*calc\(\s*var\(--agent-gui-detail-flow-max-width\)\s*\+\s*var\(--agent-gui-detail-padding-x\)\s*\+\s*var\(--agent-gui-detail-padding-x\)\s*\)\s*\)/s
+    );
     expect(css).toMatch(
       /\.agent-gui-node__bottom-dock\s*>\s*\.agent-gui-chrome__session-chrome:has\(\s*\+\s*\.agent-gui-node__composer\s+\.agent-gui-node__composer-input-group\s*>\s*\.agent-gui-chrome__session-chrome\s*\)\s*{[^}]*margin-right:\s*36px[^}]*margin-left:\s*36px/s
     );

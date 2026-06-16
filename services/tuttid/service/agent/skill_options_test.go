@@ -1,9 +1,13 @@
 package agent
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestDiscoverComposerSkillOptionsCodexUsesProviderNativeTriggers(t *testing.T) {
@@ -27,11 +31,17 @@ description: >
   Search and edit cloud docs.
 ---
 `)
+	writeSkill(t, filepath.Join(homeDir, ".agents", "skills", "broken-agents", "SKILL.md"), `description: Missing frontmatter delimiter.
+---
+`)
 	writeSkill(t, filepath.Join(homeDir, ".codex", "skills", "caveman", "SKILL.md"), `---
 description: >
   Ultra-compressed communication mode.
   Use when the user asks to be brief.
 ---
+`)
+	writeSkill(t, filepath.Join(homeDir, ".codex", "skills", "broken-codex", "SKILL.md"), `---
+description: Missing closing delimiter.
 `)
 	writeSkill(t, filepath.Join(homeDir, ".codex", "skills", ".system", "hidden", "SKILL.md"), `---
 description: Hidden system skill.
@@ -106,6 +116,47 @@ description: Internal Tutti CLI.
 	}
 }
 
+func TestDiscoverComposerSkillOptionsWarnsOnceForUnchangedInvalidSkill(t *testing.T) {
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	cwd := filepath.Join(tempDir, "repo")
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	skillPath := filepath.Join(homeDir, ".codex", "skills", "broken", "SKILL.md")
+	writeSkill(t, skillPath, `description: Missing frontmatter delimiter.
+---
+`)
+	skillMetadataCache.mu.Lock()
+	skillMetadataCache.entries = make(map[string]skillMetadataCacheEntry)
+	skillMetadataCache.mu.Unlock()
+	var output bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
+	_ = discoverComposerSkillOptions("codex", cwd, nil)
+	_ = discoverComposerSkillOptions("codex", cwd, nil)
+
+	if count := strings.Count(output.String(), "skill_frontmatter_invalid"); count != 1 {
+		t.Fatalf("invalid frontmatter warnings = %d, want 1; output:\n%s", count, output.String())
+	}
+
+	writeSkill(t, skillPath, `description: Still missing frontmatter delimiter.
+---
+`)
+	modTime := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(skillPath, modTime, modTime); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
+	_ = discoverComposerSkillOptions("codex", cwd, nil)
+
+	if count := strings.Count(output.String(), "skill_frontmatter_invalid"); count != 2 {
+		t.Fatalf("invalid frontmatter warnings after modification = %d, want 2; output:\n%s", count, output.String())
+	}
+}
+
 func TestReadSkillMetadataSupportsFoldedDescription(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "SKILL.md")
 	writeSkill(t, path, `---
@@ -120,13 +171,52 @@ metadata:
 ---
 `)
 
-	metadata := readSkillMetadata(path)
+	metadata, ok := readSkillMetadata(path)
+	if !ok {
+		t.Fatalf("readSkillMetadata() ok = false, want true")
+	}
 	if metadata.name != "lark-whiteboard" {
 		t.Fatalf("name = %q", metadata.name)
 	}
 	want := "飞书画板：查询和编辑飞书云文档中的画板。 支持导出画板为预览图片、导出原始节点结构。"
 	if metadata.description != want {
 		t.Fatalf("description = %q, want %q", metadata.description, want)
+	}
+}
+
+func TestReadSkillMetadataRejectsMissingDelimitedFrontmatter(t *testing.T) {
+	tempDir := t.TempDir()
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name: "missing start delimiter",
+			content: `name: broken
+---
+`,
+		},
+		{
+			name: "missing end delimiter",
+			content: `---
+name: broken
+`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(tempDir, test.name, "SKILL.md")
+			writeSkill(t, path, test.content)
+
+			metadata, ok := readSkillMetadata(path)
+
+			if ok {
+				t.Fatalf("readSkillMetadata() ok = true, want false")
+			}
+			if metadata.name != "" || metadata.description != "" {
+				t.Fatalf("metadata = %#v, want empty", metadata)
+			}
+		})
 	}
 }
 

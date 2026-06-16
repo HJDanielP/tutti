@@ -10,6 +10,8 @@ const (
 	DefaultDesktopLocale                   = "en"
 	DefaultDesktopSleepPreventionMode      = "never"
 	DefaultDesktopThemeSource              = "dark"
+	DefaultDesktopUpdateChannel            = "rc"
+	DefaultDesktopUpdatePolicy             = "prompt"
 )
 
 type DesktopPreferences struct {
@@ -22,6 +24,8 @@ type DesktopPreferences struct {
 	Locale                          string
 	SleepPreventionMode             string
 	ThemeSource                     string
+	UpdateChannel                   string
+	UpdatePolicy                    string
 }
 
 type AgentComposerDefaults struct {
@@ -41,6 +45,8 @@ func DefaultDesktopPreferences() DesktopPreferences {
 		Locale:                          DefaultDesktopLocale,
 		SleepPreventionMode:             DefaultDesktopSleepPreventionMode,
 		ThemeSource:                     DefaultDesktopThemeSource,
+		UpdateChannel:                   DefaultDesktopUpdateChannel,
+		UpdatePolicy:                    DefaultDesktopUpdatePolicy,
 	}
 }
 
@@ -92,6 +98,24 @@ func IsDesktopSleepPreventionMode(value string) bool {
 func IsDesktopBrowserUseConnectionMode(value string) bool {
 	switch value {
 	case "isolated", "autoConnect":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsDesktopUpdateChannel(value string) bool {
+	switch value {
+	case "stable", "rc":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsDesktopUpdatePolicy(value string) bool {
+	switch value {
+	case "off", "prompt", "auto":
 		return true
 	default:
 		return false

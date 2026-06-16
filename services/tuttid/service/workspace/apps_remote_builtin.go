@@ -167,31 +167,7 @@ func (s *AppCenterService) downloadRemoteBuiltinPackage(ctx context.Context, bui
 		ManifestJSON: manifestJSON,
 		Source:       workspacebiz.AppPackageSourceBuiltin,
 	}
-	if err := s.Store.PutAppPackage(ctx, appPackage); err != nil {
-		return workspacebiz.AppPackage{}, err
-	}
-	return appPackage, nil
-}
-
-func (s *AppCenterService) syncRemoteBuiltinPackageManifestFromDisk(ctx context.Context, appPackage workspacebiz.AppPackage, builtin builtinapps.App) (workspacebiz.AppPackage, error) {
-	manifest, manifestJSON, err := workspacebiz.ReadAppManifestFile(filepath.Join(appPackage.PackageDir, "tutti.app.json"))
-	if err != nil {
-		return workspacebiz.AppPackage{}, err
-	}
-	if manifest.AppID != builtin.Manifest.AppID || manifest.Version != builtin.Manifest.Version {
-		return workspacebiz.AppPackage{}, fmt.Errorf("remote builtin app manifest mismatch for %q", builtin.Manifest.AppID)
-	}
-	if err := validateExtractedAppPackage(appPackage.PackageDir, manifest); err != nil {
-		return workspacebiz.AppPackage{}, err
-	}
-
-	if strings.TrimSpace(appPackage.ManifestJSON) == manifestJSON {
-		return appPackage, nil
-	}
-
-	appPackage.Manifest = manifest
-	appPackage.ManifestJSON = manifestJSON
-	if err := s.Store.PutAppPackage(ctx, appPackage); err != nil {
+	if err := s.Store.PutAppPackageVersion(ctx, appPackage); err != nil {
 		return workspacebiz.AppPackage{}, err
 	}
 	return appPackage, nil

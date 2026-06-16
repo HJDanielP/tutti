@@ -16,6 +16,7 @@ type Service struct {
 	SessionDirectoryAllocator SessionDirectoryAllocator
 	PromptAttachmentStore     PromptAttachmentStore
 	RuntimePreparer           agentsidecarservice.Preparer
+	skillOptionsCache         *composerSkillOptionsCache
 }
 
 type StaleTurnResumeReconciler interface {
@@ -158,6 +159,7 @@ type RuntimeStartInput struct {
 	PlanMode         bool
 	BrowserUse       *bool
 	ReasoningEffort  string
+	Speed            string
 	Visible          *bool
 }
 
@@ -228,6 +230,7 @@ type ComposerSettingsPatch struct {
 	PlanMode         *bool
 	BrowserUse       *bool
 	ReasoningEffort  *string
+	Speed            *string
 }
 
 type RuntimeStreamEvent struct {
@@ -247,6 +250,7 @@ type CreateSessionInput struct {
 	PlanMode             *bool
 	BrowserUse           *bool
 	ReasoningEffort      *string
+	Speed                *string
 	Visible              *bool
 	ExtraSkills          []SessionSkillBundle
 }

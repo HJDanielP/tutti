@@ -5,6 +5,7 @@ export const en = {
     defaultWorkspace: "default",
     loading: "Loading",
     neverOpened: "Never opened",
+    ok: "OK",
     selectFolder: "Select folder",
     unknownError: "Unknown error",
     unreachable: "unreachable",
@@ -57,14 +58,14 @@ export const en = {
     workspaceCountNote: "{{count}} recent workspaces are currently available"
   },
   updates: {
-    availableTitle: "Version {{version}} is available",
+    availableTitle: "Update to New Version",
     badge: "update",
     checkingTitle: "Checking for updates",
-    downloadAction: "Download",
-    downloadedTitle: "Version {{version}} is ready to install",
-    downloadingTitle: "Downloading {{version}} {{percent}}",
+    downloadAction: "Update",
+    downloadedTitle: "Ready to install",
+    downloadingTitle: "Downloading {{percent}}",
     errorTitle: "Unable to check for updates",
-    restartAction: "Restart",
+    restartAction: "Install",
     retryAction: "Retry"
   },
   desktop: {
@@ -92,12 +93,15 @@ export const en = {
       title: "Export Logs"
     },
     menu: {
+      checkForUpdates: "Check for Updates...",
       edit: "Edit",
       exportLogsFailed: "Unable to export logs",
       exportLogsTitle: "Export Logs",
       exportServiceLogs: "Export Service Logs...",
       file: "File",
       help: "Help",
+      upToDateDetail: "Tutti {{version}} is currently the latest version.",
+      upToDateMessage: "You're up to date!",
       view: "View",
       window: "Window"
     }
@@ -124,7 +128,10 @@ export const en = {
     agentGui: {
       collapseConversationRail: "Collapse session list",
       expandConversationRail: "Expand session list",
-      fallbackAgentLabel: "Agent"
+      fallbackAgentLabel: "Agent",
+      openSessionUnavailableDescription:
+        "This agent session no longer exists or cannot be opened.",
+      openSessionUnavailableTitle: "Session unavailable"
     },
     agentMessageCenter: {
       openAria: "Open agent messages",
@@ -163,7 +170,7 @@ export const en = {
       title: "Analytics events"
     },
     appCenter: {
-      dockLabel: "Applications"
+      dockLabel: "App Center"
     },
     info: {
       idDescription: "Stable identifier for preload and daemon coordination.",
@@ -202,37 +209,19 @@ export const en = {
         custom: "Custom",
         default: "Default",
         dunes: "Starry dunes",
-        galaxy: "Galaxy",
         ocean: "Ocean",
         orbit: "Earth at night",
         peaks: "Mountain night",
         sand: "Sand ripples",
-        sky: "Sky"
+        sky: "Sky",
+        tutti: "Tutti"
       }
     },
     settings: {
       close: "Close settings",
-      agent: {
-        skills: {
-          empty: "No skills found",
-          loadFailed: "We couldn't load skills for this provider right now.",
-          projectScopeNote:
-            "Project-level skills are resolved inside each session.",
-          sourceKinds: {
-            bundled: "Bundled",
-            tuttiInjected: "Tutti",
-            personal: "Personal",
-            plugin: "Plugin",
-            project: "Project",
-            system: "System"
-          },
-          sourceLabel: "Source",
-          title: "Skills (read-only)"
-        }
-      },
       appearance: {
         dockPlacementDescription:
-          "Controls where the workspace dock is anchored.",
+          "Controls where the workspace dock is anchored",
         dockPlacementLabel: "Dock layout",
         dockPlacementOptions: {
           bottom: "Bottom",
@@ -243,7 +232,7 @@ export const en = {
         dockIconStyleSaveFailed:
           "We couldn't update the Dock icon style right now.",
         themeDescription:
-          "Controls window appearance and the color mode for information.",
+          "Controls window appearance and the color mode for information",
         themeLabel: "Appearance",
         themeOptions: {
           dark: "Dark",
@@ -272,7 +261,7 @@ export const en = {
       },
       general: {
         defaultAgentProviderDescription:
-          "Used for new app factory jobs, issue tasks, and workspace apps that ask for the host default.",
+          "Used for new app factory jobs, issue tasks, and workspace apps that ask for the host default",
         defaultAgentProviderLabel: "Default provider",
         defaultAgentProviderSaveFailed:
           "We couldn't update the default provider right now.",
@@ -293,19 +282,21 @@ export const en = {
           zhCN: "Simplified Chinese"
         },
         localeSaveFailed: "We couldn't switch the app language right now.",
-        preventSleepDescription:
-          "Controls when Tutti keeps this computer awake.",
+        preventSleepDescription: "Controls whether the system can enter sleep",
         preventSleepLabel: "Sleep prevention",
         preventSleepOptions: {
-          always: "Always",
-          never: "Never",
-          whileAgentRunning: "While agents run"
+          always: "Always prevent sleep",
+          never: "Allow computer sleep",
+          whileAgentRunning: "Prevent sleep only while Agent runs"
         },
         preventSleepSaveFailed:
-          "We couldn't update the sleep prevention setting right now."
+          "We couldn't update the sleep prevention setting right now.",
+        updateChannelSaveFailed:
+          "We couldn't update the release channel right now.",
+        updatePolicySaveFailed: "We couldn't update the update mode right now.",
+        versionLabel: "Desktop version"
       },
       nav: {
-        agent: "Agent",
         apps: "Apps",
         sectionsLabel: "Settings sections",
         appearance: "Appearance",
@@ -315,27 +306,32 @@ export const en = {
       apps: {
         managedModels: {
           apiKey: "API key",
-          baseUrl: "Base URL",
-          customProvider: "Custom provider",
-          delete: "Delete",
-          deleting: "Deleting...",
-          deleteFailed: "We couldn't delete that managed provider.",
-          deleteSucceeded: "Managed provider deleted.",
           addModel: "Add",
+          addProvider: "Add provider",
+          baseUrl: "Base URL",
+          collapse: "Collapse",
+          customProvider: "Custom",
+          delete: "Delete",
+          deleteConfirm: "Delete this provider?",
+          deleteFailed: "Couldn't delete — try again.",
+          deleting: "Deleting...",
           description:
-            "Store provider credentials in Tutti and let workspace apps request short-lived access.",
-          detectModels: "Detect models",
-          detectingModels: "Detecting...",
-          detectModelsEmpty: "No models were found for that provider.",
-          detectModelsFailed: "We couldn't detect models for that provider.",
-          detectModelsSucceeded: "Provider models detected.",
+            "Bring your own model API keys for your workspace apps and agents to use",
+          detectModels: "Fetch available models",
+          detectingModels: "Fetching...",
+          detectModelsEmpty: "No models found.",
+          detectModelsFailed: "Couldn't fetch models — try again.",
+          emptyDescription:
+            "Click “Add provider” to connect Agnes, OpenAI, or Anthropic with your API key",
+          emptyTitle: "No model providers yet",
           enabled: "Enable {{provider}}",
+          expand: "Expand",
           getApiKey: "Get {{provider}} API key",
-          hideApiKey: "Hide API key",
-          keyConfigured: "API key saved in Tutti",
-          keyMissing: "API key not configured",
+          hideApiKey: "Hide key",
+          keyConfigured: "Key saved",
+          keyMissing: "API key not set",
           keepExistingKey: "Leave blank to keep the saved key",
-          loadFailed: "We couldn't load managed model providers.",
+          loadFailed: "We couldn't load model providers.",
           modelId: "Model ID",
           modelIdPlaceholder: "model-id",
           models: "Models",
@@ -351,23 +347,24 @@ export const en = {
             openaiOfficial: "OpenAI official"
           },
           removeModel: "Remove model",
-          quickFillProvider: "Quick fill provider",
+          requiredFieldsMissing: "Fill in the API key and Base URL first.",
+          quickFillProvider: "Choose a preset",
           save: "Save",
-          saveFailed: "We couldn't save that managed provider.",
-          saveSucceeded: "Managed provider saved.",
+          saveFailed: "Couldn't save — try again.",
           saving: "Saving...",
-          showApiKey: "Show API key",
-          test: "Test",
-          testFailed: "Provider test failed.",
-          testSucceeded: "Provider test succeeded.",
+          showApiKey: "Show key",
+          test: "Test connection",
+          testFailed: "Connection failed — check the key or URL.",
+          testSucceeded: "Connection OK.",
           testing: "Testing...",
-          title: "Managed Models"
+          modelCount: "{{count}} models",
+          title: "Model providers"
         }
       },
       developer: {
         actionsLabel: "Actions",
         analyticsDebugDescription:
-          "Shows a floating panel with local analytics events in development builds.",
+          "Shows a floating panel with local analytics events in development builds",
         analyticsDebugLabel: "Analytics event panel",
         clearLogs: "Clear logs",
         clearingLogs: "Clearing...",
@@ -391,7 +388,9 @@ export const en = {
         openDaemonLog: "Open daemon log",
         openDesktopLog: "Open desktop log",
         openLogsDirectory: "Open logs folder",
-        versionLabel: "Desktop version"
+        visibilityDescription:
+          "Hide this panel from settings. Tap the version number in General seven times to bring it back",
+        visibilityLabel: "Show developer panel"
       },
       title: "Settings",
       trigger: "Settings"
@@ -413,7 +412,7 @@ export const en = {
       },
       nodes: {
         agent: "Agent",
-        appCenter: "Applications",
+        appCenter: "App Center",
         appWebview: "Workspace app",
         browser: "Browser",
         files: "Files",

@@ -2,10 +2,13 @@ package agent
 
 import (
 	"bufio"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/tutti-os/tutti/services/tuttid/biz/agentprovider"
 )
@@ -25,17 +28,43 @@ var hiddenTuttiProviderSkills = map[string]struct{}{
 }
 
 func discoverComposerSkillOptions(provider string, cwd string, env []string) []ComposerSkillOption {
+	roots, triggerFor := composerSkillDiscoveryPlan(provider, cwd, env)
+	if triggerFor == nil {
+		return nil
+	}
+	return discoverComposerSkillOptionsFromRoots(roots, triggerFor)
+}
+
+func (s *Service) discoverComposerSkillOptions(provider string, cwd string, env []string) []ComposerSkillOption {
+	roots, triggerFor := composerSkillDiscoveryPlan(provider, cwd, env)
+	if triggerFor == nil {
+		return nil
+	}
+	cache := s.skillOptionsCache
+	if cache == nil {
+		return discoverComposerSkillOptionsFromRoots(roots, triggerFor)
+	}
+	key := composerSkillOptionsCacheKey(provider, roots)
+	if cached, ok := cache.get(key); ok {
+		return cloneComposerSkillOptions(cached)
+	}
+	options := discoverComposerSkillOptionsFromRoots(roots, triggerFor)
+	cache.set(key, options)
+	return cloneComposerSkillOptions(options)
+}
+
+func composerSkillDiscoveryPlan(provider string, cwd string, env []string) ([]composerSkillRoot, skillTriggerFunc) {
 	switch agentprovider.Normalize(provider) {
 	case agentprovider.Codex:
-		return discoverCodexComposerSkills(cwd, env)
+		return codexComposerSkillRoots(cwd, env), codexSkillTrigger
 	case agentprovider.ClaudeCode:
-		return discoverClaudeCodeComposerSkills(cwd, env)
+		return claudeCodeComposerSkillRoots(cwd, env), claudeCodeSkillTrigger
 	default:
-		return nil
+		return nil, nil
 	}
 }
 
-func discoverCodexComposerSkills(cwd string, env []string) []ComposerSkillOption {
+func codexComposerSkillRoots(cwd string, env []string) []composerSkillRoot {
 	roots := make([]composerSkillRoot, 0)
 	roots = append(roots, ancestorSkillRoots(cwd, ".codex", "skills", composerSkillSourceProject)...)
 	if userHome, err := os.UserHomeDir(); err == nil && strings.TrimSpace(userHome) != "" {
@@ -58,10 +87,10 @@ func discoverCodexComposerSkills(cwd string, env []string) []ComposerSkillOption
 			sourceKind: composerSkillSourceTuttiInjected,
 		})
 	}
-	return discoverProviderSkillRoots(roots, codexSkillTrigger)
+	return roots
 }
 
-func discoverClaudeCodeComposerSkills(cwd string, env []string) []ComposerSkillOption {
+func claudeCodeComposerSkillRoots(cwd string, env []string) []composerSkillRoot {
 	roots := make([]composerSkillRoot, 0)
 	roots = append(roots, ancestorSkillRoots(cwd, ".claude", "skills", composerSkillSourceProject)...)
 	if userHome, err := os.UserHomeDir(); err == nil && strings.TrimSpace(userHome) != "" {
@@ -77,7 +106,7 @@ func discoverClaudeCodeComposerSkills(cwd string, env []string) []ComposerSkillO
 			pluginName: claudePluginName(pluginDir),
 		})
 	}
-	return discoverProviderSkillRoots(roots, claudeCodeSkillTrigger)
+	return roots
 }
 
 type composerSkillRoot struct {
@@ -87,6 +116,105 @@ type composerSkillRoot struct {
 }
 
 type skillTriggerFunc func(composerSkillRoot, string) string
+
+type composerSkillOptionsCache struct {
+	mu      sync.Mutex
+	entries map[string][]ComposerSkillOption
+}
+
+func newComposerSkillOptionsCache() *composerSkillOptionsCache {
+	return &composerSkillOptionsCache{
+		entries: make(map[string][]ComposerSkillOption),
+	}
+}
+
+func (c *composerSkillOptionsCache) get(key string) ([]ComposerSkillOption, bool) {
+	if c == nil {
+		return nil, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	options, ok := c.entries[key]
+	if !ok {
+		return nil, false
+	}
+	return cloneComposerSkillOptions(options), true
+}
+
+func (c *composerSkillOptionsCache) set(key string, options []ComposerSkillOption) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = cloneComposerSkillOptions(options)
+}
+
+func composerSkillOptionsCacheKey(provider string, roots []composerSkillRoot) string {
+	var builder strings.Builder
+	builder.WriteString(agentprovider.Normalize(provider))
+	for _, root := range roots {
+		builder.WriteByte('\n')
+		builder.WriteString(root.path)
+		builder.WriteByte('|')
+		builder.WriteString(root.sourceKind)
+		builder.WriteByte('|')
+		builder.WriteString(root.pluginName)
+		writeFileSignature(&builder, root.path)
+		entries, err := os.ReadDir(root.path)
+		if err != nil {
+			builder.WriteString("|missing")
+			continue
+		}
+		for _, entry := range entries {
+			name := strings.TrimSpace(entry.Name())
+			if name == "" || strings.HasPrefix(name, ".") {
+				continue
+			}
+			sourcePath := filepath.Join(root.path, name)
+			sourceInfo, err := os.Stat(sourcePath)
+			if err != nil || !sourceInfo.IsDir() {
+				continue
+			}
+			builder.WriteByte('\n')
+			builder.WriteString(filepath.Join(sourcePath, "SKILL.md"))
+			writeFileSignature(&builder, filepath.Join(sourcePath, "SKILL.md"))
+		}
+	}
+	return builder.String()
+}
+
+func writeFileSignature(builder *strings.Builder, path string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		builder.WriteString("|missing")
+		return
+	}
+	builder.WriteByte('|')
+	builder.WriteString(strconv.FormatInt(info.Size(), 10))
+	builder.WriteByte('|')
+	builder.WriteString(strconv.FormatInt(info.ModTime().UnixNano(), 10))
+	builder.WriteByte('|')
+	if info.IsDir() {
+		builder.WriteString("dir")
+	} else {
+		builder.WriteString("file")
+	}
+}
+
+func cloneComposerSkillOptions(options []ComposerSkillOption) []ComposerSkillOption {
+	if len(options) == 0 {
+		return nil
+	}
+	return append([]ComposerSkillOption(nil), options...)
+}
+
+func discoverComposerSkillOptionsFromRoots(
+	roots []composerSkillRoot,
+	triggerFor skillTriggerFunc,
+) []ComposerSkillOption {
+	return discoverProviderSkillRoots(roots, triggerFor)
+}
 
 func discoverProviderSkillRoots(
 	roots []composerSkillRoot,
@@ -146,7 +274,20 @@ func discoverProviderSkillRoot(
 		if err != nil || info.IsDir() {
 			continue
 		}
-		metadata := readSkillMetadata(skillPath)
+		metadata, ok, shouldWarn := readSkillMetadataForDiscovery(skillPath)
+		if !ok {
+			if shouldWarn {
+				slog.Warn(
+					"composer skill skipped; invalid frontmatter",
+					"error_code", "skill_frontmatter_invalid",
+					"skillName", name,
+					"skillPath", skillPath,
+					"sourceKind", root.sourceKind,
+					"reason", "missing_delimited_yaml_frontmatter",
+				)
+			}
+			continue
+		}
 		if metadata.name != "" {
 			name = metadata.name
 		}
@@ -201,24 +342,88 @@ type skillMetadata struct {
 	description string
 }
 
-func readSkillMetadata(path string) skillMetadata {
+type skillMetadataCacheEntry struct {
+	size          int64
+	modTimeUnixNS int64
+	metadata      skillMetadata
+	ok            bool
+	warnedInvalid bool
+}
+
+var skillMetadataCache = struct {
+	mu      sync.Mutex
+	entries map[string]skillMetadataCacheEntry
+}{
+	entries: make(map[string]skillMetadataCacheEntry),
+}
+
+func readSkillMetadataForDiscovery(path string) (skillMetadata, bool, bool) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return skillMetadata{}, false, false
+	}
+	size := info.Size()
+	modTimeUnixNS := info.ModTime().UnixNano()
+	skillMetadataCache.mu.Lock()
+	if entry, ok := skillMetadataCache.entries[path]; ok &&
+		entry.size == size &&
+		entry.modTimeUnixNS == modTimeUnixNS {
+		if entry.ok {
+			metadata := entry.metadata
+			skillMetadataCache.mu.Unlock()
+			return metadata, true, false
+		}
+		if !entry.warnedInvalid {
+			entry.warnedInvalid = true
+			skillMetadataCache.entries[path] = entry
+			skillMetadataCache.mu.Unlock()
+			return skillMetadata{}, false, true
+		}
+		skillMetadataCache.mu.Unlock()
+		return skillMetadata{}, false, false
+	}
+	skillMetadataCache.mu.Unlock()
+
+	metadata, ok := readSkillMetadata(path)
+	entry := skillMetadataCacheEntry{
+		size:          size,
+		modTimeUnixNS: modTimeUnixNS,
+		metadata:      metadata,
+		ok:            ok,
+		warnedInvalid: !ok,
+	}
+	skillMetadataCache.mu.Lock()
+	skillMetadataCache.entries[path] = entry
+	skillMetadataCache.mu.Unlock()
+	return metadata, ok, !ok
+}
+
+func readSkillMetadata(path string) (skillMetadata, bool) {
 	file, err := os.Open(path)
 	if err != nil {
-		return skillMetadata{}
+		return skillMetadata{}, false
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	if !scanner.Scan() || strings.TrimSpace(scanner.Text()) != "---" {
-		return skillMetadata{}
+	if !scanner.Scan() || strings.TrimSpace(strings.TrimPrefix(scanner.Text(), "\ufeff")) != "---" {
+		return skillMetadata{}, false
 	}
 	lines := make([]string, 0)
+	foundEnd := false
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "---" {
+			foundEnd = true
 			break
 		}
 		lines = append(lines, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return skillMetadata{}, false
+	}
+	if !foundEnd {
+		return skillMetadata{}, false
 	}
 
 	metadata := skillMetadata{}
@@ -242,7 +447,7 @@ func readSkillMetadata(path string) skillMetadata {
 			}
 		}
 	}
-	return metadata
+	return metadata, true
 }
 
 func isYAMLBlockScalar(value string) bool {
@@ -327,6 +532,21 @@ func withComposerSkillOptionsRuntimeContext(
 	}
 	runtimeContext["skills"] = composerSkillOptionsRuntimeContext(options)
 	return runtimeContext
+}
+
+func withFallbackComposerSkillOptionsRuntimeContext(
+	runtimeContext map[string]any,
+	options []ComposerSkillOption,
+) map[string]any {
+	if len(options) == 0 {
+		return runtimeContext
+	}
+	if runtimeContext != nil {
+		if _, ok := runtimeContext["skills"]; ok {
+			return runtimeContext
+		}
+	}
+	return withComposerSkillOptionsRuntimeContext(runtimeContext, options)
 }
 
 func skillSourceRank(sourceKind string) int {

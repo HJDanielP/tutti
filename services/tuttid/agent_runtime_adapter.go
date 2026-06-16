@@ -35,6 +35,7 @@ func agentRuntimeSessionSettings(settings agentservice.ComposerSettings) *agentr
 	result := &agentruntime.SessionSettings{
 		Model:            settings.Model,
 		ReasoningEffort:  settings.ReasoningEffort,
+		Speed:            settings.Speed,
 		PlanMode:         settings.PlanMode,
 		PermissionModeID: settings.PermissionModeID,
 	}
@@ -140,6 +141,7 @@ func (a agentRuntimeAdapter) UpdateSettings(ctx context.Context, input agentserv
 		Settings: agentruntime.SessionSettingsPatch{
 			Model:            input.Settings.Model,
 			ReasoningEffort:  input.Settings.ReasoningEffort,
+			Speed:            input.Settings.Speed,
 			PlanMode:         input.Settings.PlanMode,
 			BrowserUse:       input.Settings.BrowserUse,
 			PermissionModeID: input.Settings.PermissionModeID,
@@ -198,6 +200,7 @@ func (a agentRuntimeAdapter) Start(ctx context.Context, input agentservice.Runti
 		Settings: &agentruntime.SessionSettings{
 			Model:            input.Model,
 			ReasoningEffort:  input.ReasoningEffort,
+			Speed:            input.Speed,
 			PlanMode:         input.PlanMode,
 			BrowserUse:       cloneOptionalBool(input.BrowserUse),
 			PermissionModeID: input.PermissionModeID,
@@ -257,6 +260,7 @@ func agentRuntimeComposerSettings(settings *agentruntime.SessionSettings) *agent
 		PlanMode:         settings.PlanMode,
 		BrowserUse:       cloneOptionalBool(settings.BrowserUse),
 		ReasoningEffort:  settings.ReasoningEffort,
+		Speed:            settings.Speed,
 	}
 }
 

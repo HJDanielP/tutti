@@ -83,6 +83,7 @@ test("workspace file icon cache reads by exact cache key", async () => {
     await store.readUrl({ ...key, path: "/workspace/Other.app" }),
     null
   );
+  assert.equal(await store.readUrl({ ...key, sizePx: 128 }), null);
 });
 
 test("workspace file icon cache reads file type icons by extension and application", async () => {
@@ -105,6 +106,39 @@ test("workspace file icon cache reads file type icons by extension and applicati
   );
   assert.equal(
     await store.readUrl(testFileTypeCacheKey("pdf", "/Applications/Other.app")),
+    null
+  );
+  assert.equal(
+    await store.readUrl({
+      ...testFileTypeCacheKey("pdf", "/Applications/Preview.app"),
+      sizePx: 128
+    }),
+    null
+  );
+});
+
+test("workspace file icon cache reads image thumbnails by file identity and size", async () => {
+  const directory = await createTempDirectory("file-icon-thumbnail");
+  const store = createWorkspaceFileIconCacheStore({ directory });
+  const key = testImageThumbnailCacheKey("/workspace/photo.png", 160);
+
+  const url = await store.write({
+    bytes: Buffer.from([1, 2, 3]),
+    key,
+    mimeType: "image/png"
+  });
+
+  assert.equal(await store.readUrl(key), url);
+  assert.equal(
+    await store.readUrl(
+      testImageThumbnailCacheKey("/workspace/photo.png", 256)
+    ),
+    null
+  );
+  assert.equal(
+    await store.readUrl(
+      testImageThumbnailCacheKey("/workspace/other.png", 160)
+    ),
     null
   );
 });
@@ -178,6 +212,7 @@ function testCacheKey(path: string): WorkspaceApplicationIconCacheKey {
     assetKind: "application-icon",
     mtimeMs: 1_700_000_000_000,
     path,
+    sizePx: 256,
     workspaceID: "workspace-a"
   };
 }
@@ -190,6 +225,20 @@ function testFileTypeCacheKey(
     applicationPath,
     assetKind: "file-type-default-application-icon",
     fileExtension,
-    platform: "darwin"
+    platform: "darwin",
+    sizePx: 256
+  };
+}
+
+function testImageThumbnailCacheKey(
+  filePath: string,
+  sizePx: number
+): WorkspaceFileIconCacheKey {
+  return {
+    assetKind: "image-thumbnail",
+    mtimeMs: 1_700_000_000_000,
+    path: filePath,
+    sizePx,
+    workspaceID: "workspace-a"
   };
 }

@@ -87,7 +87,8 @@ describe("agentSlashCommandProviderPolicy", () => {
     ).toEqual([
       { name: "web" },
       { name: "compact", description: "ACP" },
-      { name: "status" }
+      { name: "status" },
+      { name: "fast" }
     ]);
   });
 
@@ -97,7 +98,7 @@ describe("agentSlashCommandProviderPolicy", () => {
         provider: "claude-code",
         commands: []
       }).map((command) => command.name)
-    ).toEqual(["compact", "status"]);
+    ).toEqual(["compact", "status", "fast"]);
   });
 
   it("filters compact when the session has no compactable context", () => {
@@ -107,7 +108,7 @@ describe("agentSlashCommandProviderPolicy", () => {
         commands: [{ name: "compact", description: "from provider" }],
         hasCompactableContext: false
       })
-    ).toEqual([{ name: "status" }]);
+    ).toEqual([{ name: "status" }, { name: "fast" }]);
   });
 
   it("filters Claude Code plan commands from provider and fallback commands", () => {
@@ -116,7 +117,7 @@ describe("agentSlashCommandProviderPolicy", () => {
         provider: "claude-code",
         commands: [{ name: "plan", description: "provider plan" }]
       })
-    ).toEqual([{ name: "compact" }, { name: "status" }]);
+    ).toEqual([{ name: "compact" }, { name: "status" }, { name: "fast" }]);
   });
 
   it("submits Codex init and compact commands immediately", () => {

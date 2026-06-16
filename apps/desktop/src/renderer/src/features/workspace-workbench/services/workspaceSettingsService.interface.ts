@@ -6,7 +6,9 @@ import type {
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
-  DesktopSleepPreventionMode
+  DesktopSleepPreventionMode,
+  DesktopUpdateChannel,
+  DesktopUpdatePolicy
 } from "@shared/preferences";
 import type { DesktopThemeSource } from "@shared/theme";
 import type {
@@ -38,6 +40,19 @@ export interface IWorkspaceSettingsService {
     options?: WorkspaceSettingsOpenOptions
   ): void;
   selectSection(sectionID: WorkspaceSettingsSectionID): void;
+  setDeveloperPanelVisible(visible: boolean): void;
+  beginManagedModelProviderDraft(
+    provider: WorkspaceManagedModelProviderID
+  ): void;
+  updateManagedModelDraft(
+    patch: Partial<WorkspaceManagedModelProviderDraft>
+  ): void;
+  cancelManagedModelProviderDraft(): void;
+  saveManagedModelDraft(): Promise<void>;
+  setManagedModelProviderEnabled(
+    providerID: WorkspaceManagedModelProviderID,
+    enabled: boolean
+  ): Promise<void>;
   changeDefaultAgentProvider(provider: DesktopAgentProvider): Promise<void>;
   changeBrowserUseConnectionMode(
     mode: DesktopBrowserUseConnectionMode
@@ -47,6 +62,8 @@ export interface IWorkspaceSettingsService {
   changeLocale(nextLocale: DesktopLocale): Promise<void>;
   changeSleepPreventionMode(mode: DesktopSleepPreventionMode): Promise<void>;
   changeThemeSource(nextThemeSource: DesktopThemeSource): Promise<void>;
+  changeUpdateChannel(channel: DesktopUpdateChannel): Promise<void>;
+  changeUpdatePolicy(policy: DesktopUpdatePolicy): Promise<void>;
   clearDeveloperLogs(): Promise<void>;
   exportDeveloperLogs(): Promise<void>;
   openLogDirectory(): Promise<void>;

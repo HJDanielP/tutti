@@ -4,6 +4,8 @@ export {
   defaultDesktopDockIconStyle,
   defaultDesktopDockPlacement,
   defaultDesktopSleepPreventionMode,
+  defaultDesktopUpdateChannel,
+  defaultDesktopUpdatePolicy,
   desktopAgentComposerDefaultsByProviderEqual,
   desktopAgentComposerDefaultsEqual,
   desktopAgentProviders,
@@ -11,11 +13,15 @@ export {
   desktopDockIconStyles,
   desktopDockPlacements,
   desktopSleepPreventionModes,
+  desktopUpdateChannels,
+  desktopUpdatePolicies,
   isDesktopAgentProvider,
   isDesktopBrowserUseConnectionMode,
   isDesktopDockIconStyle,
   isDesktopDockPlacement,
   isDesktopSleepPreventionMode,
+  isDesktopUpdateChannel,
+  isDesktopUpdatePolicy,
   mergeDesktopAgentComposerDefaultsByProvider,
   normalizeDesktopAgentComposerDefaults,
   normalizeDesktopAgentComposerDefaultsByProvider,
@@ -26,5 +32,7 @@ export {
   type DesktopBrowserUseConnectionMode,
   type DesktopDockIconStyle,
   type DesktopDockPlacement,
-  type DesktopSleepPreventionMode
+  type DesktopSleepPreventionMode,
+  type DesktopUpdateChannel,
+  type DesktopUpdatePolicy
 } from "./core.ts";

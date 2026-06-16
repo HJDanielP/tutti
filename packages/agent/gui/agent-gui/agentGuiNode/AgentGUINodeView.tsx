@@ -30,7 +30,12 @@ import {
 } from "@tutti-os/ui-system";
 import { WorkspaceUserProjectSelect } from "@tutti-os/workspace-user-project/ui";
 import type { WorkspaceUserProjectI18nRuntime } from "@tutti-os/workspace-user-project/i18n";
-import { BareIconButton, ScrollArea } from "@tutti-os/ui-system/components";
+import {
+  Badge,
+  BareIconButton,
+  Button as UiSystemButton,
+  ScrollArea
+} from "@tutti-os/ui-system/components";
 import { Button } from "../../app/renderer/components/ui/button";
 import {
   EditIcon,
@@ -54,6 +59,7 @@ import {
 import { AgentConversationFlow } from "../../shared/agentConversation/components/AgentConversationFlow";
 import type { AgentConversationVM } from "../../shared/agentConversation/contracts/agentConversationVM";
 import type { AgentPromptContentBlock } from "../../shared/contracts/dto";
+import type { AgentComposerDraft } from "./model/agentGuiNodeTypes";
 import { useProjectedAgentConversation } from "../../shared/agentConversation/projection/useProjectedAgentConversation";
 import { normalizeOptionalWorkspaceAgentStatus } from "../../shared/workspaceAgentStatusNormalizer";
 import {
@@ -180,6 +186,10 @@ export interface AgentGUIViewLabels {
   reasoningOptionMedium: string;
   reasoningOptionHigh: string;
   reasoningOptionXHigh: string;
+  speedLabel: string;
+  speedSelectionLabel: string;
+  speedOptionStandard: string;
+  speedOptionFast: string;
   permissionLabel: string;
   permissionModeReadOnly: string;
   permissionModeAuto: string;
@@ -355,7 +365,7 @@ interface AgentGUINodeViewProps {
       payload?: Record<string, unknown>;
     }) => void;
     interruptCurrentTurn: (noRunningResponseMessage: string) => void;
-    updateDraftPrompt: (prompt: string) => void;
+    updateDraftContent: (draftContent: AgentComposerDraft) => void;
     updateSelectedProjectPath?: AgentComposerProps["onProjectPathChange"];
     updateComposerSettings: (settings: {
       model?: string | null;
@@ -584,6 +594,56 @@ function resolveSlashStatus({
         }
       : null
   };
+}
+
+function slashStatusLimitsEqual(
+  left: readonly AgentComposerSlashStatusLimit[] | null | undefined,
+  right: readonly AgentComposerSlashStatusLimit[] | null | undefined
+): boolean {
+  const leftLimits = left ?? [];
+  const rightLimits = right ?? [];
+  return (
+    leftLimits.length === rightLimits.length &&
+    leftLimits.every((limit, index) => {
+      const rightLimit = rightLimits[index]!;
+      return (
+        limit.id === rightLimit.id &&
+        limit.label === rightLimit.label &&
+        (limit.percentRemaining ?? null) ===
+          (rightLimit.percentRemaining ?? null) &&
+        limit.value === rightLimit.value
+      );
+    })
+  );
+}
+
+function slashStatusesEqual(
+  left: AgentComposerSlashStatus,
+  right: AgentComposerSlashStatus
+): boolean {
+  return (
+    (left.agentSessionId ?? null) === (right.agentSessionId ?? null) &&
+    (left.baseUrl ?? null) === (right.baseUrl ?? null) &&
+    (left.contextWindow?.usedTokens ?? null) ===
+      (right.contextWindow?.usedTokens ?? null) &&
+    (left.contextWindow?.totalTokens ?? null) ===
+      (right.contextWindow?.totalTokens ?? null) &&
+    slashStatusLimitsEqual(left.limits, right.limits) &&
+    Boolean(left.limitsLoading) === Boolean(right.limitsLoading)
+  );
+}
+
+function useStableSlashStatus(
+  status: AgentComposerSlashStatus
+): AgentComposerSlashStatus {
+  const statusRef = useRef<AgentComposerSlashStatus | null>(null);
+  if (
+    statusRef.current === null ||
+    !slashStatusesEqual(statusRef.current, status)
+  ) {
+    statusRef.current = status;
+  }
+  return statusRef.current;
 }
 
 function conversationHasActiveWork(
@@ -1131,7 +1191,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
     () => ({ ...viewModel.sessionChrome, approval: null }),
     [viewModel.sessionChrome]
   );
-  const slashStatus = useMemo(
+  const rawSlashStatus = useMemo(
     () =>
       resolveSlashStatus({
         rawState: viewModel.sessionChrome.rawState,
@@ -1144,6 +1204,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       viewModel.sessionChrome.rawState
     ]
   );
+  const slashStatus = useStableSlashStatus(rawSlashStatus);
   const displayedInlineNotice = useMemo(() => {
     const inlineNotice = viewModel.inlineNotice;
     const inlineNoticeMessage = inlineNotice?.message.trim() ?? "";
@@ -1258,8 +1319,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
   const submitDisabled =
     isCollaboratorConversation ||
     !isAgentProviderReady ||
-    (!viewModel.canSubmit && !canQueueWhileBusy) ||
-    viewModel.draftPrompt.trim() === "";
+    (!viewModel.canSubmit && !canQueueWhileBusy);
   const hasNonRetryableRecoveryFailure =
     sessionChrome.recovery?.kind === "failed" &&
     sessionChrome.recovery.canRetry === false;
@@ -1280,8 +1340,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
     (activeConversationTurnBusy ||
       viewModel.pendingApproval !== null ||
       viewModel.pendingInteractivePrompt !== null ||
-      viewModel.isInterrupting) &&
-    !(canQueueWhileBusy && viewModel.draftPrompt.trim() !== "");
+      viewModel.isInterrupting);
   const syncStatus = resolveSyncIndicatorStatus(
     viewModel.activeConversation?.syncState?.status
   );
@@ -1394,6 +1453,10 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       reasoningOptionMedium: labels.reasoningOptionMedium,
       reasoningOptionHigh: labels.reasoningOptionHigh,
       reasoningOptionXHigh: labels.reasoningOptionXHigh,
+      speedLabel: labels.speedLabel,
+      speedSelectionLabel: labels.speedSelectionLabel,
+      speedOptionStandard: labels.speedOptionStandard,
+      speedOptionFast: labels.speedOptionFast,
       permissionLabel: labels.permissionLabel,
       permissionModeReadOnly: labels.permissionModeReadOnly,
       permissionModeAuto: labels.permissionModeAuto,
@@ -1477,6 +1540,10 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       labels.reasoningOptionMedium,
       labels.reasoningOptionMinimal,
       labels.reasoningOptionXHigh,
+      labels.speedLabel,
+      labels.speedSelectionLabel,
+      labels.speedOptionStandard,
+      labels.speedOptionFast,
       labels.send,
       labels.sendQueuedPromptNext,
       labels.slashCommandPalette,
@@ -1512,7 +1579,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
   const continueInNewConversation = useStableEventCallback(
     actions.continueInNewConversation
   );
-  const updateDraftPrompt = useStableEventCallback(actions.updateDraftPrompt);
+  const updateDraftContent = useStableEventCallback(actions.updateDraftContent);
   const updateSelectedProjectPath = useOptionalStableEventCallback(
     actions.updateSelectedProjectPath
   );
@@ -1555,7 +1622,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       currentUserId: viewModel.currentUserId,
       provider: viewModel.data.provider,
       slashStatus,
-      draftPrompt: viewModel.draftPrompt,
+      draftContent: viewModel.draftContent,
       availableCommands: viewModel.availableCommands,
       hasCompactableContext: viewModel.hasSentUserMessage,
       availableSkills: viewModel.availableSkills,
@@ -1585,7 +1652,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       isSubmittingPrompt: viewModel.isRespondingApproval,
       labels: composerLabels,
       workspaceUserProjectI18n,
-      onDraftChange: updateDraftPrompt,
+      onDraftContentChange: updateDraftContent,
       onProjectPathChange: updateSelectedProjectPath,
       onSettingsChange: updateComposerSettings,
       onSubmit: submitPrompt,
@@ -1626,13 +1693,14 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       stableLinkAction,
       stableRequestWorkspaceReferences,
       updateComposerSettings,
-      updateDraftPrompt,
+      updateDraftContent,
       updateSelectedProjectPath,
       viewModel.availableCommands,
       viewModel.availableSkills,
       viewModel.composerSettings,
       viewModel.currentUserId,
       viewModel.data.provider,
+      viewModel.draftContent,
       viewModel.draftPrompt,
       viewModel.drainingQueuedPromptId,
       viewModel.hasSentUserMessage,
@@ -1857,7 +1925,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
               currentUserId: viewModel.currentUserId,
               provider: viewModel.data.provider,
               slashStatus,
-              draftPrompt: viewModel.draftPrompt,
+              draftContent: viewModel.draftContent,
               availableCommands: viewModel.availableCommands,
               hasCompactableContext: viewModel.hasSentUserMessage,
               compactSupported: viewModel.compactSupported,
@@ -1886,7 +1954,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
               isSubmittingPrompt: viewModel.isRespondingApproval,
               labels: composerLabels,
               workspaceUserProjectI18n,
-              onDraftChange: updateDraftPrompt,
+              onDraftContentChange: updateDraftContent,
               onProjectPathChange: updateSelectedProjectPath,
               onSettingsChange: updateComposerSettings,
               onSubmit: submitPrompt,
@@ -2030,7 +2098,7 @@ const AgentGUIDetailHeader = memo(function AgentGUIDetailHeader({
         <StatusDot
           tone={conversationStatusTone(activeConversationStatus)}
           pulse={conversationStatusPulse(activeConversationStatus)}
-          size="md"
+          size="sm"
           ariaLabel={activeConversationStatusLabel}
           title={activeConversationStatusLabel}
         />
@@ -2041,7 +2109,7 @@ const AgentGUIDetailHeader = memo(function AgentGUIDetailHeader({
           <StatusDot
             tone={syncStateTone(syncStatus)}
             pulse={syncStatus === "pending"}
-            size="md"
+            size="sm"
             ariaLabel={syncLabel}
             title={syncLabel}
           />
@@ -2121,9 +2189,11 @@ function AgentGUICompactButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <UiSystemButton
           type="button"
-          className={styles.detailHeaderCompactButton}
+          variant="secondary"
+          size="xs"
+          className="text-[13px] font-normal"
           data-testid="agent-gui-compact-button"
           disabled={disabled}
           aria-label={label}
@@ -2141,12 +2211,12 @@ function AgentGUICompactButton({
           }}
         >
           {label}
-        </button>
+        </UiSystemButton>
       </TooltipTrigger>
       <TooltipContent
         side="bottom"
         align="end"
-        className="max-w-[320px] text-xs"
+        className="max-w-[320px] cursor-default text-xs"
       >
         {tooltip}
       </TooltipContent>
@@ -2155,6 +2225,7 @@ function AgentGUICompactButton({
 }
 
 type AgentUsageChipLevel = "normal" | "warning" | "critical";
+type AgentUsageBadgeVariant = "secondary" | "warning" | "destructive";
 
 function agentUsageChipLevel(percentUsed: number): AgentUsageChipLevel {
   if (percentUsed >= USAGE_CRITICAL_PERCENT) {
@@ -2164,6 +2235,18 @@ function agentUsageChipLevel(percentUsed: number): AgentUsageChipLevel {
     return "warning";
   }
   return "normal";
+}
+
+function agentUsageBadgeVariant(
+  level: AgentUsageChipLevel
+): AgentUsageBadgeVariant {
+  if (level === "critical") {
+    return "destructive";
+  }
+  if (level === "warning") {
+    return "warning";
+  }
+  return "secondary";
 }
 
 function AgentUsageChip({
@@ -2189,19 +2272,20 @@ function AgentUsageChip({
 
   const chipLabel = labels.usageChipLabel({ percent: percentUsed });
   const showTokens = usedTokens !== null && totalTokens !== null;
+  const usageLevel = agentUsageChipLevel(percentUsed);
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          className={styles.detailHeaderUsageChip}
+        <Badge
+          asChild
+          variant={agentUsageBadgeVariant(usageLevel)}
+          className="cursor-default text-[13px] font-normal"
           data-testid="agent-gui-usage-chip"
-          data-usage-level={agentUsageChipLevel(percentUsed)}
-          aria-label={chipLabel}
+          data-usage-level={usageLevel}
         >
-          {chipLabel}
-        </button>
+          <span aria-label={chipLabel}>{chipLabel}</span>
+        </Badge>
       </TooltipTrigger>
       <TooltipContent
         side="bottom"
@@ -2426,8 +2510,10 @@ function AgentUsageAlertBanner({
             {labels.usageCompactAction}
           </Button>
         ) : null}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           className={styles.usageAlertDismiss}
           data-testid="agent-gui-usage-alert-dismiss"
           aria-label={labels.usageAlertDismiss}
@@ -2435,7 +2521,7 @@ function AgentUsageAlertBanner({
           onClick={onDismiss}
         >
           <X size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
+        </Button>
       </span>
     </div>
   );

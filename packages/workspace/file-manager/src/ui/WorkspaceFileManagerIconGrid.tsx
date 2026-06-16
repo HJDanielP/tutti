@@ -179,7 +179,7 @@ function WorkspaceFileManagerIconTile({
   }, [selected]);
 
   const tileClassName = cn(
-    "flex min-w-0 max-w-[120px] flex-col items-center gap-1.5 rounded-md border border-transparent px-2 py-2 text-center transition-colors",
+    "flex min-w-0 max-w-[148px] flex-col items-center gap-1.5 rounded-md border border-transparent px-2 py-2 text-center transition-colors",
     isInlineRenaming
       ? "cursor-default"
       : "cursor-pointer hover:bg-transparency-block",
@@ -199,6 +199,7 @@ function WorkspaceFileManagerIconTile({
       iconClassName={workspaceFileManagerIconGridIconClassName()}
       iconUrlByCacheKey={iconUrlByCacheKey}
       isEnteringDirectory={isEnteringDirectory}
+      loadingIconClassName="size-7"
       onViewportLeave={onEntryIconViewportLeave}
       onViewportEnter={onEntryIconViewportEnter}
     />
@@ -307,7 +308,7 @@ function IconTileRenameInput({
         aria-invalid={inlineRenameValidation !== null}
         aria-label={copy.t("renameLabel")}
         className={cn(
-          "w-full min-w-0 rounded-md border border-transparent bg-[var(--transparency-block)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] outline-none",
+          "w-full min-w-0 rounded-[4px] border border-transparent bg-[var(--transparency-block)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] outline-none",
           inlineRenameValidation !== null && "border-[var(--state-danger)]"
         )}
         defaultValue={entry.name}

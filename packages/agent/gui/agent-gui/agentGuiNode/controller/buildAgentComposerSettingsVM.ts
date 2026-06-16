@@ -1,7 +1,8 @@
 import type { AgentActivityComposerOptions } from "@tutti-os/agent-activity-core";
 import type {
   AgentSessionComposerSettings,
-  AgentSessionReasoningEffort
+  AgentSessionReasoningEffort,
+  AgentSessionSpeed
 } from "../../../shared/agentSessionTypes";
 import type { AgentGUINodeData } from "../../../types";
 import type { AgentGUIComposerSettingsVM } from "../model/agentGuiNodeTypes";
@@ -10,7 +11,8 @@ import {
   normalizePermissionModeId,
   permissionConfigFromComposerOptions,
   permissionModeOptions,
-  reasoningSelectionFromComposerOptions
+  reasoningSelectionFromComposerOptions,
+  speedSelectionFromComposerOptions
 } from "./agentGuiController.composerHelpers";
 
 export function buildAgentComposerSettingsVM(input: {
@@ -22,11 +24,13 @@ export function buildAgentComposerSettingsVM(input: {
   draftSettings: AgentSessionComposerSettings;
   draftModel: string | null;
   draftReasoningEffort: AgentSessionReasoningEffort | null;
+  draftSpeed?: AgentSessionSpeed | null;
   effectivePlanMode: boolean;
   composerSupport: {
     model: boolean;
     reasoning: boolean;
     plan: boolean;
+    speed: boolean;
     browser: boolean;
   };
   providerComposerOptions: AgentActivityComposerOptions | null;
@@ -35,6 +39,9 @@ export function buildAgentComposerSettingsVM(input: {
   >;
   activeSessionReasoningSelection: ReturnType<
     typeof reasoningSelectionFromComposerOptions
+  >;
+  activeSessionSpeedSelection?: ReturnType<
+    typeof speedSelectionFromComposerOptions
   >;
 }): AgentGUIComposerSettingsVM {
   const permissionConfig = permissionConfigFromComposerOptions(
@@ -58,11 +65,22 @@ export function buildAgentComposerSettingsVM(input: {
     normalizePermissionModeId(input.draftSettings.permissionModeId) ??
     normalizePermissionModeId(permissionConfig?.defaultValue);
 
+  const selectedSpeedValue = (input.draftSpeed ??
+    input.draftSettings.speed ??
+    null) as AgentSessionSpeed | null;
+  const activeSessionSpeedSelection =
+    input.activeSessionSpeedSelection ??
+    speedSelectionFromComposerOptions(
+      input.providerComposerOptions,
+      selectedSpeedValue
+    );
+
   return {
     sessionSettings: input.sessionSettings,
     draftSettings: {
       model: input.draftModel,
       reasoningEffort: input.draftReasoningEffort,
+      speed: selectedSpeedValue,
       planMode: Boolean(input.draftSettings.planMode),
       browserUse: input.draftSettings.browserUse ?? true,
       permissionModeId: normalizePermissionModeId(
@@ -74,6 +92,7 @@ export function buildAgentComposerSettingsVM(input: {
       : false,
     supportsModel: input.composerSupport.model,
     supportsReasoningEffort: input.composerSupport.reasoning,
+    supportsSpeed: input.composerSupport.speed,
     supportsPermissionMode,
     supportsPlanMode: input.composerSupport.plan,
     supportsBrowser: input.composerSupport.browser,
@@ -88,6 +107,11 @@ export function buildAgentComposerSettingsVM(input: {
       input.sessionSettings === null &&
       input.composerSupport.reasoning &&
       input.draftReasoningEffort === null,
+    speedUnavailable:
+      input.activeConversationId !== null &&
+      input.sessionSettings === null &&
+      input.composerSupport.speed &&
+      selectedSpeedValue === null,
     permissionModeUnavailable:
       input.activeConversationId !== null &&
       input.sessionSettings === null &&
@@ -100,6 +124,7 @@ export function buildAgentComposerSettingsVM(input: {
       !input.effectivePlanMode,
     selectedModelValue,
     selectedReasoningEffortValue,
+    selectedSpeedValue,
     selectedPermissionModeValue,
     permissionConfig,
     selectedProjectPath:
@@ -118,6 +143,12 @@ export function buildAgentComposerSettingsVM(input: {
       hasOptionsSource &&
       input.activeSessionReasoningSelection !== null
         ? input.activeSessionReasoningSelection.options
+        : [],
+    availableSpeeds:
+      input.composerSupport.speed &&
+      hasOptionsSource &&
+      activeSessionSpeedSelection !== null
+        ? activeSessionSpeedSelection.options
         : [],
     availablePermissionModes: supportsPermissionMode
       ? permissionModeOptions(input.data.provider, permissionConfig)

@@ -7,6 +7,7 @@ import type {
 } from "../contracts/catalog.ts";
 import type {
   AppCenterViewModel,
+  WorkspaceAppFactoryEditAction,
   WorkspaceAppFactoryJobStatus,
   WorkspaceAppFactoryJobViewModel,
   WorkspaceAppPrimaryAction
@@ -67,9 +68,17 @@ export function createAppCenterViewModel({
         manifest: app.manifest
       });
       const factoryAgentSessionId = factoryJob?.agentSessionId?.trim() || null;
-      const status = runtime?.status ?? "idle";
+      const factoryEditAction: WorkspaceAppFactoryEditAction | null =
+        factoryJob && factoryAgentSessionId
+          ? factoryJob.status === "published"
+            ? "prepare_modification"
+            : "open_session"
+          : null;
+      const status = resolveRuntimeStatusForViewModel(runtime);
       const presentation = resolveWorkspaceAppStatusPresentation(status);
       const installed = Boolean(app.install);
+      const installBusy =
+        runtime?.installProgress != null || status === "installing";
       const sourceKind = resolveCatalogSourceKind(app.catalog);
       const localApp = sourceKind === "local";
       const runtimeId = normalizeOptionalString(runtime?.runtimeId);
@@ -121,30 +130,35 @@ export function createAppCenterViewModel({
           ? "status.comingSoon"
           : resolvePrimaryActionLabelKey(primaryAction, presentation.labelKey),
         statusTone: presentation.tone,
-        statusPulse: presentation.pulse,
+        statusPulse: runtime?.installProgress ? false : presentation.pulse,
         primaryAction,
         sourceKind,
         canOpen,
         canExport: localApp,
         canDelete: localApp,
         canReplaceIcon: replaceableIconAppIdSet.has(app.manifest.appId),
-        canOpenFolder: installed,
-        canOpenPackageFolder: installed && localApp && Boolean(displayVersion),
+        canOpenFolder: installed && !installBusy,
+        canOpenPackageFolder:
+          installed && localApp && Boolean(displayVersion) && !installBusy,
         canOpenFactorySession: Boolean(factoryAgentSessionId),
         canPublishFactoryUpdate:
           installed &&
           factoryJob?.status === "ready" &&
           Boolean(factoryJob.publishedVersion?.trim()),
-        canUninstall: installed,
+        canUninstall: installed && !installBusy,
         canRetry,
         canUpdate,
         ...(factoryAgentSessionId ? { factoryAgentSessionId } : {}),
+        ...(factoryEditAction ? { factoryEditAction } : {}),
         ...(factoryJob?.jobId ? { factoryJobId: factoryJob.jobId } : {}),
         ...(factoryJob?.provider
           ? { factoryProvider: factoryJob.provider }
           : {}),
         ...(runtime?.error?.message
           ? { errorMessage: runtime.error.message }
+          : {}),
+        ...(runtime?.installProgress
+          ? { installProgress: runtime.installProgress }
           : {})
       };
     })
@@ -176,7 +190,8 @@ function createRuntimeStateMaps(
   for (const state of runtimeStates) {
     const runtime = {
       ...state,
-      status: mapWorkspaceAppRuntimeStatus(state.status)
+      status: mapWorkspaceAppRuntimeStatus(state.status),
+      installProgress: state.installProgress ?? null
     };
     const installationId = normalizeOptionalString(runtime.installationId);
     if (installationId) {
@@ -209,6 +224,18 @@ function findRuntimeStateForApp(
   }
 
   return maps.fallbackByAppId.get(appId);
+}
+
+function resolveRuntimeStatusForViewModel(
+  runtime: WorkspaceAppRuntimeState | undefined
+): WorkspaceAppRuntimeState["status"] {
+  if (!runtime) {
+    return "idle";
+  }
+  if (runtime.installProgress != null && runtime.status === "idle") {
+    return "installing";
+  }
+  return runtime.status;
 }
 
 function resolveCatalogSourceKind(
@@ -415,7 +442,7 @@ function createFactoryJobViewModel(
     canFix: canFixValidationFailure,
     canOpenAgentSession: Boolean(agentSessionId),
     canPublish: job.status === "ready",
-    canRetryValidation: canFixValidationFailure,
+    canRetryValidation: false,
     failureReason: job.failureReason,
     updatedAtUnixMs: job.updatedAtUnixMs
   };

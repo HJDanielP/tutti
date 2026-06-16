@@ -18,7 +18,11 @@ import { AgentGUINode } from "./AgentGUINode";
 import { resolveAgentGUIHeroIconUrl } from "./AgentGUINodeView";
 import type { AgentRichTextAtProvider } from "./agentRichTextAtProvider";
 import { AGENT_GUI_MENTION_PROVIDER_IDS } from "./agentRichTextAtProvider";
-import type { AgentGUINodeViewModel } from "./model/agentGuiNodeTypes";
+import type {
+  AgentComposerDraft,
+  AgentGUIQueuedPromptVM,
+  AgentGUINodeViewModel
+} from "./model/agentGuiNodeTypes";
 import type { AgentGUINodeData } from "../../types";
 import { writeWorkspaceFileDropData } from "../terminalNode/workspaceFileDrop";
 
@@ -31,7 +35,7 @@ const mockShowPromptImagesUnsupported = vi.fn();
 const mockSubmitApprovalOption = vi.fn();
 const mockSubmitInteractivePrompt = vi.fn();
 const mockInterruptCurrentTurn = vi.fn();
-const mockUpdateDraftPrompt = vi.fn();
+const mockUpdateDraftContent = vi.fn();
 const mockUpdateComposerSettings = vi.fn();
 const mockSendQueuedPromptNext = vi.fn();
 const mockRemoveQueuedPrompt = vi.fn();
@@ -63,6 +67,22 @@ const mockRegisterUploadSources = vi.fn();
 const mockInspectUploadSources = vi.fn();
 const mockPreflightUpload = vi.fn();
 let mockViewModel: AgentGUINodeViewModel;
+
+function createDraft(prompt: string): AgentComposerDraft {
+  return { prompt, images: [] };
+}
+
+function textQueuedPrompt(
+  id: string,
+  text: string,
+  createdAtUnixMs = 1
+): AgentGUIQueuedPromptVM {
+  return {
+    id,
+    content: [{ type: "text", text }],
+    createdAtUnixMs
+  };
+}
 
 function promptBlocks(text: string) {
   return [{ type: "text" as const, text }];
@@ -185,17 +205,14 @@ function createAgentGUITestRichTextAtProviders(): readonly AgentRichTextAtProvid
         );
         const items = await Promise.all(
           sessions.map(async (session: any) => {
-            const summary =
-              session.sessionOrigin === "WORKSPACE_AGENT_SESSION_ORIGIN_HOOK"
-                ? null
-                : await Promise.resolve(
-                    mockGetWorkspaceAgentSessionSummary({
-                      workspaceId: workspaceId,
-                      agentSessionId: session.agentSessionId,
-                      agentReplyLimit: 1,
-                      recentTurnLimit: 1
-                    })
-                  ).catch(() => null);
+            const summary = await Promise.resolve(
+              mockGetWorkspaceAgentSessionSummary({
+                workspaceId: workspaceId,
+                agentSessionId: session.agentSessionId,
+                agentReplyLimit: 1,
+                recentTurnLimit: 1
+              })
+            ).catch(() => null);
             const userId = String(session.userId ?? "");
             const profile = profiles.get(userId) as any;
             const title =
@@ -593,7 +610,7 @@ vi.mock("./controller/useAgentGUINodeController", () => ({
       submitApprovalOption: mockSubmitApprovalOption,
       submitInteractivePrompt: mockSubmitInteractivePrompt,
       interruptCurrentTurn: mockInterruptCurrentTurn,
-      updateDraftPrompt: mockUpdateDraftPrompt,
+      updateDraftContent: mockUpdateDraftContent,
       updateComposerSettings: mockUpdateComposerSettings,
       sendQueuedPromptNext: mockSendQueuedPromptNext,
       removeQueuedPrompt: mockRemoveQueuedPrompt,
@@ -626,7 +643,7 @@ describe("AgentGUINode", () => {
     mockSubmitApprovalOption.mockClear();
     mockSubmitInteractivePrompt.mockClear();
     mockInterruptCurrentTurn.mockClear();
-    mockUpdateDraftPrompt.mockClear();
+    mockUpdateDraftContent.mockClear();
     mockUpdateComposerSettings.mockClear();
     mockSendQueuedPromptNext.mockClear();
     mockRemoveQueuedPrompt.mockClear();
@@ -1468,6 +1485,35 @@ describe("AgentGUINode", () => {
     );
   });
 
+  it("shows the timeline skeleton instead of unavailable empty while active conversation messages are loading", () => {
+    const conversation = {
+      id: "session-1",
+      provider: "codex" as const,
+      title: "Session 1",
+      status: "ready" as const,
+      cwd: "/workspace",
+      updatedAtUnixMs: 1
+    };
+    mockViewModel = createViewModel({
+      conversations: [conversation],
+      activeConversation: conversation,
+      activeConversationId: "session-1",
+      isLoadingMessages: true
+    });
+
+    renderAgentGUINode();
+
+    expect(
+      screen.getByTestId("agent-gui-transcript-loading-skeleton")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("agent-gui-unavailable-chat-empty")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("agent-gui-timeline")).not.toHaveClass(
+      "agent-gui-node__timeline-unavailable-chat-empty"
+    );
+  });
+
   it("lets session list items receive clicks inside the node window", () => {
     mockViewModel = createViewModel({
       conversations: [
@@ -2094,7 +2140,7 @@ describe("AgentGUINode", () => {
     renderAgentGUINode();
 
     pasteComposerText(" world");
-    await waitFor(() => expect(mockUpdateDraftPrompt).toHaveBeenCalled());
+    await waitFor(() => expect(mockUpdateDraftContent).toHaveBeenCalled());
     const sendButton = screen.getByRole("button", {
       name: "agentHost.agentGui.send"
     });
@@ -2276,17 +2322,22 @@ describe("AgentGUINode", () => {
         sessionSettings: {
           model: "gpt-5",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "auto"
         },
         draftSettings: {
           model: "gpt-5",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "preset"
         },
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPermissionMode: true,
         supportsPlanMode: true,
         isSettingsLoading: false,
@@ -2315,37 +2366,33 @@ describe("AgentGUINode", () => {
     });
     const view = renderAgentGUINode();
 
-    fireEvent.keyDown(
-      screen.getByRole("combobox", {
-        name: "agentHost.agentGui.modelLabel / agentHost.agentGui.reasoningLabel"
-      }),
-      { key: "Enter" }
-    );
-    expect(screen.queryByText("agentHost.agentGui.modelLabel")).toBeNull();
+    const modelTriggerName =
+      "agentHost.agentGui.modelLabel / agentHost.agentGui.reasoningLabel";
     fireEvent.pointerDown(
-      await screen.findByRole("option", {
-        name: /High|agentHost\.agentGui\.reasoningOptionHigh/
-      }),
+      screen.getByRole("button", { name: modelTriggerName }),
       { button: 0, ctrlKey: false, pointerId: 3, pointerType: "mouse" }
     );
-
-    view.unmount();
-    renderAgentGUINode();
+    expect(screen.queryByText("agentHost.agentGui.modelLabel")).toBeNull();
+    // Model is the primary list; reasoning is a submenu reflecting the value.
+    // (Model/reasoning selection wiring is covered by the dedicated
+    // AgentComposerSettingsMenus spec; here we only assert the controls
+    // render and that permission selection still drives updateComposerSettings.)
+    expect(
+      await screen.findByRole("menuitem", { name: /GPT-5\.5/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", {
+        name: /agentHost\.agentGui\.reasoningLabel/
+      })
+    ).toHaveTextContent("agentHost.agentGui.reasoningOptionHigh");
+    // Close the model menu (jsdom does not run radix's pointerup-to-close).
+    const openModelMenu = screen.queryByRole("menu");
+    if (openModelMenu) {
+      fireEvent.keyDown(openModelMenu, { key: "Escape" });
+    }
 
     fireEvent.keyDown(
-      screen.getByRole("combobox", {
-        name: "agentHost.agentGui.modelLabel / agentHost.agentGui.reasoningLabel"
-      }),
-      { key: "Enter" }
-    );
-    fireEvent.pointerDown(
-      await screen.findByRole("option", { name: /GPT-5\.5/ }),
-      { button: 0, ctrlKey: false, pointerId: 4, pointerType: "mouse" }
-    );
-    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-
-    fireEvent.keyDown(
-      screen.getByRole("combobox", {
+      await screen.findByRole("combobox", {
         name: "agentHost.agentGui.permissionLabel"
       }),
       { key: "Enter" }
@@ -2358,14 +2405,9 @@ describe("AgentGUINode", () => {
     );
 
     expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
-      model: "gpt-5.5"
-    });
-    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
-      reasoningEffort: "high"
-    });
-    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
       permissionModeId: "full-access"
     });
+    view.unmount();
   }, 15000);
 
   it("offers plan mode in the permission dropdown when supported", async () => {
@@ -2375,18 +2417,23 @@ describe("AgentGUINode", () => {
         sessionSettings: {
           model: "claude-4",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "default"
         },
         draftSettings: {
           model: "claude-4",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "default"
         },
         effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPermissionMode: true,
         supportsPlanMode: true,
         isSettingsLoading: false,
@@ -2430,12 +2477,16 @@ describe("AgentGUINode", () => {
         draftSettings: {
           model: "claude-4",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "acceptEdits"
         },
         effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPermissionMode: true,
         supportsPlanMode: true,
         isSettingsLoading: false,
@@ -2470,12 +2521,16 @@ describe("AgentGUINode", () => {
         draftSettings: {
           model: "claude-4",
           reasoningEffort: "high",
+          speed: null,
           planMode: true,
           permissionModeId: "acceptEdits"
         },
         effectivePlanMode: true,
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPermissionMode: true,
         supportsPlanMode: true,
         isSettingsLoading: false,
@@ -2550,12 +2605,16 @@ describe("AgentGUINode", () => {
         draftSettings: {
           model: "gpt-5",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "auto"
         },
         effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPermissionMode: true,
         supportsPlanMode: false,
         isSettingsLoading: false,
@@ -2606,11 +2665,15 @@ describe("AgentGUINode", () => {
         draftSettings: {
           model: "gpt-5",
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "preset"
         },
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPlanMode: true,
         isSettingsLoading: false,
         modelUnavailable: false,
@@ -2622,10 +2685,10 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    const modelButton = screen.getByRole("combobox", {
+    const modelButton = screen.getByRole("button", {
       name: "agentHost.agentGui.modelLabel / agentHost.agentGui.reasoningLabel"
     });
-    expect(modelButton).toHaveTextContent("Gpt-5");
+    expect(modelButton).toHaveTextContent("GPT-5");
     expect(modelButton).toHaveTextContent(
       "agentHost.agentGui.reasoningOptionHigh"
     );
@@ -2640,11 +2703,15 @@ describe("AgentGUINode", () => {
         draftSettings: {
           model: null,
           reasoningEffort: null,
+          speed: null,
           planMode: false,
           permissionModeId: "preset"
         },
         supportsModel: false,
         supportsReasoningEffort: false,
+        supportsSpeed: false,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPlanMode: false,
         isSettingsLoading: false,
         modelUnavailable: false,
@@ -2670,18 +2737,23 @@ describe("AgentGUINode", () => {
         sessionSettings: {
           model: null,
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           permissionModeId: "auto"
         },
         draftSettings: {
           model: null,
           reasoningEffort: "high",
+          speed: null,
           planMode: false,
           browserUse: true,
           permissionModeId: "auto"
         },
         supportsModel: true,
         supportsReasoningEffort: true,
+        supportsSpeed: true,
+        speedUnavailable: false,
+        availableSpeeds: [],
         supportsPlanMode: true,
         isSettingsLoading: false,
         modelUnavailable: false,
@@ -2696,7 +2768,7 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    const modelButton = screen.getByRole("combobox", {
+    const modelButton = screen.getByRole("button", {
       name: "agentHost.agentGui.modelLabel / agentHost.agentGui.reasoningLabel"
     });
     expect(modelButton).toHaveTextContent("GPT-5.5");
@@ -2704,9 +2776,14 @@ describe("AgentGUINode", () => {
       "agentHost.agentGui.reasoningOptionHigh"
     );
 
-    fireEvent.keyDown(modelButton, { key: "Enter" });
+    fireEvent.pointerDown(modelButton, {
+      button: 0,
+      ctrlKey: false,
+      pointerId: 7,
+      pointerType: "mouse"
+    });
     expect(
-      await screen.findByRole("option", { name: /GPT-5\.5/ })
+      await screen.findByRole("menuitem", { name: /GPT-5\.5/ })
     ).toBeInTheDocument();
   });
 
@@ -2714,16 +2791,8 @@ describe("AgentGUINode", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       queuedPrompts: [
-        {
-          id: "queued-1",
-          prompt: "follow-up while busy",
-          createdAtUnixMs: 1
-        },
-        {
-          id: "queued-2",
-          prompt: "ship this after that",
-          createdAtUnixMs: 2
-        }
+        textQueuedPrompt("queued-1", "follow-up while busy"),
+        textQueuedPrompt("queued-2", "ship this after that", 2)
       ],
       canQueueWhileBusy: true,
       canSubmit: false,
@@ -2795,12 +2864,10 @@ describe("AgentGUINode", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       queuedPrompts: [
-        {
-          id: "queued-1",
-          prompt:
-            "follow [@2046494774160003072 & Claude Code Claude Code](mention://agent-session?workspaceId=room-1&id=session-queued)",
-          createdAtUnixMs: 1
-        }
+        textQueuedPrompt(
+          "queued-1",
+          "follow [@2046494774160003072 & Claude Code Claude Code](mention://agent-session?workspaceId=room-1&id=session-queued)"
+        )
       ],
       canQueueWhileBusy: true,
       canSubmit: false,
@@ -2887,13 +2954,7 @@ describe("AgentGUINode", () => {
           }
         ]
       },
-      queuedPrompts: [
-        {
-          id: "queued-1",
-          prompt: "follow-up while waiting",
-          createdAtUnixMs: 1
-        }
-      ]
+      queuedPrompts: [textQueuedPrompt("queued-1", "follow-up while waiting")]
     });
     renderAgentGUINode();
 
@@ -2921,12 +2982,10 @@ describe("AgentGUINode", () => {
       canSubmit: false,
       hasSentUserMessage: true,
       queuedPrompts: [
-        {
-          id: "queued-1",
-          prompt:
-            "local & Codex [@AI Media Canvas](mention://workspace-app?appId=ai-media-canvas&workspaceId=room-1) 帮我用这个应用生成一批国际象棋图片",
-          createdAtUnixMs: 1
-        }
+        textQueuedPrompt(
+          "queued-1",
+          "local & Codex [@AI Media Canvas](mention://workspace-app?appId=ai-media-canvas&workspaceId=room-1) 帮我用这个应用生成一批国际象棋图片"
+        )
       ]
     });
     renderAgentGUINode({
@@ -3294,7 +3353,7 @@ describe("AgentGUINode", () => {
       key: "Enter"
     });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/web ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/web "));
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
 
@@ -3312,7 +3371,7 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/init"));
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
     await waitFor(() =>
       expect(getComposerEditor()).not.toHaveTextContent("/init")
     );
@@ -3335,7 +3394,7 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(editor, { key: "Enter" });
 
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/compact"));
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("shows Codex fallback slash commands when ACP has not advertised commands", () => {
@@ -3354,7 +3413,7 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/compact"));
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("hides compact in an empty conversation", () => {
@@ -3383,7 +3442,7 @@ describe("AgentGUINode", () => {
 
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
     expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("does not expose Codex plan as a local slash command from palette selection", () => {
@@ -3398,7 +3457,7 @@ describe("AgentGUINode", () => {
 
     expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/pla"));
-    expect(mockUpdateDraftPrompt).not.toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("blocks manual Codex plan text", () => {
@@ -3413,7 +3472,7 @@ describe("AgentGUINode", () => {
 
     expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("blocks advertised Claude Code plan commands", () => {
@@ -3433,7 +3492,7 @@ describe("AgentGUINode", () => {
 
     expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("opens slash commands after leading whitespace at prompt start", () => {
@@ -3462,7 +3521,7 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/web ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/web "));
     await waitFor(() => expect(getComposerEditor()).toHaveTextContent("/web"));
   });
 
@@ -3477,7 +3536,7 @@ describe("AgentGUINode", () => {
     pasteComposerText("/");
 
     await waitFor(() =>
-      expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/")
+      expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/"))
     );
     expect(
       screen.getByRole("listbox", {
@@ -3601,7 +3660,7 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(editor, { key: "ArrowDown" });
     fireEvent.keyDown(editor, { key: "Tab" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/read ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/read "));
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
 
@@ -3618,7 +3677,7 @@ describe("AgentGUINode", () => {
 
     fireEvent.click(screen.getByText("read").closest("button")!);
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/read ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/read "));
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
 
@@ -3656,8 +3715,8 @@ describe("AgentGUINode", () => {
       key: "Enter"
     });
 
-    expect(mockUpdateDraftPrompt).not.toHaveBeenCalled();
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/web query"));
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("does not match slash commands after non-command text", () => {
@@ -3688,10 +3747,12 @@ describe("AgentGUINode", () => {
 
     const editor = getComposerEditor();
     fireEvent.keyDown(editor, { key: "Escape" });
+    expect(mockUpdateDraftContent).not.toHaveBeenCalled();
+
     fireEvent.keyDown(editor, { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).not.toHaveBeenCalled();
     expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/"));
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
   it("filters slash commands and closes the palette after the command token", () => {
@@ -3747,7 +3808,9 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("$architecture-review ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("$architecture-review ")
+    );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
 
@@ -3776,7 +3839,9 @@ describe("AgentGUINode", () => {
 
     const editor = getComposerEditor();
     fireEvent.keyDown(editor, { key: "Enter" });
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith("/architecture-review ");
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("/architecture-review ")
+    );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
 
     fireEvent.keyDown(editor, { key: "Enter" });
@@ -3850,8 +3915,8 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-      "please use $architecture-review "
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("please use $architecture-review ")
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
@@ -3907,8 +3972,8 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-      "/product-design:frontend-design "
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("/product-design:frontend-design ")
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
@@ -3944,8 +4009,8 @@ describe("AgentGUINode", () => {
 
     const editor = getComposerEditor();
     fireEvent.keyDown(editor, { key: "Enter" });
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-      "$product-design:frontend-design "
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("$product-design:frontend-design ")
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
 
@@ -3986,8 +4051,8 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-      "please use /product-design:frontend-design "
+    expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+      createDraft("please use /product-design:frontend-design ")
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
   });
@@ -4034,8 +4099,8 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
     await waitFor(() =>
-      expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-        "[@README.md](/workspace/docs/README.md) "
+      expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+        createDraft("[@README.md](/workspace/docs/README.md) ")
       )
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
@@ -5241,8 +5306,8 @@ describe("AgentGUINode", () => {
     });
 
     await waitFor(() =>
-      expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-        "[@README.md](/workspace/docs/README.md) "
+      expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+        createDraft("[@README.md](/workspace/docs/README.md) ")
       )
     );
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
@@ -5290,8 +5355,10 @@ describe("AgentGUINode", () => {
     });
 
     await waitFor(() =>
-      expect(mockUpdateDraftPrompt).toHaveBeenCalledWith(
-        "[@README.md](/workspace/docs/README.md) [@src](/workspace/src) "
+      expect(mockUpdateDraftContent).toHaveBeenCalledWith(
+        createDraft(
+          "[@README.md](/workspace/docs/README.md) [@src](/workspace/src) "
+        )
       )
     );
   });
@@ -5676,6 +5743,24 @@ describe("AgentGUINode", () => {
       HTMLElement.prototype.getBoundingClientRect =
         originalGetBoundingClientRect;
     }
+  });
+
+  it("keeps the bottom dock composer 24px wider than the transcript flow", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "app/renderer/agentactivity.css"),
+      "utf8"
+    );
+
+    expect(css).toMatch(/--agent-gui-detail-padding-x:\s*24px/);
+    expect(css).toMatch(
+      /\.agent-gui-node__timeline\s*{[^}]*padding:\s*32px\s+var\(--agent-gui-detail-padding-x\)\s+24px/s
+    );
+    expect(css).toMatch(
+      /\.agent-gui-node__bottom-dock\s*{[^}]*width:\s*min\(\s*100%,\s*calc\(\s*var\(--agent-gui-detail-flow-max-width\)\s*\+\s*var\(--agent-gui-detail-padding-x\)\s*\+\s*var\(--agent-gui-detail-padding-x\)\s*\)\s*\)/s
+    );
+    expect(css).toMatch(
+      /\.agent-gui-node__bottom-dock\s*>\s*\.agent-gui-node__composer\s*{[^}]*padding-right:\s*0[^}]*padding-left:\s*0/s
+    );
   });
 
   it("deduplicates inline notices already shown by session chrome", () => {
@@ -6670,6 +6755,9 @@ function createManagedAgentsStateItem(
 function createViewModel(
   overrides: Partial<AgentGUINodeViewModel> = {}
 ): AgentGUINodeViewModel {
+  const draftContent =
+    overrides.draftContent ?? createDraft(overrides.draftPrompt ?? "");
+  const draftPrompt = overrides.draftPrompt ?? draftContent.prompt;
   return {
     workspaceId: "room-1",
     data: {
@@ -6683,7 +6771,8 @@ function createViewModel(
     activeConversationId: null,
     availableCommands: [],
     availableSkills: [],
-    draftPrompt: "",
+    draftPrompt,
+    draftContent,
     isLoadingConversations: false,
     isLoadingMessages: false,
     isCreatingConversation: false,
@@ -6711,12 +6800,16 @@ function createViewModel(
       draftSettings: {
         model: null,
         reasoningEffort: null,
+        speed: null,
         planMode: false,
         browserUse: true,
         permissionModeId: "preset"
       },
       supportsModel: true,
       supportsReasoningEffort: true,
+      supportsSpeed: true,
+      speedUnavailable: false,
+      availableSpeeds: [],
       supportsPlanMode: true,
       isSettingsLoading: false,
       modelUnavailable: false,
