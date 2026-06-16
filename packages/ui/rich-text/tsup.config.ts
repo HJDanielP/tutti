@@ -9,6 +9,7 @@ export default defineConfig({
     "at-panel/model": "src/at-panel/model.ts",
     "core/index": "src/core/index.ts",
     "editor/index": "src/editor/index.ts",
+    "mention/index": "src/mention/index.ts",
     "plugins/index": "src/plugins/index.ts",
     "types/index": "src/types/index.ts"
   },
