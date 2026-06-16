@@ -559,7 +559,7 @@ function ComposerMenuOptionItems({
           key={option.value}
           className={cn(
             styles.composerMenuItem,
-            withDescription && "items-start"
+            withDescription && option.description && "items-start"
           )}
           onPointerDown={(event) => {
             if (event.button === 0 && !event.ctrlKey) {

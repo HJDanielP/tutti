@@ -1386,6 +1386,23 @@ describe("AgentModelReasoningDropdown", () => {
     );
   });
 
+  it("keeps model options vertically centered when they have no description", async () => {
+    renderModelReasoning();
+
+    openModelReasoningMenu();
+
+    await screen.findByRole("menu");
+    const menu = document.querySelector(
+      '[data-agent-composer-settings-layout="model-primary"]'
+    );
+    const modelOption =
+      Array.from(menu?.querySelectorAll('[role="menuitem"]') ?? []).find(
+        (item) => item.textContent?.includes("GPT-5.5")
+      ) ?? null;
+    expect(modelOption).not.toBeNull();
+    expect(modelOption).not.toHaveClass("items-start");
+  });
+
   it("shows model and reasoning together in the trigger", () => {
     renderModelReasoning();
     const trigger = modelReasoningTrigger();
