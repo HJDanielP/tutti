@@ -881,6 +881,10 @@ export const AgentGUINode = memo(function AgentGUINode({
       reviewPicker: {
         title: t("agentHost.agentGui.reviewPicker.title"),
         targetLabel: t("agentHost.agentGui.reviewPicker.targetLabel"),
+        searchPlaceholder: t(
+          "agentHost.agentGui.reviewPicker.searchPlaceholder"
+        ),
+        noResults: t("agentHost.agentGui.reviewPicker.noResults"),
         uncommitted: t("agentHost.agentGui.reviewPicker.uncommitted"),
         baseBranch: t("agentHost.agentGui.reviewPicker.baseBranch"),
         commit: t("agentHost.agentGui.reviewPicker.commit"),

@@ -1829,8 +1829,8 @@ describe("AgentComposer", () => {
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
 
-    // Default target is uncommitted changes; confirming submits a bare /review.
-    fireEvent.click(screen.getByText("开始审查"));
+    // Selecting the "uncommitted changes" scope submits a bare /review.
+    fireEvent.click(screen.getByText("未提交的更改"));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0]?.[0]).toEqual([
       { type: "text", text: "/review" }
@@ -1996,6 +1996,8 @@ function createLabels(): Parameters<typeof AgentComposer>[0]["labels"] {
     reviewPicker: {
       title: "代码审查",
       targetLabel: "审查范围",
+      searchPlaceholder: "搜索",
+      noResults: "无匹配结果",
       uncommitted: "未提交的更改",
       baseBranch: "与分支比较",
       commit: "指定提交",

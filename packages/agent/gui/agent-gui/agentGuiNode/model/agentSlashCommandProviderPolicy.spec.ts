@@ -6,7 +6,7 @@ import {
 } from "./agentSlashCommandProviderPolicy";
 
 describe("agentSlashCommandProviderPolicy", () => {
-  it("adds Codex compact and status fallback commands after provider commands", () => {
+  it("adds Codex compact, status, fast, and review fallback commands after provider commands", () => {
     expect(
       resolveSlashCommandsForProvider({
         provider: "codex",
@@ -16,7 +16,8 @@ describe("agentSlashCommandProviderPolicy", () => {
       { name: "web" },
       { name: "compact", description: "ACP" },
       { name: "status" },
-      { name: "fast" }
+      { name: "fast" },
+      { name: "review" }
     ]);
   });
 
@@ -36,7 +37,7 @@ describe("agentSlashCommandProviderPolicy", () => {
         commands: [{ name: "compact", description: "from provider" }],
         hasCompactableContext: false
       })
-    ).toEqual([{ name: "status" }, { name: "fast" }]);
+    ).toEqual([{ name: "status" }, { name: "fast" }, { name: "review" }]);
   });
 
   it("filters Claude Code plan commands from provider and fallback commands", () => {
@@ -211,6 +212,22 @@ describe("agentSlashCommandProviderPolicy", () => {
       provider: "codex",
       commands: [{ name: "review", description: "Review code changes" }]
     });
+    expect(
+      resolveSlashCommandSubmitEffect({
+        provider: "codex",
+        commands,
+        draft: "/review"
+      })
+    ).toEqual({ kind: "showReviewPicker" });
+  });
+
+  it("opens the review picker for Codex fallback /review before provider commands arrive", () => {
+    const commands = resolveSlashCommandsForProvider({
+      provider: "codex",
+      commands: [],
+      hasCompactableContext: false
+    });
+    expect(commands.map((command) => command.name)).toContain("review");
     expect(
       resolveSlashCommandSubmitEffect({
         provider: "codex",

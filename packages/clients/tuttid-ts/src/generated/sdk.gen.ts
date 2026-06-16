@@ -190,6 +190,9 @@ import type {
   ListWorkspaceFileDirectoryData,
   ListWorkspaceFileDirectoryErrors,
   ListWorkspaceFileDirectoryResponses,
+  ListWorkspaceGitBranchesData,
+  ListWorkspaceGitBranchesErrors,
+  ListWorkspaceGitBranchesResponses,
   ListWorkspaceIssueRunsData,
   ListWorkspaceIssueRunsErrors,
   ListWorkspaceIssueRunsResponses,
@@ -1286,6 +1289,22 @@ export const readWorkspaceAgentSessionAttachment = <
   >({
     security: [{ scheme: "bearer", type: "http" }],
     url: "/v1/workspaces/{workspaceID}/agent-sessions/{agentSessionID}/attachments/{attachmentID}",
+    ...options
+  });
+
+/**
+ * List git branches for a workspace working directory
+ */
+export const listWorkspaceGitBranches = <ThrowOnError extends boolean = false>(
+  options: Options<ListWorkspaceGitBranchesData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    ListWorkspaceGitBranchesResponses,
+    ListWorkspaceGitBranchesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/workspaces/{workspaceID}/git-branches",
     ...options
   });
 

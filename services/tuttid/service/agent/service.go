@@ -280,6 +280,19 @@ func (s *Service) ListGitBranches(ctx context.Context, workspaceID string, agent
 	return listGitBranches(ctx, session.Cwd)
 }
 
+// ListGitBranchesForPath lists local git branches for a workspace working
+// directory before any agent session exists (e.g. the empty-hero composer's
+// selected project path). It mirrors the graceful degradation of the
+// session-scoped path: a non-git or missing directory yields an empty result.
+func (*Service) ListGitBranchesForPath(ctx context.Context, workspaceID string, workingDirectory string) (GitBranches, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	workingDirectory = strings.TrimSpace(workingDirectory)
+	if workspaceID == "" || workingDirectory == "" {
+		return GitBranches{}, ErrInvalidArgument
+	}
+	return listGitBranches(ctx, workingDirectory)
+}
+
 func (s *Service) get(ctx context.Context, workspaceID string, agentSessionID string, reconcileStaleTurn bool) (Session, error) {
 	session, ok := s.controller().Session(workspaceID, agentSessionID)
 	if ok {

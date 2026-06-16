@@ -491,6 +491,10 @@ export interface TuttidClient {
     workspaceID: string,
     agentSessionID: string
   ): Promise<WorkspaceAgentSessionGitBranchesResponse>;
+  listWorkspaceGitBranches(
+    workspaceID: string,
+    workingDirectory: string
+  ): Promise<WorkspaceAgentSessionGitBranchesResponse>;
   updateWorkspaceAgentSessionSettings(
     workspaceID: string,
     agentSessionID: string,

@@ -125,11 +125,18 @@ export function createDesktopAgentGUIWorkbenchHostInput({
       tuttidClient,
       workspaceId
     }),
-    onRequestGitBranches: async ({ agentSessionId }) => {
-      const result = await tuttidClient.listWorkspaceAgentSessionGitBranches(
-        workspaceId,
-        agentSessionId
-      );
+    onRequestGitBranches: async ({ agentSessionId, workingDirectory }) => {
+      const result = agentSessionId
+        ? await tuttidClient.listWorkspaceAgentSessionGitBranches(
+            workspaceId,
+            agentSessionId
+          )
+        : workingDirectory
+          ? await tuttidClient.listWorkspaceGitBranches(
+              workspaceId,
+              workingDirectory
+            )
+          : { branches: [] as string[], currentBranch: null };
       return {
         branches: result.branches,
         currentBranch: result.currentBranch ?? null

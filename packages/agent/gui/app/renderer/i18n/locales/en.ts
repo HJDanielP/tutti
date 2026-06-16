@@ -540,6 +540,8 @@ export const en = {
       reviewPicker: {
         title: "Code review",
         targetLabel: "What to review",
+        searchPlaceholder: "Search",
+        noResults: "No matches",
         uncommitted: "Uncommitted changes",
         baseBranch: "Compare against a branch",
         commit: "A specific commit",

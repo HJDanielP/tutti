@@ -509,6 +509,12 @@ export function createDesktopTuttidClient(
         agentSessionID
       );
     },
+    async listWorkspaceGitBranches(workspaceID, workingDirectory) {
+      return (await resolveClient()).listWorkspaceGitBranches(
+        workspaceID,
+        workingDirectory
+      );
+    },
     async updateWorkspaceAgentSessionSettings(
       workspaceID,
       agentSessionID,

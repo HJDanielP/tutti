@@ -269,6 +269,9 @@ function createTransportClient(
     async listWorkspaceAgentSessionGitBranches() {
       throw new Error("not used");
     },
+    async listWorkspaceGitBranches() {
+      throw new Error("not used");
+    },
     async updateWorkspaceAgentSessionSettings() {
       throw new Error("not used");
     },

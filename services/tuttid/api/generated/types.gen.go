@@ -2909,6 +2909,11 @@ type GetWorkspaceFileTreeSnapshotParams struct {
 	PrefetchBudgetMs *WorkspaceFilePrefetchBudgetMs `form:"prefetchBudgetMs,omitempty" json:"prefetchBudgetMs,omitempty"`
 }
 
+// ListWorkspaceGitBranchesParams defines parameters for ListWorkspaceGitBranches.
+type ListWorkspaceGitBranchesParams struct {
+	WorkingDirectory string `form:"workingDirectory" json:"workingDirectory"`
+}
+
 // ListWorkspaceIssuesParams defines parameters for ListWorkspaceIssues.
 type ListWorkspaceIssuesParams struct {
 	PageSize     *IssueManagerPageSize     `form:"pageSize,omitempty" json:"pageSize,omitempty"`

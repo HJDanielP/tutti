@@ -42,9 +42,10 @@ func listGitBranches(ctx context.Context, cwd string) (GitBranches, error) {
 			branches = append(branches, name)
 		}
 	}
+	currentBranch := gitCurrentBranch(ctx, cwd)
 	return GitBranches{
 		Branches:      branches,
-		CurrentBranch: gitCurrentBranch(ctx, cwd),
+		CurrentBranch: currentBranch,
 	}, nil
 }
 

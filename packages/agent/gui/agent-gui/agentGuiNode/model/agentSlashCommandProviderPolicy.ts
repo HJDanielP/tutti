@@ -66,6 +66,10 @@ const ACP_FALLBACK_COMMANDS: readonly AgentSessionCommand[] = [
   { name: "status" },
   { name: "fast" }
 ];
+const CODEX_FALLBACK_COMMANDS: readonly AgentSessionCommand[] = [
+  ...ACP_FALLBACK_COMMANDS,
+  { name: REVIEW_COMMAND }
+];
 
 const PROVIDER_SLASH_POLICY: Record<
   "codex" | "claude-code",
@@ -73,7 +77,7 @@ const PROVIDER_SLASH_POLICY: Record<
 > = {
   codex: {
     immediateCommands: new Set(["init", "compact"]),
-    fallbackCommands: ACP_FALLBACK_COMMANDS
+    fallbackCommands: CODEX_FALLBACK_COMMANDS
   },
   "claude-code": {
     immediateCommands: new Set(["compact", "context", "usage"]),

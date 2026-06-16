@@ -226,6 +226,9 @@ type ServerInterface interface {
 	// Detect conflicting local file uploads into one workspace directory
 	// (POST /v1/workspaces/{workspaceID}/files/upload/preflight)
 	PreflightUploadWorkspaceFiles(w http.ResponseWriter, r *http.Request, workspaceID WorkspaceID)
+	// List git branches for a workspace working directory
+	// (GET /v1/workspaces/{workspaceID}/git-branches)
+	ListWorkspaceGitBranches(w http.ResponseWriter, r *http.Request, workspaceID WorkspaceID, params ListWorkspaceGitBranchesParams)
 	// List issue-manager topics for one workspace
 	// (GET /v1/workspaces/{workspaceID}/issue-topics)
 	ListWorkspaceIssueTopics(w http.ResponseWriter, r *http.Request, workspaceID WorkspaceID)
@@ -2939,6 +2942,54 @@ func (siw *ServerInterfaceWrapper) PreflightUploadWorkspaceFiles(w http.Response
 	handler.ServeHTTP(w, r)
 }
 
+// ListWorkspaceGitBranches operation middleware
+func (siw *ServerInterfaceWrapper) ListWorkspaceGitBranches(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceID" -------------
+	var workspaceID WorkspaceID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceID", r.PathValue("workspaceID"), &workspaceID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWorkspaceGitBranchesParams
+
+	// ------------- Required query parameter "workingDirectory" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "workingDirectory", r.URL.Query(), &params.WorkingDirectory, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "workingDirectory"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workingDirectory", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWorkspaceGitBranches(w, r, workspaceID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWorkspaceIssueTopics operation middleware
 func (siw *ServerInterfaceWrapper) ListWorkspaceIssueTopics(w http.ResponseWriter, r *http.Request) {
 
@@ -4838,6 +4889,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/files/tree-snapshot", wrapper.GetWorkspaceFileTreeSnapshot)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/files/upload", wrapper.UploadWorkspaceFiles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/files/upload/preflight", wrapper.PreflightUploadWorkspaceFiles)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/git-branches", wrapper.ListWorkspaceGitBranches)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/issue-topics", wrapper.ListWorkspaceIssueTopics)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/issue-topics", wrapper.CreateWorkspaceIssueTopic)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/workspaces/{workspaceID}/issue-topics/{topicID}", wrapper.DeleteWorkspaceIssueTopic)
@@ -12477,6 +12529,123 @@ func (response PreflightUploadWorkspaceFiles503JSONResponse) VisitPreflightUploa
 	return err
 }
 
+type ListWorkspaceGitBranchesRequestObject struct {
+	WorkspaceID WorkspaceID `json:"workspaceID"`
+	Params      ListWorkspaceGitBranchesParams
+}
+
+type ListWorkspaceGitBranchesResponseObject interface {
+	VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error
+}
+
+type ListWorkspaceGitBranches200JSONResponse WorkspaceAgentSessionGitBranchesResponse
+
+func (response ListWorkspaceGitBranches200JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches400JSONResponse struct {
+	InvalidRequestErrorJSONResponse
+}
+
+func (response ListWorkspaceGitBranches400JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches401JSONResponse struct{ UnauthorizedErrorJSONResponse }
+
+func (response ListWorkspaceGitBranches401JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches404JSONResponse struct {
+	WorkspaceNotFoundErrorJSONResponse
+}
+
+func (response ListWorkspaceGitBranches404JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches405JSONResponse struct {
+	MethodNotAllowedErrorJSONResponse
+}
+
+func (response ListWorkspaceGitBranches405JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(405)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches502JSONResponse struct {
+	WorkspaceOperationErrorJSONResponse
+}
+
+func (response ListWorkspaceGitBranches502JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWorkspaceGitBranches503JSONResponse struct {
+	ServiceUnavailableErrorJSONResponse
+}
+
+func (response ListWorkspaceGitBranches503JSONResponse) VisitListWorkspaceGitBranchesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListWorkspaceIssueTopicsRequestObject struct {
 	WorkspaceID WorkspaceID `json:"workspaceID"`
 }
@@ -17161,6 +17330,9 @@ type StrictServerInterface interface {
 	// Detect conflicting local file uploads into one workspace directory
 	// (POST /v1/workspaces/{workspaceID}/files/upload/preflight)
 	PreflightUploadWorkspaceFiles(ctx context.Context, request PreflightUploadWorkspaceFilesRequestObject) (PreflightUploadWorkspaceFilesResponseObject, error)
+	// List git branches for a workspace working directory
+	// (GET /v1/workspaces/{workspaceID}/git-branches)
+	ListWorkspaceGitBranches(ctx context.Context, request ListWorkspaceGitBranchesRequestObject) (ListWorkspaceGitBranchesResponseObject, error)
 	// List issue-manager topics for one workspace
 	// (GET /v1/workspaces/{workspaceID}/issue-topics)
 	ListWorkspaceIssueTopics(ctx context.Context, request ListWorkspaceIssueTopicsRequestObject) (ListWorkspaceIssueTopicsResponseObject, error)
@@ -19386,6 +19558,33 @@ func (sh *strictHandler) PreflightUploadWorkspaceFiles(w http.ResponseWriter, r 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PreflightUploadWorkspaceFilesResponseObject); ok {
 		if err := validResponse.VisitPreflightUploadWorkspaceFilesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListWorkspaceGitBranches operation middleware
+func (sh *strictHandler) ListWorkspaceGitBranches(w http.ResponseWriter, r *http.Request, workspaceID WorkspaceID, params ListWorkspaceGitBranchesParams) {
+	var request ListWorkspaceGitBranchesRequestObject
+
+	request.WorkspaceID = workspaceID
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWorkspaceGitBranches(ctx, request.(ListWorkspaceGitBranchesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWorkspaceGitBranches")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListWorkspaceGitBranchesResponseObject); ok {
+		if err := validResponse.VisitListWorkspaceGitBranchesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

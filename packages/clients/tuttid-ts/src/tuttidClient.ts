@@ -60,6 +60,7 @@ import {
   readWorkspaceFilePreview,
   readWorkspaceAgentSessionAttachment,
   listWorkspaceAgentSessionGitBranches,
+  listWorkspaceGitBranches,
   removeWorkspaceIssueContextRef,
   removeWorkspaceIssueTaskContextRef,
   resizeWorkspaceTerminal,
@@ -705,6 +706,14 @@ export function createTuttidClient(
         response,
         "List workspace agent session git branches failed."
       );
+    },
+    async listWorkspaceGitBranches(workspaceID, workingDirectory) {
+      const response = await listWorkspaceGitBranches({
+        client,
+        path: { workspaceID },
+        query: { workingDirectory }
+      });
+      return unwrapData(response, "List workspace git branches failed.");
     },
     async updateWorkspaceAgentSessionSettings(
       workspaceID,

@@ -49,24 +49,26 @@ const (
 	appServerMethodPatchApprovalV1     = "applyPatchApproval"
 
 	// Server -> client notifications.
-	appServerNotifyThreadStarted     = "thread/started"
-	appServerNotifyTurnStarted       = "turn/started"
-	appServerNotifyTurnCompleted     = "turn/completed"
-	appServerNotifyAgentMessageDelta = "item/agentMessage/delta"
-	appServerNotifyReasoningDelta    = "item/reasoning/textDelta"
-	appServerNotifyReasoningSummary  = "item/reasoning/summaryTextDelta"
-	appServerNotifyItemStarted       = "item/started"
-	appServerNotifyItemCompleted     = "item/completed"
-	appServerNotifyTokenUsage        = "thread/tokenUsage/updated"
-	appServerNotifyPlanUpdated       = "turn/plan/updated"
-	appServerNotifyThreadNameUpdated = "thread/name/updated"
-	appServerNotifyRateLimitsUpdated = "account/rateLimits/updated"
-	appServerNotifyAccountUpdated    = "account/updated"
-	appServerNotifyError             = "error"
-	appServerNotifyWarning           = "warning"
-	appServerNotifyDeprecation       = "deprecationNotice"
-	appServerNotifyModelRerouted     = "model/rerouted"
-	appServerNotifyThreadCompacted   = "thread/compacted"
+	appServerNotifyThreadStarted         = "thread/started"
+	appServerNotifyTurnStarted           = "turn/started"
+	appServerNotifyTurnCompleted         = "turn/completed"
+	appServerNotifyAgentMessageDelta     = "item/agentMessage/delta"
+	appServerNotifyReasoningDelta        = "item/reasoning/textDelta"
+	appServerNotifyReasoningSummary      = "item/reasoning/summaryTextDelta"
+	appServerNotifyReasoningSummaryPart  = "item/reasoning/summaryPartAdded"
+	appServerNotifyThreadSettingsUpdated = "thread/settings/updated"
+	appServerNotifyItemStarted           = "item/started"
+	appServerNotifyItemCompleted         = "item/completed"
+	appServerNotifyTokenUsage            = "thread/tokenUsage/updated"
+	appServerNotifyPlanUpdated           = "turn/plan/updated"
+	appServerNotifyThreadNameUpdated     = "thread/name/updated"
+	appServerNotifyRateLimitsUpdated     = "account/rateLimits/updated"
+	appServerNotifyAccountUpdated        = "account/updated"
+	appServerNotifyError                 = "error"
+	appServerNotifyWarning               = "warning"
+	appServerNotifyDeprecation           = "deprecationNotice"
+	appServerNotifyModelRerouted         = "model/rerouted"
+	appServerNotifyThreadCompacted       = "thread/compacted"
 )
 
 const (
@@ -367,6 +369,13 @@ func (a *CodexAppServerAdapter) Resume(ctx context.Context, session Session) err
 		authState:       "authenticated",
 		acpLiveState:    liveState,
 		pendingRequests: make(map[string]*pendingACPRequest),
+	})
+	// Mirror Start: push the command snapshot so a resumed session advertises
+	// review/compact/undo to the GUI (otherwise the slash palette and the
+	// review picker only work on freshly created sessions).
+	a.emitCommandSnapshot(AgentSessionCommandSnapshot{
+		AgentSessionID: strings.TrimSpace(session.AgentSessionID),
+		Commands:       codexAppServerCommands(),
 	})
 	return nil
 }

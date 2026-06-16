@@ -83,11 +83,13 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 			return nil
 		}
 		return normalizer.AppendAssistantChunk(session, turnID, asStringRaw(params["delta"]))
+	case appServerNotifyReasoningSummaryPart, appServerNotifyThreadSettingsUpdated:
+		return nil
 	case appServerNotifyReasoningDelta, appServerNotifyReasoningSummary:
 		if normalizer == nil {
 			return nil
 		}
-		return normalizer.AppendThinkingChunk(session, turnID, asStringRaw(params["delta"]))
+		return normalizer.AppendThinkingChunk(session, turnID, appServerReasoningDeltaText(params))
 	case appServerNotifyItemStarted:
 		return a.appServerItemEvents(session, turnID, payloadObject(params["item"]), false, normalizer)
 	case appServerNotifyItemCompleted:
@@ -214,7 +216,15 @@ func (a *CodexAppServerAdapter) appServerItemEvents(
 			},
 		))
 		return events
-	case "reasoning", "userMessage", "hookPrompt":
+	case "reasoning":
+		if !completed {
+			return nil
+		}
+		// Surface review/inline reasoning as a finalized thinking row. The
+		// normalizer dedupes against any reasoning that already streamed as
+		// textDelta chunks, so this is safe for both delivery modes.
+		return normalizer.FinalizeThinkingItem(session, turnID, appServerReasoningText(item))
+	case "userMessage", "hookPrompt":
 		return nil
 	default:
 		update, ok := appServerItemToolCallUpdate(item, completed)
@@ -874,6 +884,18 @@ func appServerAnswerValues(value any) []string {
 
 // --- request parameter builders ---
 
+// appServerThreadReasoningSummaryConfig selects the thread-level reasoning
+// summary mode for codex app-server. Inline /review turns interleave readable
+// reasoning via summaryTextDelta; the legacy ACP adapter disables summaries for
+// spark, but app-server review still needs them.
+func appServerThreadReasoningSummaryConfig(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" || codexACPModelDisablesReasoningSummary(model) {
+		return "auto"
+	}
+	return ""
+}
+
 func appServerThreadStartParams(session Session, cwd string) map[string]any {
 	settings := session.SettingsValue()
 	params := map[string]any{
@@ -886,7 +908,7 @@ func appServerThreadStartParams(session Session, cwd string) map[string]any {
 	if reasoning := codexACPReasoningEffortValue(settings.ReasoningEffort); reasoning != "" {
 		config["model_reasoning_effort"] = reasoning
 	}
-	if summary := codexACPReasoningSummaryOverride(settings.Model); summary != "" {
+	if summary := appServerThreadReasoningSummaryConfig(settings.Model); summary != "" {
 		config[codexACPConfigModelReasoningSummary] = summary
 	}
 	if serviceTier := codexServiceTierValue(settings.Speed); serviceTier != "" {
@@ -1296,4 +1318,84 @@ func truthyBool(value any) bool {
 func asStringRaw(value any) string {
 	typed, _ := value.(string)
 	return typed
+}
+
+// appServerReasoningText pulls the human-readable text out of a completed
+// `reasoning` thread item. Per the Codex app-server schema, the ThreadItem
+// reasoning variant is {id, summary, content} where summary and content are
+// usually string arrays. Some app-server versions also stream reasoning via
+// summaryTextDelta/textDelta and may emit completed items before those arrays
+// are populated, so callers should still handle streaming deltas.
+func appServerReasoningText(item map[string]any) string {
+	if text := reasoningSectionsText(item["summary"]); text != "" {
+		return text
+	}
+	if text := reasoningSectionsText(item["content"]); text != "" {
+		return text
+	}
+	return firstNonEmpty(asStringRaw(item["text"]), asString(item["text"]))
+}
+
+// appServerReasoningDeltaText reads a reasoning delta payload. Most app-server
+// versions use `delta`, but some event shapes expose the chunk as `text`.
+func appServerReasoningDeltaText(params map[string]any) string {
+	return firstNonEmpty(asStringRaw(params["delta"]), asStringRaw(params["text"]))
+}
+
+// reasoningSectionsText joins the non-empty sections of a reasoning
+// summary/content value, separating sections with a blank line.
+func reasoningSectionsText(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []string:
+		return joinReasoningSectionTexts(typed)
+	case []any:
+		parts := make([]string, 0, len(typed))
+		for _, raw := range typed {
+			if text := reasoningSectionText(raw); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.Join(parts, "\n\n")
+	default:
+		return ""
+	}
+}
+
+func joinReasoningSectionTexts(values []string) string {
+	var b strings.Builder
+	for _, value := range values {
+		text := asStringRaw(value)
+		if text == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(text)
+	}
+	return b.String()
+}
+
+func reasoningSectionText(raw any) string {
+	if text := asStringRaw(raw); text != "" {
+		return text
+	}
+	item, ok := raw.(map[string]any)
+	if !ok {
+		return ""
+	}
+	return firstNonEmpty(
+		asStringRaw(item["text"]),
+		asStringRaw(item["summary_text"]),
+		asStringRaw(item["summaryText"]),
+		asStringRaw(item["summary"]),
+		asStringRaw(item["content"]),
+		asString(item["text"]),
+		asString(item["summary_text"]),
+		asString(item["summaryText"]),
+		asString(item["summary"]),
+		asString(item["content"]),
+	)
 }

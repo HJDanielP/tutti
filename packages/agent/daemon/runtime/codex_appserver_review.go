@@ -2,6 +2,7 @@ package agentruntime
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	activityshared "github.com/tutti-os/tutti/packages/agentactivity/daemon/activity/events"
@@ -47,6 +48,10 @@ func appServerReviewTarget(args string) map[string]any {
 	return map[string]any{"type": "custom", "instructions": args}
 }
 
+func appServerReviewReasoningSummary() string {
+	return "auto"
+}
+
 // appServerMessageHandler builds the message callback shared by the
 // thread-control slash commands (compact, review, undo): every app-server
 // message is routed through handleAppServerMessage and its events emitted.
@@ -80,15 +85,31 @@ func (a *CodexAppServerAdapter) execReviewSlashCommand(
 	emitTerminal func([]activityshared.Event),
 	emitCommands CommandSnapshotSink,
 ) (bool, error) {
+	normalizer.SetThinkingPresentation("review-process")
 	params := map[string]any{
 		"threadId": appSession.threadID,
 		"target":   appServerReviewTarget(args),
 		"delivery": "inline",
+		// Inline review interleaves readable reasoning via summaryTextDelta.
+		// Request summaries explicitly so review turns do not inherit a thread
+		// configured with model_reasoning_summary=none (for example spark).
+		"summary": appServerReviewReasoningSummary(),
 	}
 	result, err := appSession.client.Call(ctx, appServerMethodReviewStart, params,
 		a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands))
 	if err != nil {
-		emitTerminal([]activityshared.Event{newTurnActivityEvent(session, EventTurnFailed, turnID, SessionStatusFailed, "", "", acpFailureMetadata(err))})
+		if errors.Is(err, context.Canceled) || errors.Is(err, errPermissionRequestCanceled) {
+			terminalEvents := a.pendingRequestFailureEvents(session, turnID, errPermissionRequestCanceled)
+			terminalEvents = append(terminalEvents, normalizer.FinishInterrupted(session, turnID, "interrupted")...)
+			terminalEvents = append(terminalEvents, newTurnActivityEvent(session, EventTurnCanceled, turnID, SessionStatusCanceled, "", "", map[string]any{
+				"error": err.Error(),
+			}))
+			emitTerminal(terminalEvents)
+		} else {
+			terminalEvents := normalizer.FinishFailed(session, turnID)
+			terminalEvents = append(terminalEvents, newTurnActivityEvent(session, EventTurnFailed, turnID, SessionStatusFailed, "", "", acpFailureMetadata(err)))
+			emitTerminal(terminalEvents)
+		}
 		return true, nil
 	}
 	initialTurn := appServerTurnFromResult(result)
@@ -97,9 +118,20 @@ func (a *CodexAppServerAdapter) execReviewSlashCommand(
 	}
 	finalTurn, finishErr := a.awaitTurnCompletion(ctx, appSession, appTurn, initialTurn)
 	if finishErr != nil {
-		terminalEvents := normalizer.FinishFailed(session, turnID)
-		terminalEvents = append(terminalEvents, newTurnActivityEvent(session, EventTurnFailed, turnID, SessionStatusFailed, "", "", acpFailureMetadata(finishErr)))
-		emitTerminal(terminalEvents)
+		if errors.Is(finishErr, context.Canceled) || errors.Is(finishErr, errPermissionRequestCanceled) {
+			// User cancellation: resolve any pending approval as failed and
+			// report the turn as canceled (not failed), mirroring a normal turn.
+			terminalEvents := a.pendingRequestFailureEvents(session, turnID, errPermissionRequestCanceled)
+			terminalEvents = append(terminalEvents, normalizer.FinishInterrupted(session, turnID, "interrupted")...)
+			terminalEvents = append(terminalEvents, newTurnActivityEvent(session, EventTurnCanceled, turnID, SessionStatusCanceled, "", "", map[string]any{
+				"error": finishErr.Error(),
+			}))
+			emitTerminal(terminalEvents)
+		} else {
+			terminalEvents := normalizer.FinishFailed(session, turnID)
+			terminalEvents = append(terminalEvents, newTurnActivityEvent(session, EventTurnFailed, turnID, SessionStatusFailed, "", "", acpFailureMetadata(finishErr)))
+			emitTerminal(terminalEvents)
+		}
 		return true, nil
 	}
 	normalizer.ApplyAssistantFinalText(appServerTurnFinalAssistantText(finalTurn))

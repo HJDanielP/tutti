@@ -495,6 +495,8 @@ export const zhCN = {
       reviewPicker: {
         title: "代码审查",
         targetLabel: "审查范围",
+        searchPlaceholder: "搜索",
+        noResults: "无匹配结果",
         uncommitted: "未提交的更改",
         baseBranch: "与分支比较",
         commit: "指定提交",
