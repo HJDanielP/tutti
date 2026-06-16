@@ -1451,6 +1451,9 @@ func TestAppServerReasoningDeltaTextPreservesWhitespace(t *testing.T) {
 	if got := appServerReasoningDeltaText(map[string]any{"text": "still "}); got != "still " {
 		t.Fatalf("fallback text = %q, want trailing space preserved", got)
 	}
+	if got := appServerReasoningDeltaText(map[string]any{"text": " more"}); got != " more" {
+		t.Fatalf("text fallback = %q, want leading space preserved", got)
+	}
 }
 
 func TestCodexAppServerAdapterSlashReviewInlineReasoningSummaryDelta(t *testing.T) {

@@ -1453,8 +1453,8 @@ func appServerReasoningText(item map[string]any) string {
 // appServerReasoningDeltaText reads a reasoning delta payload. Most app-server
 // versions use `delta`, but some event shapes expose the chunk as `text`.
 func appServerReasoningDeltaText(params map[string]any) string {
-	if text := asStringRaw(params["delta"]); text != "" {
-		return text
+	if delta := asStringRaw(params["delta"]); delta != "" {
+		return delta
 	}
 	return asStringRaw(params["text"])
 }
