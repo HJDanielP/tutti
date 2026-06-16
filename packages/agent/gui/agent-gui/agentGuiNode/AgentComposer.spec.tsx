@@ -439,6 +439,7 @@ describe("AgentComposer", () => {
   });
 
   it("exposes browser-use through the slash capability group", async () => {
+    const onDraftChange = vi.fn();
     const onSettingsChange = vi.fn();
     render(
       <AgentComposer
@@ -470,7 +471,7 @@ describe("AgentComposer", () => {
         isSubmittingPrompt={false}
         labels={createLabels()}
         workspaceUserProjectI18n={workspaceUserProjectI18n}
-        onDraftChange={vi.fn()}
+        onDraftChange={onDraftChange}
         onSettingsChange={onSettingsChange}
         onSubmit={vi.fn()}
         onSendQueuedPromptNext={vi.fn()}
@@ -489,7 +490,52 @@ describe("AgentComposer", () => {
 
     fireEvent.click(browserCapability);
 
+    expect(onDraftChange).toHaveBeenCalledWith("/browser ");
+    expect(screen.getByRole("textbox")).toHaveValue("/browser ");
     expect(onSettingsChange).toHaveBeenCalledWith({ browserUse: true });
+  });
+
+  it("submits browser capability tokens as prompt text", () => {
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <AgentComposer
+        workspaceId="workspace-1"
+        currentUserId="user-1"
+        provider="codex"
+        draftPrompt="/browser inspect this page"
+        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
+        disabled={false}
+        submitDisabled={false}
+        placeholder="placeholder"
+        composerSettings={createComposerSettings({
+          supportsBrowser: true
+        })}
+        queuedPrompts={[]}
+        drainingQueuedPromptId={null}
+        canQueueWhileBusy={false}
+        showStopButton={false}
+        activePrompt={null}
+        isInterrupting={false}
+        isSendingTurn={false}
+        isSubmittingPrompt={false}
+        labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
+        onDraftChange={vi.fn()}
+        onSettingsChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendQueuedPromptNext={vi.fn()}
+        onRemoveQueuedPrompt={vi.fn()}
+        onEditQueuedPrompt={vi.fn()}
+        onInterruptCurrentTurn={vi.fn()}
+        onSubmitInteractivePrompt={vi.fn()}
+      />
+    );
+
+    fireEvent.submit(container.querySelector("form")!);
+
+    expect(onSubmit).toHaveBeenCalledWith([
+      { type: "text", text: "/browser inspect this page" }
+    ]);
   });
 
   it("matches the browser-use slash capability by its English alias", async () => {

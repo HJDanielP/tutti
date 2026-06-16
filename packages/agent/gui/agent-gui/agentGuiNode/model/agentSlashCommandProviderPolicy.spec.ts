@@ -25,7 +25,7 @@ describe("agentSlashCommandProviderPolicy", () => {
     });
   });
 
-  it("enables browser use from Chinese and English slash capability names", () => {
+  it("fills a canonical browser token from Chinese and English slash capability names", () => {
     const commands = resolveSlashCommandsForProvider({
       provider: "codex",
       commands: [],
@@ -38,21 +38,21 @@ describe("agentSlashCommandProviderPolicy", () => {
         command: commands.find((command) => command.name === "browser")!,
         currentDraft: "/浏览"
       })
-    ).toEqual({ kind: "enableBrowserUse" });
+    ).toEqual({ kind: "enableBrowserUse", draft: "/browser " });
     expect(
       resolveSlashCommandSubmitEffect({
         provider: "codex",
         commands,
         draft: "/浏览器"
       })
-    ).toEqual({ kind: "enableBrowserUse" });
+    ).toBeNull();
     expect(
       resolveSlashCommandSubmitEffect({
         provider: "codex",
         commands,
         draft: "/browser"
       })
-    ).toEqual({ kind: "enableBrowserUse" });
+    ).toBeNull();
   });
 
   it("adds Codex compact and status fallback commands after provider commands", () => {

@@ -95,6 +95,7 @@ import {
 } from "./agentRichText/agentRichTextPromptImages";
 import type { AgentPromptContentBlock } from "../../shared/contracts/dto/agentSession";
 import type { AgentMessageMarkdownWorkspaceAppIcon } from "../../shared/AgentMessageMarkdown";
+import type { AgentCapabilityTokenOption } from "./agentRichText/agentCapabilityTokenExtension";
 import {
   AgentMentionSearchController,
   type AgentMentionFilterId,
@@ -678,6 +679,20 @@ export function AgentComposer({
           }),
     [availableSkills, skillQueryMatch]
   );
+  const availableCapabilities = useMemo<AgentCapabilityTokenOption[]>(
+    () =>
+      composerSettings.supportsBrowser
+        ? [
+            {
+              capability: "browserUse",
+              label: labels.browserUseCapabilityLabel,
+              name: "browser",
+              trigger: "/browser"
+            }
+          ]
+        : [],
+    [composerSettings.supportsBrowser, labels.browserUseCapabilityLabel]
+  );
   const slashPaletteEntries = useMemo<AgentSlashPaletteEntry[]>(() => {
     const commandEntries: AgentSlashPaletteEntry[] = filteredCommands.map(
       (command) => {
@@ -850,7 +865,11 @@ export function AgentComposer({
         return;
       }
       if (effect.kind === "enableBrowserUse") {
-        clearSlashCommandDraft();
+        const nextDraft = effect.draft;
+        draftPromptRef.current = nextDraft;
+        setPaletteDraftPrompt(nextDraft);
+        onDraftChange(nextDraft);
+        setIsPaletteOpen(false);
         if (
           !settingsControlsDisabled &&
           composerSettings.sessionSettings === null
@@ -2063,6 +2082,7 @@ export function AgentComposer({
                   onChange={handleDraftChange}
                   onSubmit={submitCurrentPrompt}
                   availableSkills={availableSkills}
+                  availableCapabilities={availableCapabilities}
                   removeMentionLabel={labels.removeMention}
                   onKeyDownForPalette={handlePaletteKeyDown}
                   onFileMentionSuggestionChange={

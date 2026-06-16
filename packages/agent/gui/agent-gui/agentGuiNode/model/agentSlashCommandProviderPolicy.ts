@@ -36,6 +36,7 @@ export type SlashCommandSelectionEffect =
     }
   | {
       kind: "enableBrowserUse";
+      draft: string;
     }
   | {
       kind: "blockCommand";
@@ -118,7 +119,10 @@ export function resolveSlashCommandSelectionEffect({
   currentDraft
 }: ResolveSlashCommandSelectionEffectInput): SlashCommandSelectionEffect {
   if (isBrowserUseCapability(command)) {
-    return { kind: "enableBrowserUse" };
+    return {
+      kind: "enableBrowserUse",
+      draft: draftForSlashCommand(command, currentDraft)
+    };
   }
   const commandName = normalizedCommandName(command);
   if (isBlockedSlashCommand(provider, commandName)) {
@@ -164,7 +168,7 @@ export function resolveSlashCommandSubmitEffect({
     return null;
   }
   if (isBrowserUseCapability(command)) {
-    return { kind: "enableBrowserUse" };
+    return null;
   }
   const commandName = normalizedCommandName(command);
   if (isLocalStatusCommand(provider, commandName)) {
