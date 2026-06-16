@@ -37,6 +37,9 @@ func TestSQLiteStoreGetDesktopPreferencesDefaultsWhenUnset(t *testing.T) {
 	if preferences.SleepPreventionMode != "never" {
 		t.Fatalf("GetDesktopPreferences() sleepPreventionMode = %q, want never", preferences.SleepPreventionMode)
 	}
+	if preferences.BrowserUseConnectionMode != "isolated" {
+		t.Fatalf("GetDesktopPreferences() browserUseConnectionMode = %q, want isolated", preferences.BrowserUseConnectionMode)
+	}
 }
 
 func TestSQLiteStorePutDesktopPreferencesPersistsValue(t *testing.T) {
@@ -55,12 +58,13 @@ func TestSQLiteStorePutDesktopPreferencesPersistsValue(t *testing.T) {
 		},
 		DefaultAgentProvider: "claude-code",
 
-		DockIconStyle:       "default",
-		DockPlacement:       "left",
-		Initialized:         true,
-		Locale:              "zh-CN",
-		SleepPreventionMode: "whileAgentRunning",
-		ThemeSource:         "dark",
+		BrowserUseConnectionMode: "autoConnect",
+		DockIconStyle:            "default",
+		DockPlacement:            "left",
+		Initialized:              true,
+		Locale:                   "zh-CN",
+		SleepPreventionMode:      "whileAgentRunning",
+		ThemeSource:              "dark",
 	})
 	if err != nil {
 		t.Fatalf("PutDesktopPreferences() error = %v", err)
@@ -90,6 +94,9 @@ func TestSQLiteStorePutDesktopPreferencesPersistsValue(t *testing.T) {
 	}
 	if reloaded.SleepPreventionMode != "whileAgentRunning" {
 		t.Fatalf("GetDesktopPreferences() sleepPreventionMode = %q, want whileAgentRunning", reloaded.SleepPreventionMode)
+	}
+	if reloaded.BrowserUseConnectionMode != "autoConnect" {
+		t.Fatalf("GetDesktopPreferences() browserUseConnectionMode = %q, want autoConnect", reloaded.BrowserUseConnectionMode)
 	}
 	codexDefaults := reloaded.AgentComposerDefaultsByProvider["codex"]
 	if codexDefaults.Model != "gpt-5" ||

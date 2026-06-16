@@ -54,7 +54,9 @@ Use this shape for new entries:
   address and token, then run `tutti-dev status --json`. If status succeeds
   but the browser command fails after roughly the CLI client timeout, inspect
   whether the first browser command is lazily starting `chrome-devtools-mcp` or
-  another browser backend.
+  another browser backend. For browser backend overrides, inspect
+  `TUTTI_BROWSER_MCP_COMMAND`, `TUTTI_BROWSER_MCP_ARGS`, and the packaged
+  desktop's internal `TUTTI_BROWSER_MCP_ENTRY_PATH` handoff.
 - Root cause:
   Browser commands can do a cold start on first use. The daemon may launch the
   browser backend while the CLI HTTP request is still waiting for the daemon to

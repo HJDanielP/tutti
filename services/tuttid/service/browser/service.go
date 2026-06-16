@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentruntime "github.com/tutti-os/tutti/packages/agentactivity/daemon/runtime"
+	preferencesbiz "github.com/tutti-os/tutti/services/tuttid/biz/preferences"
 )
 
 // defaultIdleTTL shuts a workspace's browser (and its Chrome) down after a
@@ -17,19 +18,30 @@ const defaultIdleTTL = 5 * time.Minute
 // chrome-devtools-mcp subprocess per workspace, reused across CLI calls and
 // torn down on idle or daemon shutdown.
 type Service struct {
-	transport agentruntime.ProcessTransport
-	idleTTL   time.Duration
+	transport   agentruntime.ProcessTransport
+	preferences PreferencesReader
+	idleTTL     time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*browserSession
 }
 
+// PreferencesReader reads desktop preferences that affect browser launch.
+type PreferencesReader interface {
+	GetDesktopPreferences(context.Context) (preferencesbiz.DesktopPreferences, error)
+}
+
 // NewService constructs a browser Service using a local process transport.
-func NewService() *Service {
+func NewService(preferences ...PreferencesReader) *Service {
+	var reader PreferencesReader
+	if len(preferences) > 0 {
+		reader = preferences[0]
+	}
 	return &Service{
-		transport: agentruntime.NewLocalProcessTransport(),
-		idleTTL:   defaultIdleTTL,
-		sessions:  make(map[string]*browserSession),
+		transport:   agentruntime.NewLocalProcessTransport(),
+		preferences: reader,
+		idleTTL:     defaultIdleTTL,
+		sessions:    make(map[string]*browserSession),
 	}
 }
 
@@ -54,9 +66,16 @@ func (s *Service) getOrCreate(workspaceID string) *browserSession {
 	if session, ok := s.sessions[workspaceID]; ok {
 		return session
 	}
-	session := &browserSession{transport: s.transport}
+	session := &browserSession{
+		transport: s.transport,
+		command:   s.resolveCommand,
+	}
 	s.sessions[workspaceID] = session
 	return session
+}
+
+func (s *Service) resolveCommand(ctx context.Context) []string {
+	return resolveBrowserMCPCommand(ctx, s.preferences)
 }
 
 func (s *Service) resetIdle(workspaceID string, session *browserSession) {

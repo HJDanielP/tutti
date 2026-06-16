@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	agentruntime "github.com/tutti-os/tutti/packages/agentactivity/daemon/runtime"
+	preferencesbiz "github.com/tutti-os/tutti/services/tuttid/biz/preferences"
 )
 
 // scriptedConn fakes an MCP server over the process connection: it answers
@@ -77,13 +79,15 @@ func (c *scriptedConn) sentMessages() []map[string]any {
 type scriptedTransport struct {
 	mu       sync.Mutex
 	conns    []*scriptedConn
+	specs    []agentruntime.ProcessSpec
 	startCnt int
 }
 
-func (t *scriptedTransport) Start(_ context.Context, _ agentruntime.ProcessSpec) (agentruntime.ProcessConnection, error) {
+func (t *scriptedTransport) Start(_ context.Context, spec agentruntime.ProcessSpec) (agentruntime.ProcessConnection, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.startCnt++
+	t.specs = append(t.specs, spec)
 	conn := newScriptedConn()
 	t.conns = append(t.conns, conn)
 	return conn, nil
@@ -148,6 +152,32 @@ func TestCallToolReusesSession(t *testing.T) {
 	}
 }
 
+func TestCallToolUsesAutoConnectWhenDesktopPreferenceReusesChrome(t *testing.T) {
+	transport := &scriptedTransport{}
+	svc := newTestService(transport)
+	svc.preferences = staticPreferencesReader{
+		preferences: preferencesbiz.DesktopPreferences{
+			BrowserUseConnectionMode: "autoConnect",
+		},
+	}
+	ctx := context.Background()
+
+	if _, err := svc.CallTool(ctx, "ws-1", "", "list_pages", nil); err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+
+	if len(transport.specs) != 1 {
+		t.Fatalf("started specs len = %d, want 1", len(transport.specs))
+	}
+	command := transport.specs[0].Command
+	if !slices.Contains(command, "--autoConnect") {
+		t.Fatalf("command = %#v, want --autoConnect", command)
+	}
+	if slices.Contains(command, "--isolated") {
+		t.Fatalf("command = %#v, did not want --isolated", command)
+	}
+}
+
 func idOf(v any) int {
 	switch n := v.(type) {
 	case float64:
@@ -157,6 +187,14 @@ func idOf(v any) int {
 		return int(i)
 	}
 	return -1
+}
+
+type staticPreferencesReader struct {
+	preferences preferencesbiz.DesktopPreferences
+}
+
+func (r staticPreferencesReader) GetDesktopPreferences(context.Context) (preferencesbiz.DesktopPreferences, error) {
+	return r.preferences, nil
 }
 
 // TestE2ENavigateRealChrome drives a real chrome-devtools-mcp + Chrome through

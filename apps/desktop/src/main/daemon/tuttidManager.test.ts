@@ -75,6 +75,22 @@ test("resolveBrowserMcpDaemonEnv respects an explicit operator override", () => 
   }
 });
 
+test("resolveBrowserMcpDaemonEnv respects an explicit args override", () => {
+  const previousEnv = { ...process.env };
+  try {
+    delete process.env.TUTTI_BROWSER_MCP_COMMAND;
+    process.env.TUTTI_BROWSER_MCP_ARGS =
+      '["--browserUrl","http://127.0.0.1:9222"]';
+    const got = resolveBrowserMcpDaemonEnv({
+      isPackaged: true,
+      resourcesPath: join(tmpdir(), "tutti-resources")
+    });
+    assert.deepEqual(got, {});
+  } finally {
+    restoreEnv(previousEnv);
+  }
+});
+
 test("resolveBrowserMcpDaemonEnv falls back to npx when the vendored bundle is absent", () => {
   const previousEnv = { ...process.env };
   try {
@@ -109,12 +125,9 @@ test("resolveBrowserMcpDaemonEnv points the daemon at a vendored bundle when pre
     await writeFile(entry, "// stub\n");
 
     const got = resolveBrowserMcpDaemonEnv({ isPackaged: true, resourcesPath });
-    assert.equal(got.TUTTI_BROWSER_MCP_COMMAND, "node");
-    assert.deepEqual(JSON.parse(got.TUTTI_BROWSER_MCP_ARGS ?? ""), [
-      entry,
-      "--isolated",
-      "--no-usage-statistics"
-    ]);
+    assert.deepEqual(got, {
+      TUTTI_BROWSER_MCP_ENTRY_PATH: entry
+    });
   } finally {
     restoreEnv(previousEnv);
   }

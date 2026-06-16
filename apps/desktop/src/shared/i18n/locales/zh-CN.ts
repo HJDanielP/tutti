@@ -263,6 +263,14 @@ export const zhCN = {
           "用于新的 App Factory 任务、Issue 任务，以及读取宿主默认值的工作区应用。",
         defaultAgentProviderLabel: "默认 Provider",
         defaultAgentProviderSaveFailed: "暂时无法更新默认 Provider。",
+        browserUseConnectionModeDescription:
+          "复用 Chrome 需要先在 Chrome 的 chrome://inspect/#remote-debugging 中开启远程调试。更改会在下一次浏览器会话启动时生效。",
+        browserUseConnectionModeLabel: "浏览器连接",
+        browserUseConnectionModeOptions: {
+          autoConnect: "复用当前 Chrome",
+          isolated: "独立浏览器"
+        },
+        browserUseConnectionModeSaveFailed: "暂时无法更新浏览器连接设置。",
         languageDescription: "会立刻应用到所有已打开窗口，并在重启后继续生效",
         languageLabel: "语言",
         languageOptions: {

@@ -222,12 +222,15 @@ const vendoredBrowserMcpRelPath = join(
 
 // resolveBrowserMcpDaemonEnv points the daemon at a vendored chrome-devtools-mcp
 // in packaged builds so browser use never has to fetch it over the network at
-// runtime. It is intentionally best-effort: an explicit operator override, dev
-// runs, or a missing bundle all fall back to the daemon's pinned `npx` default.
+// runtime. The daemon still owns browser connection-mode arguments because they
+// come from persisted desktop preferences.
 export function resolveBrowserMcpDaemonEnv(
   runtime?: DesktopElectronAppRuntime
 ): Record<string, string> {
-  if (process.env.TUTTI_BROWSER_MCP_COMMAND?.trim()) {
+  if (
+    process.env.TUTTI_BROWSER_MCP_COMMAND?.trim() ||
+    process.env.TUTTI_BROWSER_MCP_ARGS?.trim()
+  ) {
     return {};
   }
   let appRuntime: DesktopElectronAppRuntime;
@@ -244,12 +247,7 @@ export function resolveBrowserMcpDaemonEnv(
     return {};
   }
   return {
-    TUTTI_BROWSER_MCP_COMMAND: "node",
-    TUTTI_BROWSER_MCP_ARGS: JSON.stringify([
-      entry,
-      "--isolated",
-      "--no-usage-statistics"
-    ])
+    TUTTI_BROWSER_MCP_ENTRY_PATH: entry
   };
 }
 

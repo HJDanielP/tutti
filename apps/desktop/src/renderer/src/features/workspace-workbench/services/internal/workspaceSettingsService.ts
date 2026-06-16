@@ -2,6 +2,7 @@ import type { DesktopDeveloperLogKind } from "@shared/contracts/ipc";
 import type { DesktopLocale } from "@shared/i18n";
 import type {
   DesktopAgentProvider,
+  DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
   DesktopSleepPreventionMode
@@ -171,6 +172,27 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
       this.notifications.error({
         title: createActiveTranslator().t(
           "workspace.settings.general.defaultAgentProviderSaveFailed"
+        )
+      });
+    }
+  }
+
+  async changeBrowserUseConnectionMode(
+    mode: DesktopBrowserUseConnectionMode
+  ): Promise<void> {
+    if (
+      this.desktopPreferences.store.browserUseConnectionMode === mode ||
+      this.desktopPreferences.store.changingBrowserUseConnectionMode === mode
+    ) {
+      return;
+    }
+
+    try {
+      await this.desktopPreferences.setBrowserUseConnectionMode(mode);
+    } catch {
+      this.notifications.error({
+        title: createActiveTranslator().t(
+          "workspace.settings.general.browserUseConnectionModeSaveFailed"
         )
       });
     }
@@ -687,6 +709,8 @@ IReporterService(WorkspaceSettingsService, undefined, 3);
 
 const noopDesktopPreferencesStore: DesktopPreferencesReadableStoreState = {
   agentComposerDefaultsByProvider: {},
+  browserUseConnectionMode: "isolated",
+  changingBrowserUseConnectionMode: null,
   changingDefaultAgentProvider: null,
   changingDockIconStyle: null,
   changingDockPlacement: null,
@@ -704,6 +728,9 @@ const noopDesktopPreferencesStore: DesktopPreferencesReadableStoreState = {
 const noopDesktopPreferences: DesktopPreferencesService = {
   _serviceBrand: undefined,
   store: noopDesktopPreferencesStore,
+  setBrowserUseConnectionMode(mode) {
+    return Promise.resolve(mode);
+  },
   setDefaultAgentProvider(provider) {
     return Promise.resolve(provider);
   },

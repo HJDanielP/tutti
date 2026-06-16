@@ -276,6 +276,15 @@ export const en = {
         defaultAgentProviderLabel: "Default provider",
         defaultAgentProviderSaveFailed:
           "We couldn't update the default provider right now.",
+        browserUseConnectionModeDescription:
+          "Reusing Chrome requires remote debugging to be enabled in Chrome at chrome://inspect/#remote-debugging. Changes apply to the next browser session.",
+        browserUseConnectionModeLabel: "Browser connection",
+        browserUseConnectionModeOptions: {
+          autoConnect: "Reuse current Chrome",
+          isolated: "Separate browser"
+        },
+        browserUseConnectionModeSaveFailed:
+          "We couldn't update the browser connection setting right now.",
         languageDescription:
           "Applies to all open windows now and new windows after restart",
         languageLabel: "Language",

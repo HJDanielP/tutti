@@ -129,7 +129,7 @@ func (w *tuttiWiring) buildWorkspaceModule(ctx context.Context) error {
 	// Browser use is delivered through the daemon-owned `tutti browser` CLI;
 	// the service owns a chrome-devtools-mcp subprocess per workspace.
 	if agentsidecarservice.BrowserUseDefaultEnabled() {
-		w.browserService = browsersvc.NewService()
+		w.browserService = browsersvc.NewService(workspaceStore)
 	}
 	api, appCenterService, err := buildDaemonAPI(ctx, workspaceStore, nil, w.browserService)
 	if err != nil {

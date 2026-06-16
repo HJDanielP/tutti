@@ -35,6 +35,7 @@ type ToolImage struct {
 // calls are serialized because the underlying Chrome is single-instance.
 type browserSession struct {
 	transport agentruntime.ProcessTransport
+	command   func(context.Context) []string
 
 	startOnce sync.Once
 	startErr  error
@@ -49,7 +50,13 @@ type browserSession struct {
 
 func (s *browserSession) start(ctx context.Context, cwd string) error {
 	s.startOnce.Do(func() {
-		command := resolveBrowserMCPCommand()
+		resolveCommand := s.command
+		if resolveCommand == nil {
+			resolveCommand = func(ctx context.Context) []string {
+				return resolveBrowserMCPCommand(ctx, nil)
+			}
+		}
+		command := resolveCommand(ctx)
 		conn, err := s.transport.Start(ctx, agentruntime.ProcessSpec{
 			Provider: "browser",
 			CWD:      cwd,

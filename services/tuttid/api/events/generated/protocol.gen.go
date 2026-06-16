@@ -6,7 +6,7 @@ import "encoding/json"
 
 const (
 	BusinessEventProtocolVersion = 1
-	BusinessEventCatalogRevision = "sha256:af057c7c4057cb9f"
+	BusinessEventCatalogRevision = "sha256:04e54516637f2b5e"
 )
 
 type Topic string
@@ -91,12 +91,13 @@ type PreferencesDesktopPreferences struct {
 			ReasoningEffort  *string `json:"reasoningEffort,omitempty"`
 		} `json:"openclaw,omitempty"`
 	} `json:"agentComposerDefaultsByProvider"`
-	DefaultAgentProvider string `json:"defaultAgentProvider"`
-	DockIconStyle        string `json:"dockIconStyle"`
-	DockPlacement        string `json:"dockPlacement"`
-	Locale               string `json:"locale"`
-	SleepPreventionMode  string `json:"sleepPreventionMode"`
-	ThemeSource          string `json:"themeSource"`
+	BrowserUseConnectionMode *string `json:"browserUseConnectionMode,omitempty"`
+	DefaultAgentProvider     string  `json:"defaultAgentProvider"`
+	DockIconStyle            string  `json:"dockIconStyle"`
+	DockPlacement            string  `json:"dockPlacement"`
+	Locale                   string  `json:"locale"`
+	SleepPreventionMode      string  `json:"sleepPreventionMode"`
+	ThemeSource              string  `json:"themeSource"`
 }
 
 type WorkspaceWorkspaceAppFactoryJob struct {

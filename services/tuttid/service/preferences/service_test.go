@@ -40,12 +40,13 @@ func TestServiceGetReturnsStoredDesktopPreferences(t *testing.T) {
 			getResult: preferencesbiz.DesktopPreferences{
 				DefaultAgentProvider: "claude-code",
 
-				DockIconStyle:       "default",
-				DockPlacement:       "left",
-				Initialized:         true,
-				Locale:              "zh-CN",
-				SleepPreventionMode: "whileAgentRunning",
-				ThemeSource:         "dark",
+				BrowserUseConnectionMode: "autoConnect",
+				DockIconStyle:            "default",
+				DockPlacement:            "left",
+				Initialized:              true,
+				Locale:                   "zh-CN",
+				SleepPreventionMode:      "whileAgentRunning",
+				ThemeSource:              "dark",
 			},
 		},
 	}
@@ -72,6 +73,9 @@ func TestServiceGetReturnsStoredDesktopPreferences(t *testing.T) {
 	if preferences.SleepPreventionMode != "whileAgentRunning" {
 		t.Fatalf("Get() sleepPreventionMode = %q, want whileAgentRunning", preferences.SleepPreventionMode)
 	}
+	if preferences.BrowserUseConnectionMode != "autoConnect" {
+		t.Fatalf("Get() browserUseConnectionMode = %q, want autoConnect", preferences.BrowserUseConnectionMode)
+	}
 }
 
 func TestServicePutTrimsDesktopPreferences(t *testing.T) {
@@ -95,11 +99,12 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 		},
 		DefaultAgentProvider: " claude ",
 
-		DockIconStyle:       "default",
-		DockPlacement:       " left ",
-		Locale:              " zh-CN ",
-		SleepPreventionMode: "whileAgentRunning",
-		ThemeSource:         " dark ",
+		BrowserUseConnectionMode: " autoConnect ",
+		DockIconStyle:            "default",
+		DockPlacement:            " left ",
+		Locale:                   " zh-CN ",
+		SleepPreventionMode:      "whileAgentRunning",
+		ThemeSource:              " dark ",
 	})
 	if err != nil {
 		t.Fatalf("Put() error = %v", err)
@@ -122,6 +127,9 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 	if store.putInput.SleepPreventionMode != "whileAgentRunning" {
 		t.Fatalf("stored sleepPreventionMode = %q, want whileAgentRunning", store.putInput.SleepPreventionMode)
 	}
+	if store.putInput.BrowserUseConnectionMode != "autoConnect" {
+		t.Fatalf("stored browserUseConnectionMode = %q, want autoConnect", store.putInput.BrowserUseConnectionMode)
+	}
 	claudeDefaults := store.putInput.AgentComposerDefaultsByProvider["claude-code"]
 	if claudeDefaults.Model != "claude-3-5" ||
 		claudeDefaults.PermissionModeID != "full-access" ||
@@ -138,7 +146,8 @@ func TestServicePutTrimsDesktopPreferences(t *testing.T) {
 		publisher.published[0].Locale != "zh-CN" ||
 		publisher.published[0].DefaultAgentProvider != "claude-code" ||
 		publisher.published[0].ThemeSource != "dark" ||
-		publisher.published[0].SleepPreventionMode != "whileAgentRunning" {
+		publisher.published[0].SleepPreventionMode != "whileAgentRunning" ||
+		publisher.published[0].BrowserUseConnectionMode != "autoConnect" {
 		t.Fatalf("published preferences = %#v, want left/zh-CN/dark/prevent-sleep", publisher.published[0])
 	}
 }

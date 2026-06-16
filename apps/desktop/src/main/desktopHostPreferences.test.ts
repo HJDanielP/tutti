@@ -15,6 +15,7 @@ test("createDesktopHostPreferencesState initializes missing preferences with dar
           initialized: false,
           preferences: {
             agentComposerDefaultsByProvider: {},
+            browserUseConnectionMode: "isolated",
             defaultAgentProvider: "codex",
 
             dockIconStyle: "flat",
@@ -39,6 +40,7 @@ test("createDesktopHostPreferencesState initializes missing preferences with dar
     {
       preferences: {
         agentComposerDefaultsByProvider: {},
+        browserUseConnectionMode: "isolated",
         defaultAgentProvider: "codex",
 
         dockIconStyle: "default",
@@ -52,6 +54,7 @@ test("createDesktopHostPreferencesState initializes missing preferences with dar
   assert.equal(state.getDockPlacement(), "bottom");
   assert.equal(state.getLocale(), "zh-CN");
   assert.equal(state.getDefaultAgentProvider(), "codex");
+  assert.equal(state.getBrowserUseConnectionMode(), "isolated");
   assert.equal(state.getSleepPreventionMode(), "never");
   assert.equal(state.getDockIconStyle(), "default");
   assert.equal(state.getThemeSource(), "dark");
@@ -68,6 +71,7 @@ test("createDesktopHostPreferencesState keeps initialized theme preferences", as
           initialized: true,
           preferences: {
             agentComposerDefaultsByProvider: {},
+            browserUseConnectionMode: "isolated",
             defaultAgentProvider: "codex",
 
             dockIconStyle: "default",
@@ -89,6 +93,7 @@ test("createDesktopHostPreferencesState keeps initialized theme preferences", as
   assert.equal(state.getDockPlacement(), "bottom");
   assert.equal(state.getLocale(), "en");
   assert.equal(state.getDefaultAgentProvider(), "codex");
+  assert.equal(state.getBrowserUseConnectionMode(), "isolated");
   assert.equal(state.getSleepPreventionMode(), "never");
   assert.equal(state.getThemeSource(), "system");
 });
@@ -103,6 +108,7 @@ test("createDesktopHostPreferencesState notifies subscribers after sync changes"
           initialized: true,
           preferences: {
             agentComposerDefaultsByProvider: {},
+            browserUseConnectionMode: "isolated",
             defaultAgentProvider: "codex",
 
             dockIconStyle: "default",
@@ -127,6 +133,8 @@ test("createDesktopHostPreferencesState notifies subscribers after sync changes"
   state.sync({ locale: "zh-CN" });
   state.sync({ defaultAgentProvider: "claude-code" });
   state.sync({ defaultAgentProvider: "claude-code" });
+  state.sync({ browserUseConnectionMode: "autoConnect" });
+  state.sync({ browserUseConnectionMode: "autoConnect" });
   state.sync({ dockPlacement: "left" });
   state.sync({ dockPlacement: "left" });
   state.sync({ sleepPreventionMode: "whileAgentRunning" });
@@ -134,7 +142,7 @@ test("createDesktopHostPreferencesState notifies subscribers after sync changes"
   unsubscribe();
   state.sync({ locale: "en" });
 
-  assert.equal(notifications, 4);
+  assert.equal(notifications, 5);
 });
 
 function createLogger(): DesktopLogger {

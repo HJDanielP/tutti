@@ -2943,6 +2943,11 @@ components:
       enum:
         - default
         - flat
+    DesktopBrowserUseConnectionMode:
+      type: string
+      enum:
+        - isolated
+        - autoConnect
     DesktopPreferences:
       type: object
       additionalProperties: false
@@ -2957,6 +2962,8 @@ components:
       properties:
         agentComposerDefaultsByProvider:
           $ref: "#/components/schemas/DesktopAgentComposerDefaultsByProvider"
+        browserUseConnectionMode:
+          $ref: "#/components/schemas/DesktopBrowserUseConnectionMode"
         defaultAgentProvider:
           $ref: "#/components/schemas/WorkspaceAgentProvider"
         dockIconStyle:

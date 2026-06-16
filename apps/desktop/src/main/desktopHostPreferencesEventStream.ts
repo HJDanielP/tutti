@@ -43,6 +43,7 @@ export function connectDesktopHostPreferencesEventStream(
       deps.preferences.sync({
         agentComposerDefaultsByProvider:
           nextPreferences.agentComposerDefaultsByProvider,
+        browserUseConnectionMode: nextPreferences.browserUseConnectionMode,
         defaultAgentProvider: nextPreferences.defaultAgentProvider,
         dockPlacement: nextPreferences.dockPlacement,
         locale: nextPreferences.locale,

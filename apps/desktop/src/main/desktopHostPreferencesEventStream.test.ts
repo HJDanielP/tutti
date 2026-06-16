@@ -34,6 +34,7 @@ test("desktop host preferences follows authoritative preference events", async (
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -46,6 +47,7 @@ test("desktop host preferences follows authoritative preference events", async (
 
   assert.equal(preferences.getLocale(), "zh-CN");
   assert.equal(preferences.getDefaultAgentProvider(), "codex");
+  assert.equal(preferences.getBrowserUseConnectionMode(), "isolated");
   assert.equal(preferences.getDockPlacement(), "bottom");
   assert.equal(preferences.getSleepPreventionMode(), "never");
   assert.equal(preferences.getThemeSource(), "dark");
@@ -56,6 +58,7 @@ test("desktop host preferences follows authoritative preference events", async (
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -78,6 +81,9 @@ test("desktop host preferences follows authoritative preference events", async (
 function createHostPreferencesState(): DesktopHostPreferencesState {
   let defaultAgentProvider: DesktopPreferencesStateResponse["preferences"]["defaultAgentProvider"] =
     "codex";
+  let browserUseConnectionMode: NonNullable<
+    DesktopPreferencesStateResponse["preferences"]["browserUseConnectionMode"]
+  > = "isolated";
   let dockPlacement: DesktopPreferencesStateResponse["preferences"]["dockPlacement"] =
     "bottom";
   let locale: DesktopPreferencesStateResponse["preferences"]["locale"] = "en";
@@ -94,6 +100,9 @@ function createHostPreferencesState(): DesktopHostPreferencesState {
     },
     getDefaultAgentProvider() {
       return defaultAgentProvider;
+    },
+    getBrowserUseConnectionMode() {
+      return browserUseConnectionMode;
     },
     getDockIconStyle() {
       return "default";
@@ -116,6 +125,9 @@ function createHostPreferencesState(): DesktopHostPreferencesState {
       }
       if (input.defaultAgentProvider) {
         defaultAgentProvider = input.defaultAgentProvider;
+      }
+      if (input.browserUseConnectionMode) {
+        browserUseConnectionMode = input.browserUseConnectionMode;
       }
       if (input.dockPlacement) {
         dockPlacement = input.dockPlacement;

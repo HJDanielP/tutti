@@ -18,6 +18,7 @@ test("desktop preferences client resolves writes from the authoritative event", 
   const completion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -33,6 +34,7 @@ test("desktop preferences client resolves writes from the authoritative event", 
       payload: {
         preferences: {
           agentComposerDefaultsByProvider: {},
+          browserUseConnectionMode: "isolated",
           defaultAgentProvider: "codex",
 
           dockIconStyle: "default",
@@ -50,6 +52,7 @@ test("desktop preferences client resolves writes from the authoritative event", 
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -62,6 +65,7 @@ test("desktop preferences client resolves writes from the authoritative event", 
 
   assert.deepEqual(await completion, {
     agentComposerDefaultsByProvider: {},
+    browserUseConnectionMode: "isolated",
     defaultAgentProvider: "codex",
 
     dockIconStyle: "default",
@@ -92,6 +96,7 @@ test("desktop preferences client fans out authoritative preference updates", asy
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -105,6 +110,7 @@ test("desktop preferences client fans out authoritative preference updates", asy
   assert.deepEqual(receivedUpdates, [
     {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -129,6 +135,7 @@ test("desktop preferences client rejects pending writes when disposed", async ()
   const completion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -150,6 +157,7 @@ test("desktop preferences client confirms writes from HTTP when the event does n
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -171,6 +179,7 @@ test("desktop preferences client confirms writes from HTTP when the event does n
   const completion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -183,6 +192,7 @@ test("desktop preferences client confirms writes from HTTP when the event does n
 
   assert.deepEqual(await completion, {
     agentComposerDefaultsByProvider: {},
+    browserUseConnectionMode: "isolated",
     defaultAgentProvider: "codex",
 
     dockIconStyle: "default",
@@ -201,6 +211,7 @@ test("desktop preferences client notifies subscribers when HTTP confirmation suc
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -227,6 +238,7 @@ test("desktop preferences client notifies subscribers when HTTP confirmation suc
   await client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -240,6 +252,7 @@ test("desktop preferences client notifies subscribers when HTTP confirmation suc
   assert.deepEqual(receivedUpdates, [
     {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -258,6 +271,7 @@ test("desktop preferences client rejects writes when the authoritative state can
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -279,6 +293,7 @@ test("desktop preferences client rejects writes when the authoritative state can
   const completion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -309,6 +324,7 @@ test("desktop preferences client coalesces concurrent identical writes", async (
   const firstCompletion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -321,6 +337,7 @@ test("desktop preferences client coalesces concurrent identical writes", async (
   const secondCompletion = client.updateDesktopPreferences({
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -337,6 +354,7 @@ test("desktop preferences client coalesces concurrent identical writes", async (
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",
@@ -361,6 +379,7 @@ function createFakeTuttidClient(
     initialized: true,
     preferences: {
       agentComposerDefaultsByProvider: {},
+      browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
       dockIconStyle: "default",

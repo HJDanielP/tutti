@@ -189,8 +189,11 @@ export type DesktopDockPlacement = "bottom" | "left";
 
 export type DesktopDockIconStyle = "default" | "flat";
 
+export type DesktopBrowserUseConnectionMode = "isolated" | "autoConnect";
+
 export type DesktopPreferences = {
   agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
+  browserUseConnectionMode?: DesktopBrowserUseConnectionMode;
   defaultAgentProvider: WorkspaceAgentProvider;
   dockIconStyle: DesktopDockIconStyle;
   dockPlacement: DesktopDockPlacement;

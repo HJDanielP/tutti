@@ -37,8 +37,10 @@ import {
 } from "../../../../../shared/i18n/index.ts";
 import {
   type DesktopAgentProvider,
+  desktopBrowserUseConnectionModes,
   desktopDockPlacements,
   desktopSleepPreventionModes,
+  type DesktopBrowserUseConnectionMode,
   type DesktopDockPlacement,
   type DesktopSleepPreventionMode
 } from "../../../../../shared/preferences/index.ts";
@@ -195,6 +197,9 @@ export function WorkspaceSettingsPanel({
                 changingDefaultAgentProvider={
                   desktopPreferencesState.changingDefaultAgentProvider
                 }
+                changingBrowserUseConnectionMode={
+                  desktopPreferencesState.changingBrowserUseConnectionMode
+                }
                 changingLocale={desktopPreferencesState.changingLocale}
                 changingSleepPreventionMode={
                   desktopPreferencesState.changingSleepPreventionMode
@@ -202,7 +207,13 @@ export function WorkspaceSettingsPanel({
                 defaultAgentProvider={
                   desktopPreferencesState.defaultAgentProvider
                 }
+                browserUseConnectionMode={
+                  desktopPreferencesState.browserUseConnectionMode
+                }
                 locale={desktopPreferencesState.locale}
+                onBrowserUseConnectionModeChange={(mode) => {
+                  void settingsService.changeBrowserUseConnectionMode(mode);
+                }}
                 onDefaultAgentProviderChange={(provider) => {
                   void settingsService.changeDefaultAgentProvider(provider);
                 }}
@@ -1140,21 +1151,29 @@ function SettingsRow({
 }
 
 function WorkspaceGeneralSettingsSection({
+  browserUseConnectionMode,
   changingDefaultAgentProvider,
+  changingBrowserUseConnectionMode,
   changingLocale,
   changingSleepPreventionMode,
   defaultAgentProvider,
   locale,
   onDefaultAgentProviderChange,
+  onBrowserUseConnectionModeChange,
   onLocaleChange,
   onSleepPreventionModeChange,
   sleepPreventionMode
 }: {
+  browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   changingDefaultAgentProvider: DesktopAgentProvider | null;
+  changingBrowserUseConnectionMode: DesktopBrowserUseConnectionMode | null;
   changingLocale: DesktopLocale | null;
   changingSleepPreventionMode: DesktopSleepPreventionMode | null;
   defaultAgentProvider: DesktopAgentProvider;
   locale: DesktopLocale;
+  onBrowserUseConnectionModeChange: (
+    mode: DesktopBrowserUseConnectionMode
+  ) => void;
   onDefaultAgentProviderChange: (provider: DesktopAgentProvider) => void;
   onLocaleChange: (locale: DesktopLocale) => void;
   onSleepPreventionModeChange: (mode: DesktopSleepPreventionMode) => void;
@@ -1166,6 +1185,10 @@ function WorkspaceGeneralSettingsSection({
   const isUpdatingDefaultAgentProvider = changingDefaultAgentProvider !== null;
   const pendingDefaultAgentProvider =
     changingDefaultAgentProvider ?? defaultAgentProvider;
+  const isUpdatingBrowserUseConnectionMode =
+    changingBrowserUseConnectionMode !== null;
+  const pendingBrowserUseConnectionMode =
+    changingBrowserUseConnectionMode ?? browserUseConnectionMode;
   const isUpdatingSleepPrevention = changingSleepPreventionMode !== null;
   const pendingSleepPreventionMode =
     changingSleepPreventionMode ?? sleepPreventionMode;
@@ -1202,6 +1225,55 @@ function WorkspaceGeneralSettingsSection({
                   {optionLocale === "en"
                     ? t("workspace.settings.general.languageOptions.en")
                     : t("workspace.settings.general.languageOptions.zhCN")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex w-full items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 max-[560px]:w-full">
+          <strong className="text-[13px] font-semibold text-[var(--text-primary)]">
+            {t("workspace.settings.general.browserUseConnectionModeLabel")}
+          </strong>
+          <p className="m-0 text-[13px] leading-[1.3] text-[var(--text-secondary)]">
+            {t(
+              "workspace.settings.general.browserUseConnectionModeDescription"
+            )}
+          </p>
+        </div>
+        <div className="w-[220px] min-w-[220px] max-[560px]:w-full max-[560px]:min-w-0">
+          <Select
+            disabled={isUpdatingBrowserUseConnectionMode}
+            value={pendingBrowserUseConnectionMode}
+            onValueChange={(value) =>
+              onBrowserUseConnectionModeChange(
+                value as DesktopBrowserUseConnectionMode
+              )
+            }
+          >
+            <SelectTrigger
+              aria-label={t(
+                "workspace.settings.general.browserUseConnectionModeLabel"
+              )}
+              className={workspaceSettingsSelectTriggerClass}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              className={workspaceSettingsSelectContentClass}
+              style={{ zIndex: "var(--z-panel-popover)" }}
+            >
+              {desktopBrowserUseConnectionModes.map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {mode === "autoConnect"
+                    ? t(
+                        "workspace.settings.general.browserUseConnectionModeOptions.autoConnect"
+                      )
+                    : t(
+                        "workspace.settings.general.browserUseConnectionModeOptions.isolated"
+                      )}
                 </SelectItem>
               ))}
             </SelectContent>
