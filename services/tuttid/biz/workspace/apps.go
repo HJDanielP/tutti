@@ -53,8 +53,7 @@ type AppManifestCLI struct {
 }
 
 type AppManifestReferences struct {
-	ListEndpoint   string `json:"listEndpoint"`
-	SearchEndpoint string `json:"searchEndpoint,omitempty"`
+	ListEndpoint string `json:"listEndpoint"`
 }
 
 type AppManifestWindow struct {
@@ -237,6 +236,23 @@ type AppRuntimeState struct {
 	UpdatedAtUnixMs *int64
 }
 
+type AppInstallUserPhase string
+
+const (
+	AppInstallUserPhaseDownloading AppInstallUserPhase = "downloading"
+	AppInstallUserPhaseInstalling  AppInstallUserPhase = "installing"
+	AppInstallUserPhaseStarting    AppInstallUserPhase = "starting"
+)
+
+type AppInstallProgress struct {
+	UserPhase       AppInstallUserPhase
+	OverallPercent  float64
+	DownloadedBytes *int64
+	TotalBytes      *int64
+	Indeterminate   bool
+	UpdatedAtUnixMs int64
+}
+
 type AppCLIStatus string
 
 const (
@@ -268,6 +284,7 @@ type WorkspaceApp struct {
 	AvailableIconURL *string
 	UpdateAvailable  bool
 	Runtime          AppRuntimeState
+	InstallProgress  *AppInstallProgress
 	CLI              AppCLIState
 	References       AppReferencesState
 	StateRevision    int64
@@ -436,7 +453,6 @@ func ParseAppManifestJSON(data []byte) (AppManifest, string, error) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return AppManifest{}, "", fmt.Errorf("parse app manifest json: %w", err)
 	}
-	normalizeAppManifestReferences(&manifest)
 	if err := ValidateAppManifest(manifest); err != nil {
 		return AppManifest{}, "", err
 	}
@@ -460,23 +476,11 @@ func validateAppManifestReferencesJSON(raw map[string]json.RawMessage) error {
 		return errors.New("app manifest references must be an object when provided")
 	}
 	for key := range references {
-		if key != "listEndpoint" && key != "searchEndpoint" {
+		if key != "listEndpoint" {
 			return fmt.Errorf("app manifest references.%s is unsupported", key)
 		}
 	}
 	return nil
-}
-
-func normalizeAppManifestReferences(manifest *AppManifest) {
-	if manifest == nil || manifest.References == nil {
-		return
-	}
-	listEndpoint := strings.TrimSpace(manifest.References.ListEndpoint)
-	searchEndpoint := strings.TrimSpace(manifest.References.SearchEndpoint)
-	if listEndpoint == "" && searchEndpoint != "" {
-		manifest.References.ListEndpoint = searchEndpoint
-	}
-	manifest.References.SearchEndpoint = ""
 }
 
 func ReadAppManifestFile(path string) (AppManifest, string, error) {

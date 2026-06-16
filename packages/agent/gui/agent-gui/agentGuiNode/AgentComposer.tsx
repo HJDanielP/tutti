@@ -1283,7 +1283,7 @@ export function AgentComposer({
     [draftContent, onDraftContentChange, promptBeforeSelection, skillQueryMatch]
   );
 
-  const submitCurrentPrompt = (): void => {
+  const submitCurrentPrompt = useStableEventCallback((): void => {
     const canSubmitWhileSending = canQueueWhileBusy && isSendingTurn;
     if (
       isSelectedProjectMissing ||
@@ -1329,14 +1329,17 @@ export function AgentComposer({
     draftPromptRef.current = "";
     setPaletteDraftPrompt("");
     onDraftContentChange(emptyAgentComposerDraft());
-  };
+  });
 
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    submitCurrentPrompt();
-  };
+  const submit = useCallback(
+    (event: FormEvent<HTMLFormElement>): void => {
+      event.preventDefault();
+      submitCurrentPrompt();
+    },
+    [submitCurrentPrompt]
+  );
 
-  const handleSlashPaletteKeyDown = useCallback(
+  const handleSlashPaletteKeyDown = useStableEventCallback(
     (event: KeyboardEvent): boolean => {
       if (!showSlashPalette) {
         return false;
@@ -1371,14 +1374,7 @@ export function AgentComposer({
         return true;
       }
       return false;
-    },
-    [
-      activeHighlight,
-      selectCommand,
-      selectSkill,
-      showSlashPalette,
-      slashPaletteEntries
-    ]
+    }
   );
 
   const selectFileMention = useCallback(
@@ -1609,16 +1605,11 @@ export function AgentComposer({
     ]
   );
 
-  const handlePaletteKeyDown = useCallback(
+  const handlePaletteKeyDown = useStableEventCallback(
     (event: KeyboardEvent): boolean =>
       handleFileMentionKeyDown(event) ||
       handleSlashPaletteKeyDown(event) ||
-      handleModeCycleKeyDown(event),
-    [
-      handleFileMentionKeyDown,
-      handleSlashPaletteKeyDown,
-      handleModeCycleKeyDown
-    ]
+      handleModeCycleKeyDown(event)
   );
 
   useEffect(() => {
@@ -1723,14 +1714,16 @@ export function AgentComposer({
     };
   }, [closeOpenPalette, showPalette]);
 
-  const handleDraftChange = (nextDraft: string): void => {
-    draftPromptRef.current = nextDraft;
-    setPaletteDraftPrompt(nextDraft);
-    setIsPaletteOpen(true);
-    setSubmittedImagePreview([]);
-    submittedImagePreviewObservedBusyRef.current = false;
-    onDraftContentChange({ ...draftContent, prompt: nextDraft });
-  };
+  const handleDraftChange = useStableEventCallback(
+    (nextDraft: string): void => {
+      draftPromptRef.current = nextDraft;
+      setPaletteDraftPrompt(nextDraft);
+      setIsPaletteOpen(true);
+      setSubmittedImagePreview([]);
+      submittedImagePreviewObservedBusyRef.current = false;
+      onDraftContentChange({ ...draftContent, prompt: nextDraft });
+    }
+  );
 
   const addDraftImages = useCallback(
     (images: AgentRichTextPastedImage[]): void => {
@@ -2715,6 +2708,14 @@ export function AgentComposer({
       </div>
     </form>
   );
+}
+
+function useStableEventCallback<Args extends unknown[], Result>(
+  callback: (...args: Args) => Result
+): (...args: Args) => Result {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  return useCallback((...args: Args) => callbackRef.current(...args), []);
 }
 
 function SendFilledIcon(): React.JSX.Element {
