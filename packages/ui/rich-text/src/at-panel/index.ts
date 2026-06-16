@@ -1,3 +1,14 @@
+export { MentionPalette } from "./MentionPalette.tsx";
+export { flattenMentionPaletteEntries } from "./mentionPaletteEntries.ts";
+export type {
+  MentionPaletteCategory,
+  MentionPaletteEntry,
+  MentionPaletteFilterId,
+  MentionPaletteGroup,
+  MentionPaletteGroupId,
+  MentionPaletteProps,
+  MentionPaletteState
+} from "./mentionPaletteTypes.ts";
 export {
   RichTextAtPanel,
   type RichTextAtPanelProps

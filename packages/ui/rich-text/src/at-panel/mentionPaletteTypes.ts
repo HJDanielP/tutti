@@ -16,6 +16,13 @@ export interface MentionPaletteGroup<TItem> {
   visibleCount: number;
   hasMore: boolean;
   emptyLabel?: string;
+  /**
+   * Optional precomputed label for the "show more" expand control. When omitted
+   * the shell falls back to `+<remaining>`. Surfaces that need exact wording
+   * (e.g. the agent's translated "show N more") compute this themselves so the
+   * shell stays free of surface-specific i18n.
+   */
+  expandLabel?: string;
 }
 
 export type MentionPaletteState<TItem> =
@@ -70,4 +77,6 @@ export interface MentionPaletteProps<TItem> {
   onExpandGroup: (groupId: MentionPaletteGroupId) => void;
   onCycleFilter: (delta: 1 | -1) => void;
   onMoveSelection: (delta: 1 | -1) => void;
+  /** Rendered after the groups, before the keyboard hint bar. */
+  renderListFooter?: () => ReactNode;
 }

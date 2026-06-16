@@ -1,0 +1,670 @@
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type JSX,
+  type MouseEvent as ReactMouseEvent,
+  type MutableRefObject,
+  type ReactNode,
+  type RefObject
+} from "react";
+import {
+  FolderFailedFilledIcon,
+  KeyboardFilledIcon
+} from "@tutti-os/ui-system/icons";
+import {
+  Spinner,
+  UnderlineTabs,
+  menuItemClassName
+} from "@tutti-os/ui-system/components";
+import { cn } from "@tutti-os/ui-system/utils";
+import { flattenMentionPaletteEntries } from "./mentionPaletteEntries.ts";
+import type {
+  MentionPaletteGroup,
+  MentionPaletteProps,
+  MentionPaletteState
+} from "./mentionPaletteTypes.ts";
+import "./mentionPalette.css";
+
+const paletteStyles = {
+  palette:
+    "rich-text-at-mention-palette nodrag grid h-full max-h-[320px] min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden text-[13px] [-webkit-app-region:no-drag]",
+  header: "rich-text-at-mention-palette-header relative z-10 shrink-0",
+  footer: "rich-text-at-mention-palette-footer shrink-0",
+  scrollShell: "relative min-h-0 overflow-hidden",
+  scrollBody:
+    "rich-text-at-mention-palette-scroll-region h-full min-h-0 overflow-y-auto overscroll-contain px-1 pb-1 pt-2",
+  rowButton: cn(
+    menuItemClassName,
+    "nodrag min-h-9 w-full min-w-0 justify-start overflow-hidden rounded-[6px] border-0 bg-transparent px-2.5 py-2 text-left hover:bg-[var(--transparency-block)] focus:bg-[var(--transparency-block)] data-[highlighted]:bg-[var(--transparency-block)] active:bg-[var(--transparency-active)]"
+  ),
+  categoryButton:
+    "nodrag flex min-h-[72px] w-full items-center gap-3.5 rounded-[6px] border-0 bg-transparent px-2.5 py-2.5 text-left text-[var(--text-primary)] transition-[background-color,color] hover:bg-[var(--transparency-block)] focus-visible:bg-[var(--transparency-block)] focus-visible:outline-none active:bg-[var(--transparency-active)]",
+  expandButton:
+    "nodrag flex w-full items-center justify-center rounded-[6px] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--transparency-block)] focus-visible:bg-[var(--transparency-block)] focus-visible:outline-none active:bg-[var(--transparency-active)]"
+} as const;
+
+const MENTION_PALETTE_LOADING_MIN_VISIBLE_MS = 320;
+
+export function MentionPalette<TItem>(
+  props: MentionPaletteProps<TItem>
+): JSX.Element {
+  "use memo";
+  const {
+    state,
+    highlightedKey,
+    getItemKey,
+    renderItem,
+    labels,
+    hintLabels,
+    maxHeightPx,
+    onHighlightChange,
+    onSelectItem,
+    onSelectCategory,
+    onSelectFilter,
+    onExpandGroup,
+    onCycleFilter,
+    onMoveSelection,
+    renderListFooter
+  } = props;
+
+  const highlightedOptionRef = useRef<HTMLButtonElement | null>(null);
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+  const loadingVisibleUntilRef = useRef(0);
+  const loadingHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const [loadingIndicatorVisible, setLoadingIndicatorVisible] = useState(
+    state.status === "loading"
+  );
+
+  const interactiveEntries = flattenMentionPaletteEntries(
+    state,
+    (item, groupId) => getItemKey(item, findGroup(state.groups, groupId))
+  );
+  const hasInteractiveEntries = interactiveEntries.some(
+    (entry) => entry.type === "item" || entry.type === "expand"
+  );
+
+  const showLoadingState =
+    loadingIndicatorVisible &&
+    (!hasInteractiveEntries || state.mode === "browse");
+
+  useEffect(() => {
+    const highlightedElement = highlightedOptionRef.current;
+    if (!highlightedElement) {
+      return;
+    }
+    const scrollContainer = scrollBodyRef.current;
+    if (!scrollContainer || !scrollContainer.contains(highlightedElement)) {
+      highlightedElement.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightedKey]);
+
+  useEffect(() => {
+    if (loadingHideTimerRef.current !== null) {
+      clearTimeout(loadingHideTimerRef.current);
+      loadingHideTimerRef.current = null;
+    }
+
+    if (state.status === "loading") {
+      loadingVisibleUntilRef.current =
+        Date.now() + MENTION_PALETTE_LOADING_MIN_VISIBLE_MS;
+      setLoadingIndicatorVisible(true);
+      return;
+    }
+
+    const remainingMs = loadingVisibleUntilRef.current - Date.now();
+    if (remainingMs <= 0) {
+      setLoadingIndicatorVisible(false);
+      return;
+    }
+
+    loadingHideTimerRef.current = setTimeout(() => {
+      loadingHideTimerRef.current = null;
+      setLoadingIndicatorVisible(false);
+    }, remainingMs);
+
+    return () => {
+      if (loadingHideTimerRef.current !== null) {
+        clearTimeout(loadingHideTimerRef.current);
+        loadingHideTimerRef.current = null;
+      }
+    };
+  }, [state.status]);
+
+  const paletteMaxHeightStyle: CSSProperties | undefined =
+    maxHeightPx > 0 ? { maxHeight: `${maxHeightPx}px` } : undefined;
+
+  if (state.status === "error") {
+    return (
+      <div
+        className={paletteStyles.palette}
+        style={paletteMaxHeightStyle}
+        role="listbox"
+        aria-label={labels.tabHint}
+      >
+        <MentionPaletteEmptyState icon="folder-failed" label={labels.error} />
+      </div>
+    );
+  }
+
+  const isBrowse = state.mode === "browse";
+  const browseEmpty = isBrowse && !hasInteractiveEntries;
+
+  let body: ReactNode;
+  if (showLoadingState) {
+    body = <MentionPaletteLoading label={labels.loading} />;
+  } else if (browseEmpty || (!isBrowse && state.groups.length === 0)) {
+    body = (
+      <MentionPaletteEmptyState
+        icon={isBrowse ? "keyboard" : "folder-failed"}
+        label={labels.empty}
+      />
+    );
+  } else {
+    body = (
+      <MentionPaletteGroups
+        state={state}
+        highlightedKey={highlightedKey}
+        highlightedOptionRef={highlightedOptionRef}
+        getItemKey={getItemKey}
+        renderItem={renderItem}
+        onHighlightChange={onHighlightChange}
+        onSelectItem={onSelectItem}
+        onExpandGroup={onExpandGroup}
+        renderListFooter={renderListFooter}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={paletteStyles.palette}
+      style={paletteMaxHeightStyle}
+      role="listbox"
+      aria-label={labels.tabHint}
+    >
+      <div className={paletteStyles.header}>
+        <UnderlineTabs
+          tabs={state.categories.map((category) => ({
+            value: category.id,
+            label: category.label
+          }))}
+          value={state.filter}
+          onValueChange={isBrowse ? onSelectCategory : onSelectFilter}
+          className="rich-text-at-mention-palette-tabs"
+          preventMouseDownDefault
+        />
+      </div>
+      <div className={paletteStyles.scrollShell}>
+        <div ref={scrollBodyRef} className={paletteStyles.scrollBody}>
+          {body}
+        </div>
+        <MentionPaletteScrollbar scrollBodyRef={scrollBodyRef} />
+      </div>
+      <div className={paletteStyles.footer}>
+        <MentionPaletteHint
+          ariaLabel={labels.tabHint}
+          cycleFilterLabel={hintLabels.cycleFilter}
+          moveSelectionLabel={hintLabels.moveSelection}
+          onCycleFilter={onCycleFilter}
+          onMoveSelection={onMoveSelection}
+        />
+      </div>
+    </div>
+  );
+}
+
+function findGroup<TItem>(
+  groups: MentionPaletteState<TItem>["groups"],
+  groupId: string
+): MentionPaletteGroup<TItem> {
+  const group = groups.find((candidate) => candidate.id === groupId);
+  if (!group) {
+    throw new Error(`MentionPalette: unknown group id "${groupId}"`);
+  }
+  return group;
+}
+
+function MentionPaletteGroups<TItem>({
+  state,
+  highlightedKey,
+  highlightedOptionRef,
+  getItemKey,
+  renderItem,
+  onHighlightChange,
+  onSelectItem,
+  onExpandGroup,
+  renderListFooter
+}: {
+  state: MentionPaletteState<TItem>;
+  highlightedKey: string | null;
+  highlightedOptionRef: MutableRefObject<HTMLButtonElement | null>;
+  getItemKey: (item: TItem, group: MentionPaletteGroup<TItem>) => string;
+  renderItem: (item: TItem, ctx: { active: boolean }) => ReactNode;
+  onHighlightChange: (key: string) => void;
+  onSelectItem: (item: TItem, group: MentionPaletteGroup<TItem>) => void;
+  onExpandGroup: (groupId: string) => void;
+  renderListFooter?: () => ReactNode;
+}): JSX.Element {
+  return (
+    <div className="grid gap-3">
+      {state.groups.map((group, index) => {
+        const showGroupDivider = index > 0;
+        return (
+          <section key={group.id} className="grid gap-1">
+            {showGroupDivider ? (
+              <div
+                className="mx-3 mb-2 border-t border-[var(--line-1)]"
+                data-rich-text-at-mention-group-divider="true"
+                aria-hidden="true"
+              />
+            ) : null}
+            {group.label ? (
+              <div className="px-3 text-[13px] font-normal text-[var(--text-secondary)]">
+                {group.label}
+              </div>
+            ) : null}
+            <div className="grid gap-1">
+              {group.items.length === 0 && group.emptyLabel ? (
+                <div className="px-3 py-1 text-[13px] font-normal text-[var(--text-tertiary)]">
+                  {group.emptyLabel}
+                </div>
+              ) : null}
+              {group.items.map((item) => {
+                const entryKey = `${group.id}:${getItemKey(item, group)}`;
+                const isHighlighted = entryKey === highlightedKey;
+                return (
+                  <button
+                    key={entryKey}
+                    ref={isHighlighted ? highlightedOptionRef : null}
+                    type="button"
+                    className={cn(
+                      paletteStyles.rowButton,
+                      isHighlighted && "bg-[var(--transparency-block)]"
+                    )}
+                    role="option"
+                    aria-selected={isHighlighted}
+                    onMouseEnter={() => onHighlightChange(entryKey)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onSelectItem(item, group)}
+                  >
+                    {renderItem(item, { active: isHighlighted })}
+                  </button>
+                );
+              })}
+              {group.hasMore ? (
+                <button
+                  key={`expand:${group.id}`}
+                  ref={
+                    `expand:${group.id}` === highlightedKey
+                      ? highlightedOptionRef
+                      : null
+                  }
+                  type="button"
+                  className={cn(
+                    paletteStyles.expandButton,
+                    `expand:${group.id}` === highlightedKey &&
+                      "bg-[var(--transparency-block)] text-[var(--text-primary)]"
+                  )}
+                  onMouseEnter={() => onHighlightChange(`expand:${group.id}`)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onExpandGroup(group.id)}
+                >
+                  {group.expandLabel ??
+                    `+${Math.max(0, group.totalCount - group.visibleCount)}`}
+                </button>
+              ) : null}
+            </div>
+          </section>
+        );
+      })}
+      {renderListFooter?.()}
+    </div>
+  );
+}
+
+function MentionPaletteEmptyState({
+  icon = "folder-failed",
+  label
+}: {
+  icon?: "folder-failed" | "keyboard";
+  label: string;
+}): JSX.Element {
+  "use memo";
+  const EmptyStateIcon =
+    icon === "keyboard" ? KeyboardFilledIcon : FolderFailedFilledIcon;
+
+  return (
+    <div
+      className="flex h-full min-h-0 flex-1 items-center justify-center px-4 py-6 text-center text-[13px] text-[var(--text-tertiary)]"
+      data-empty-state-icon={icon}
+      data-testid="rich-text-at-mention-palette-empty-state"
+    >
+      <div className="flex max-w-[28ch] flex-col items-center justify-center gap-3">
+        <EmptyStateIcon
+          className="h-6 w-6 text-[var(--text-tertiary)]"
+          aria-hidden="true"
+        />
+        <span className="leading-5 text-[var(--text-tertiary)]">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function MentionPaletteLoading({ label }: { label: string }): JSX.Element {
+  "use memo";
+  return (
+    <div className="flex min-h-[52px] items-center gap-2 rounded-xl px-3 text-[13px] text-[var(--text-secondary)]">
+      <Spinner
+        size={16}
+        className="text-[var(--text-secondary)]"
+        testId="rich-text-at-mention-loading-spinner"
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function MentionPaletteHint({
+  ariaLabel,
+  cycleFilterLabel,
+  moveSelectionLabel,
+  onCycleFilter,
+  onMoveSelection
+}: {
+  ariaLabel: string;
+  cycleFilterLabel: string;
+  moveSelectionLabel: string;
+  onCycleFilter: (delta: 1 | -1) => void;
+  onMoveSelection: (delta: 1 | -1) => void;
+}): JSX.Element {
+  "use memo";
+  return (
+    <div
+      className="rich-text-at-mention-palette-hint"
+      aria-label={ariaLabel}
+      data-testid="rich-text-at-mention-palette-hint"
+    >
+      <button
+        className="rich-text-at-mention-palette-hint-item rich-text-at-mention-palette-hint-button"
+        type="button"
+        aria-label={cycleFilterLabel}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => onCycleFilter(1)}
+      >
+        {/* i18n-check-ignore: Keyboard key label. */}
+        <kbd className="rich-text-at-mention-palette-shortcut">Tab</kbd>
+        <span>{cycleFilterLabel}</span>
+      </button>
+      <span
+        className="rich-text-at-mention-palette-hint-separator"
+        aria-hidden="true"
+      >
+        ｜
+      </span>
+      <span className="rich-text-at-mention-palette-hint-item">
+        <span className="rich-text-at-mention-palette-shortcut-group">
+          <button
+            className="rich-text-at-mention-palette-shortcut rich-text-at-mention-palette-shortcut--arrow rich-text-at-mention-palette-shortcut-button"
+            type="button"
+            aria-label={`↑ ${moveSelectionLabel}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onMoveSelection(-1)}
+          >
+            ↑
+          </button>
+          <button
+            className="rich-text-at-mention-palette-shortcut rich-text-at-mention-palette-shortcut--arrow rich-text-at-mention-palette-shortcut-button"
+            type="button"
+            aria-label={`↓ ${moveSelectionLabel}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onMoveSelection(1)}
+          >
+            ↓
+          </button>
+        </span>
+        <span>{moveSelectionLabel}</span>
+      </span>
+    </div>
+  );
+}
+
+interface MentionPaletteScrollbarState {
+  scrollable: boolean;
+  thumbHeight: number;
+  thumbTop: number;
+}
+
+interface MentionPaletteScrollbarDragState {
+  maxScrollTop: number;
+  maxThumbTop: number;
+  startClientY: number;
+  startScrollTop: number;
+}
+
+const MENTION_PALETTE_SCROLLBAR_MIN_THUMB_HEIGHT = 24;
+const MENTION_PALETTE_SCROLLBAR_HIDDEN_STATE: MentionPaletteScrollbarState = {
+  scrollable: false,
+  thumbHeight: 0,
+  thumbTop: 0
+};
+
+function MentionPaletteScrollbar({
+  scrollBodyRef
+}: {
+  scrollBodyRef: RefObject<HTMLDivElement | null>;
+}): JSX.Element {
+  "use memo";
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<MentionPaletteScrollbarDragState | null>(null);
+  const [scrollbarState, setScrollbarState] =
+    useState<MentionPaletteScrollbarState>({
+      scrollable: false,
+      thumbHeight: 0,
+      thumbTop: 0
+    });
+  const [dragging, setDragging] = useState(false);
+
+  const hideScrollbar = useCallback((): void => {
+    setScrollbarState((previous) =>
+      previous.scrollable ||
+      previous.thumbHeight !== 0 ||
+      previous.thumbTop !== 0
+        ? MENTION_PALETTE_SCROLLBAR_HIDDEN_STATE
+        : previous
+    );
+  }, []);
+
+  const syncScrollbarState = useCallback((): void => {
+    const contentElement = scrollBodyRef.current;
+    if (!contentElement) {
+      hideScrollbar();
+      return;
+    }
+
+    const { scrollHeight, scrollTop, clientHeight } = contentElement;
+    const measuredTrackHeight = trackRef.current?.clientHeight ?? 0;
+    const trackHeight =
+      measuredTrackHeight > 0 ? measuredTrackHeight : clientHeight;
+    const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
+
+    if (clientHeight <= 0 || trackHeight <= 0 || maxScrollTop <= 0) {
+      hideScrollbar();
+      return;
+    }
+
+    const thumbHeight = Math.max(
+      MENTION_PALETTE_SCROLLBAR_MIN_THUMB_HEIGHT,
+      Math.round((clientHeight / scrollHeight) * trackHeight)
+    );
+    const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+    const thumbTop = Math.round((scrollTop / maxScrollTop) * maxThumbTop);
+    setScrollbarState((previous) =>
+      previous.scrollable &&
+      previous.thumbHeight === thumbHeight &&
+      previous.thumbTop === thumbTop
+        ? previous
+        : { scrollable: true, thumbHeight, thumbTop }
+    );
+  }, [hideScrollbar, scrollBodyRef]);
+
+  useEffect(() => {
+    const contentElement = scrollBodyRef.current;
+    if (!contentElement) {
+      hideScrollbar();
+      return;
+    }
+
+    syncScrollbarState();
+    contentElement.addEventListener("scroll", syncScrollbarState, {
+      passive: true
+    });
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(syncScrollbarState)
+        : null;
+    resizeObserver?.observe(contentElement);
+    if (trackRef.current) {
+      resizeObserver?.observe(trackRef.current);
+    }
+    const animationFrameId = window.requestAnimationFrame(syncScrollbarState);
+    return () => {
+      contentElement.removeEventListener("scroll", syncScrollbarState);
+      resizeObserver?.disconnect();
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [hideScrollbar, scrollBodyRef, syncScrollbarState]);
+
+  useEffect(() => {
+    if (!dragging) {
+      return;
+    }
+
+    const handleMouseMove = (event: MouseEvent): void => {
+      const contentElement = scrollBodyRef.current;
+      const dragState = dragStateRef.current;
+      if (!contentElement || !dragState || dragState.maxThumbTop <= 0) {
+        return;
+      }
+      const delta = event.clientY - dragState.startClientY;
+      const nextThumbTop =
+        (dragState.startScrollTop / dragState.maxScrollTop) *
+          dragState.maxThumbTop +
+        delta;
+      contentElement.scrollTop =
+        (Math.min(Math.max(0, nextThumbTop), dragState.maxThumbTop) /
+          dragState.maxThumbTop) *
+        dragState.maxScrollTop;
+      syncScrollbarState();
+    };
+
+    const handleMouseUp = (): void => {
+      dragStateRef.current = null;
+      setDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragging, scrollBodyRef, syncScrollbarState]);
+
+  const scrollContentToThumbTop = (thumbTop: number): void => {
+    const contentElement = scrollBodyRef.current;
+    const trackElement = trackRef.current;
+    if (!contentElement || !trackElement) {
+      return;
+    }
+    const maxScrollTop = Math.max(
+      0,
+      contentElement.scrollHeight - contentElement.clientHeight
+    );
+    const maxThumbTop = Math.max(
+      0,
+      trackElement.clientHeight - scrollbarState.thumbHeight
+    );
+    if (maxScrollTop <= 0 || maxThumbTop <= 0) {
+      return;
+    }
+    contentElement.scrollTop =
+      (Math.min(Math.max(0, thumbTop), maxThumbTop) / maxThumbTop) *
+      maxScrollTop;
+    syncScrollbarState();
+  };
+
+  const handleTrackMouseDown = (
+    event: ReactMouseEvent<HTMLDivElement>
+  ): void => {
+    if (
+      event.button !== 0 ||
+      !scrollbarState.scrollable ||
+      event.target !== event.currentTarget
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const trackRect = event.currentTarget.getBoundingClientRect();
+    scrollContentToThumbTop(
+      event.clientY - trackRect.top - scrollbarState.thumbHeight / 2
+    );
+  };
+
+  const handleThumbMouseDown = (
+    event: ReactMouseEvent<HTMLDivElement>
+  ): void => {
+    if (event.button !== 0 || !scrollbarState.scrollable) {
+      return;
+    }
+    const contentElement = scrollBodyRef.current;
+    const trackElement = trackRef.current;
+    if (!contentElement || !trackElement) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    dragStateRef.current = {
+      maxScrollTop: Math.max(
+        0,
+        contentElement.scrollHeight - contentElement.clientHeight
+      ),
+      maxThumbTop: Math.max(
+        0,
+        trackElement.clientHeight - scrollbarState.thumbHeight
+      ),
+      startClientY: event.clientY,
+      startScrollTop: contentElement.scrollTop
+    };
+    setDragging(true);
+  };
+
+  if (!scrollbarState.scrollable && !dragging) {
+    return <div ref={trackRef} className="hidden" aria-hidden="true" />;
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      className="workspace-agents-status-panel__scrollbar rich-text-at-mention-palette-scrollbar group/status-scrollbar"
+      data-scrollable={scrollbarState.scrollable ? "true" : "false"}
+      data-dragging={dragging ? "true" : "false"}
+      data-testid="rich-text-at-mention-palette-scrollbar"
+      aria-hidden="true"
+      onMouseDown={handleTrackMouseDown}
+    >
+      <div
+        className="workspace-agents-status-panel__scrollbar-thumb"
+        onMouseDown={handleThumbMouseDown}
+        style={{
+          height: `${scrollbarState.thumbHeight}px`,
+          transform: `translateY(${scrollbarState.thumbTop}px)`
+        }}
+      />
+    </div>
+  );
+}
