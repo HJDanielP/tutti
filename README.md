@@ -72,9 +72,13 @@ No more switching back and forth across multiple tabs. One view gives you the fu
 
 Connect your existing Claude, Codex, and Gemini subscriptions directly. All apps and agents run on top of them, with no extra fees.
 
+![Bring Your Own Subscriptions — connect your existing Claude, Codex, and Gemini plans](docs/assets/bring-your-own-subscriptions.jpg)
+
 ### Personalize Your Workspace
 
 Set up your workspace the way you like. Switch between dark mode and light mode, change your desktop background, adjust the dock position, customize icon styles, and more.
+
+![Personalize Your Workspace — dark or light mode, desktop background, dock, and icon styles](docs/assets/personalize-your-workspace.jpg)
 
 ## Who is Tutti for?
 
