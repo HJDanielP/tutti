@@ -1378,7 +1378,7 @@ func TestAppCenterServiceInstallPackagePrunesOldInactiveVersions(t *testing.T) {
 	if err := store.PutAppPackageVersion(ctx, activePackage); err != nil {
 		t.Fatalf("PutAppPackageVersion(active) error = %v", err)
 	}
-	runner := &AppRunner{RuntimeResolver: &preloadThenFailRuntimeResolver{called: make(chan struct{}), startErr: errors.New("skip runtime")}}
+	runner := &AppRunner{RuntimeResolver: &appRuntimeResolverStub{called: make(chan struct{}), err: errors.New("skip runtime")}}
 	service := AppCenterService{
 		Store:          store,
 		WorkspaceStore: &catalogStoreStub{getWorkspace: workspacebiz.Summary{ID: "ws-1", Name: "Workspace"}},
@@ -1389,6 +1389,7 @@ func TestAppCenterServiceInstallPackagePrunesOldInactiveVersions(t *testing.T) {
 	if _, err := service.installPackage(ctx, "ws-1", activePackage, InstallOptions{}); err != nil {
 		t.Fatalf("installPackage() error = %v", err)
 	}
+	waitForRunnerStatus(t, runner, "ws-1", "large-builtin", workspacebiz.AppRuntimeStatusFailed)
 
 	if _, err := store.GetAppPackageVersion(ctx, "large-builtin", "1.0.0"); !errors.Is(err, workspacedata.ErrWorkspaceAppNotFound) {
 		t.Fatalf("old package version error = %v, want ErrWorkspaceAppNotFound", err)
