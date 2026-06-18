@@ -412,36 +412,6 @@ export function AgentModelReasoningDropdown({
   const [menuOpen, setMenuOpen] = useState(false);
   const menu = buildComposerModelMenuModel(composerSettings, labels);
   const menuDisabled = disabled || menu.disabled;
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7808/ingest/f5ca3992-d942-4347-9378-897ee3300e86", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "19f915"
-      },
-      body: JSON.stringify({
-        sessionId: "19f915",
-        runId: "pre-fix",
-        hypothesisId: "H2-H3",
-        location: "AgentComposerSettingsMenus.tsx:AgentModelReasoningDropdown",
-        message: "model dropdown render",
-        data: {
-          renderCount: renderCountRef.current,
-          menuOpen,
-          menuDisabled,
-          isSettingsLoading: composerSettings.isSettingsLoading,
-          modelOptionsCount: menu.model.options.length,
-          triggerLabel: menu.trigger.combinedLabel || menu.trigger.modelLabel,
-          showModel: menu.model.show
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  });
   const applySettingsChange = (patch: {
     model?: string;
     reasoningEffort?: string;
@@ -452,34 +422,7 @@ export function AgentModelReasoningDropdown({
   };
 
   return (
-    <DropdownMenu
-      open={menuOpen}
-      onOpenChange={(nextOpen) => {
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7808/ingest/f5ca3992-d942-4347-9378-897ee3300e86",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "19f915"
-            },
-            body: JSON.stringify({
-              sessionId: "19f915",
-              runId: "pre-fix",
-              hypothesisId: "H3",
-              location:
-                "AgentComposerSettingsMenus.tsx:AgentModelReasoningDropdown:onOpenChange",
-              message: "model dropdown open state change",
-              data: { from: menuOpen, to: nextOpen },
-              timestamp: Date.now()
-            })
-          }
-        ).catch(() => {});
-        // #endregion
-        setMenuOpen(nextOpen);
-      }}
-    >
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild disabled={menuDisabled}>
         <button
           type="button"

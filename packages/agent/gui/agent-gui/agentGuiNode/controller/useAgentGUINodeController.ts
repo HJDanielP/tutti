@@ -754,6 +754,23 @@ function sessionHasRenderableMessages(input: {
   );
 }
 
+function maxOptionalTimeUnixMs(
+  left: number | null | undefined,
+  right: number | null | undefined
+): number | undefined {
+  const leftTime =
+    typeof left === "number" && Number.isFinite(left) ? left : undefined;
+  const rightTime =
+    typeof right === "number" && Number.isFinite(right) ? right : undefined;
+  if (leftTime === undefined) {
+    return rightTime;
+  }
+  if (rightTime === undefined) {
+    return leftTime;
+  }
+  return Math.max(leftTime, rightTime);
+}
+
 function mergeSnapshotConversationSummary(
   existing: AgentGUIConversationSummary | undefined,
   incoming: AgentGUIConversationSummary,
@@ -805,6 +822,10 @@ function mergeSnapshotConversationSummary(
     ...titleFields,
     status,
     syncState,
+    sortTimeUnixMs: maxOptionalTimeUnixMs(
+      existing.sortTimeUnixMs,
+      incoming.sortTimeUnixMs
+    ),
     updatedAtUnixMs: shouldKeepExistingStatus
       ? existing.updatedAtUnixMs
       : titleFields.title === existing.title &&
