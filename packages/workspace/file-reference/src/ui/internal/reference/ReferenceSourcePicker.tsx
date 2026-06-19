@@ -29,6 +29,9 @@ import {
   ScrollArea,
   SearchIcon,
   Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   cn
 } from "@tutti-os/ui-system";
 import { AddIcon } from "@tutti-os/ui-system/icons";
@@ -54,6 +57,7 @@ import {
   type ReferenceNodePreviewState,
   type ReferenceGroupedSelection
 } from "../../../react/internal/reference/useReferenceSourcePickerView.ts";
+import { formatHierarchyTitle } from "./referenceSourcePickerPresentation.ts";
 
 export interface ReferenceSourcePickerProps {
   aggregator: ReferenceSourceAggregator;
@@ -73,9 +77,10 @@ export interface ReferenceSourcePickerProps {
 
 /**
  * 左栏二级分组(应用/任务列表)默认最多展示的条目数;超出则折叠在「拉取更多」之后。
- * 每点一次「拉取更多」再多展示一页(同样步长),并在源端仍有续页(cursor)时拉取下一页。
+ * 点击「拉取更多」先展开已加载的隐藏分组;已加载分组全部可见后,若源端仍有续页(cursor),
+ * 再复用同一入口拉取下一页。
  */
-const SIDEBAR_GROUP_PAGE_SIZE = 20;
+const SIDEBAR_GROUP_PAGE_SIZE = 5;
 
 type PickerView = ReturnType<typeof useReferenceSourcePickerView>;
 
@@ -448,18 +453,13 @@ function SourceSidebar({
   const loadMoreGroups = (sourceId: string) => {
     const groups = view.sidebarGroupsBySource[sourceId] ?? [];
     const limit = shownBySource[sourceId] ?? SIDEBAR_GROUP_PAGE_SIZE;
-    // 以当前实际可见数为基准再加一页(selectedIndex 撑高时不回退已可见的项)。
-    const selectedIndex = groups.findIndex(
-      (group) => nodeRefKey(group.ref) === view.selectedGroupKey
-    );
-    const visibleCount = selectedIndex >= limit ? selectedIndex + 1 : limit;
-    const next = visibleCount + SIDEBAR_GROUP_PAGE_SIZE;
-    setShownBySource((prev) => ({ ...prev, [sourceId]: next }));
-    // 已加载的分组不够填满下一页、且源端仍有续页时,顺带拉取下一页补足。
-    if (
-      next > groups.length &&
-      (view.sidebarHasMoreBySource[sourceId] ?? false)
-    ) {
+    // 点「查看更多」先展示全部已加载项;已全部可见时,同一入口再拉源端下一页。
+    const visibleCount = Math.max(groups.length, limit);
+    if (groups.length > limit) {
+      setShownBySource((prev) => ({ ...prev, [sourceId]: visibleCount }));
+      return;
+    }
+    if (view.sidebarHasMoreBySource[sourceId] ?? false) {
       view.loadMoreSidebarGroups(sourceId);
     }
   };
@@ -527,12 +527,14 @@ function SourceSidebar({
                           icon={tab.icon}
                         />
                       )}
-                      <span
-                        className="min-w-0 flex-1 truncate"
-                        data-autofit-label
-                      >
-                        {group.displayName}
-                      </span>
+                      <FullTextTooltip content={group.displayName}>
+                        <span
+                          className="min-w-0 flex-1 truncate"
+                          data-autofit-label
+                        >
+                          {group.displayName}
+                        </span>
+                      </FullTextTooltip>
                       {group.childCount != null ? (
                         <span className="shrink-0 text-[11px] text-[var(--text-tertiary)]">
                           {group.childCount}
@@ -554,7 +556,12 @@ function SourceSidebar({
                       className="text-[var(--text-secondary)]"
                       size={12}
                     />
-                  ) : null}
+                  ) : (
+                    <ChevronDownIcon
+                      className="shrink-0 text-[var(--text-secondary)]"
+                      size={12}
+                    />
+                  )}
                   <span>{copy.t("referencePicker.loadMoreGroups")}</span>
                 </button>
               ) : null}
@@ -580,6 +587,7 @@ function SearchResultRow({
   onToggle: (node: ReferenceNode) => void;
 }): JSX.Element {
   const isFolder = node.kind === "folder";
+  const contextLabel = node.contextLabel ?? node.ref.nodeId;
   return (
     <div
       className={cn(
@@ -599,12 +607,16 @@ function SearchResultRow({
           )}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">
-            {node.displayName}
-          </span>
-          <span className="block truncate text-[11px] text-[var(--text-secondary)]">
-            {node.contextLabel ?? node.ref.nodeId}
-          </span>
+          <FullTextTooltip content={node.displayName}>
+            <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">
+              {node.displayName}
+            </span>
+          </FullTextTooltip>
+          <FullTextTooltip content={contextLabel}>
+            <span className="block truncate text-[11px] text-[var(--text-secondary)]">
+              {contextLabel}
+            </span>
+          </FullTextTooltip>
         </span>
       </div>
       <Button
@@ -657,8 +669,16 @@ function toPreviewSurfaceState(
         objectUrl: previewState.objectUrl,
         status: "image"
       };
+    case "video":
+      return {
+        entry: node,
+        objectUrl: previewState.objectUrl,
+        status: "video"
+      };
     case "text":
       return { content: previewState.content, entry: node, status: "text" };
+    case "html":
+      return { content: previewState.content, entry: node, status: "html" };
     case "readonly":
       return {
         entry: node,
@@ -706,6 +726,37 @@ const SOURCE_BADGE_CLASSES: Record<string, string> = {
     "bg-[color-mix(in_srgb,var(--rich-text-mention-issue)_12%,transparent)] text-[var(--rich-text-mention-issue)]"
 };
 
+function FullTextTooltip({
+  children,
+  content
+}: {
+  children: ReactNode;
+  content: string;
+}): JSX.Element {
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent
+        className="max-w-[min(520px,calc(100vw-32px))] whitespace-normal text-left [overflow-wrap:anywhere]"
+        side="top"
+        style={{
+          maxWidth: "min(520px, calc(100vw - 32px))",
+          overflowWrap: "anywhere",
+          whiteSpace: "normal",
+          backgroundColor: "var(--background-fronted)",
+          border: "1px solid var(--border-1)",
+          borderRadius: 6,
+          boxShadow: "var(--shadow-soft)",
+          color: "var(--text-primary)",
+          padding: "4px 8px"
+        }}
+      >
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function PreviewInfoPane({
   copy,
   node,
@@ -719,6 +770,8 @@ function PreviewInfoPane({
   sourceLabel: string;
   hierarchy: readonly ReferenceNode[];
 }): JSX.Element {
+  const hierarchyTitle = formatHierarchyTitle(hierarchy);
+
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-[var(--background-fronted)]">
       {node ? (
@@ -729,6 +782,8 @@ function PreviewInfoPane({
             emptyMessage={copy.t("referencePicker.emptyPreview")}
             frameClassName="flex aspect-[3/2] w-full flex-col items-center justify-center overflow-hidden rounded-[8px] border border-[var(--line-2,var(--border-2))] bg-[var(--transparency-block)] p-0 text-center"
             imageAlt={(entry) => entry.displayName}
+            htmlFrameClassName="items-stretch justify-stretch bg-white"
+            htmlTitle={(entry) => entry.displayName}
             imageFrameClassName="p-3"
             loadingIndicator={<Spinner size={16} />}
             loadingMessage={copy.t("referencePicker.previewLoading")}
@@ -744,9 +799,11 @@ function PreviewInfoPane({
             textClassName="h-full w-full overflow-auto p-3 text-left text-[11px] leading-5 whitespace-pre-wrap break-words text-[var(--text-primary)]"
             textFrameClassName="items-stretch justify-stretch"
           />
-          <p className="truncate text-[15px] font-semibold">
-            {node.displayName}
-          </p>
+          <FullTextTooltip content={node.displayName}>
+            <p className="truncate text-[15px] font-semibold">
+              {node.displayName}
+            </p>
+          </FullTextTooltip>
           <dl className="space-y-2 text-[13px]">
             <InfoRow label={copy.t("referencePicker.previewSource")}>
               <Badge
@@ -774,26 +831,44 @@ function PreviewInfoPane({
               </p>
               {/* 类目录路径展示:逐级 displayName 以「/」连接,如 文稿 / xx / xx。
                   每截单独 truncate(最长 ~14ch),超长段(如哈希目录)不再换行撑乱布局。 */}
-              <div className="flex flex-wrap items-center gap-y-1 text-[12px] leading-5">
-                {hierarchy.map((crumb, index) => (
-                  <span
-                    key={nodeRefKey(crumb.ref)}
-                    className="flex min-w-0 items-center"
-                  >
-                    {index > 0 ? (
-                      <span className="mx-1 shrink-0 text-[var(--text-tertiary)]">
-                        /
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <div className="flex flex-wrap items-center gap-y-1 text-[12px] leading-5">
+                    {hierarchy.map((crumb, index) => (
+                      <span
+                        key={nodeRefKey(crumb.ref)}
+                        className="flex min-w-0 items-center"
+                      >
+                        {index > 0 ? (
+                          <span className="mx-1 shrink-0 text-[var(--text-tertiary)]">
+                            /
+                          </span>
+                        ) : null}
+                        <span className="max-w-[14ch] truncate text-[var(--text-secondary)]">
+                          {crumb.displayName}
+                        </span>
                       </span>
-                    ) : null}
-                    <span
-                      className="max-w-[14ch] truncate text-[var(--text-secondary)]"
-                      title={crumb.displayName}
-                    >
-                      {crumb.displayName}
-                    </span>
-                  </span>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  className="max-w-[min(520px,calc(100vw-32px))] whitespace-normal text-left [overflow-wrap:anywhere]"
+                  side="top"
+                  style={{
+                    maxWidth: "min(520px, calc(100vw - 32px))",
+                    overflowWrap: "anywhere",
+                    whiteSpace: "normal",
+                    backgroundColor: "var(--background-fronted)",
+                    border: "1px solid var(--border-1)",
+                    borderRadius: 6,
+                    boxShadow: "var(--shadow-soft)",
+                    color: "var(--text-primary)",
+                    padding: "4px 8px"
+                  }}
+                >
+                  {hierarchyTitle}
+                </TooltipContent>
+              </Tooltip>
             </div>
           ) : null}
         </div>
@@ -840,6 +915,12 @@ function Footer({
   onClose: () => void;
   onConfirm: () => void;
 }): JSX.Element {
+  const selectionTooltipId = useId();
+  const [selectionTooltipOpen, setSelectionTooltipOpen] = useState(false);
+  const selectionTooltipLabel = selection
+    .map((node) => node.displayName)
+    .join("\n");
+
   return (
     <div className="flex items-center justify-between gap-3 border-t border-[var(--line-1)] px-4 py-3 sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
@@ -852,13 +933,45 @@ function Footer({
             className="min-w-0 max-w-[12rem]"
             variant="secondary"
           >
-            <span className="truncate">{node.displayName}</span>
+            <FullTextTooltip content={node.displayName}>
+              <span className="truncate">{node.displayName}</span>
+            </FullTextTooltip>
           </Badge>
         ))}
         {selection.length > 2 ? (
-          <Badge className="shrink-0" variant="secondary">
-            +{selection.length - 2}
-          </Badge>
+          <span
+            className="relative inline-flex shrink-0"
+            onBlur={() => setSelectionTooltipOpen(false)}
+            onFocus={() => setSelectionTooltipOpen(true)}
+            onMouseEnter={() => setSelectionTooltipOpen(true)}
+            onMouseLeave={() => setSelectionTooltipOpen(false)}
+          >
+            <Badge
+              asChild
+              className="shrink-0 cursor-default"
+              variant="secondary"
+            >
+              <button
+                aria-describedby={selectionTooltipId}
+                aria-label={selectionTooltipLabel}
+                type="button"
+              >
+                +{selection.length - 2}
+              </button>
+            </Badge>
+            <span
+              aria-hidden={!selectionTooltipOpen}
+              className="pointer-events-none absolute bottom-[calc(100%+8px)] left-0 z-[var(--z-tooltip,100700)] max-h-[min(20rem,calc(100vh-96px))] w-max max-w-[min(28rem,calc(100vw-32px))] overflow-auto whitespace-pre-line rounded-md border border-[var(--border-1)] bg-[var(--background-fronted)] px-2 py-1 text-left text-[13px] leading-[1.3] text-[var(--text-primary)] shadow-soft transition-opacity duration-100 [overflow-wrap:anywhere]"
+              id={selectionTooltipId}
+              role="tooltip"
+              style={{
+                opacity: selectionTooltipOpen ? 1 : 0,
+                visibility: selectionTooltipOpen ? "visible" : "hidden"
+              }}
+            >
+              {selectionTooltipLabel}
+            </span>
+          </span>
         ) : null}
       </div>
       <div className="flex items-center gap-2">
@@ -1209,12 +1322,14 @@ function TreeNodeRow({
         ) : (
           <FileIcon className="size-4 shrink-0 text-[var(--text-tertiary)]" />
         )}
-        <span
-          className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]"
-          data-autofit-label
-        >
-          {node.displayName}
-        </span>
+        <FullTextTooltip content={node.displayName}>
+          <span
+            className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]"
+            data-autofit-label
+          >
+            {node.displayName}
+          </span>
+        </FullTextTooltip>
         <Button
           aria-label={node.displayName}
           aria-pressed={selected}
