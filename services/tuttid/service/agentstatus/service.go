@@ -184,6 +184,7 @@ const defaultInstallTimeout = 5 * time.Minute
 const defaultProbeReadyAfter = 600 * time.Millisecond
 const defaultProbeTimeout = 3 * time.Second
 const defaultProbeWaitDelay = 500 * time.Millisecond
+const externalRegistryNPMProbeTimeoutPadding = 100 * time.Millisecond
 
 func (s Service) List(ctx context.Context, input ListInput) (Snapshot, error) {
 	now := s.now()
@@ -271,7 +272,7 @@ func (s Service) probeAdapterRuntimeCommand(
 	} else {
 		result.BinaryPath = command[0]
 	}
-	return s.probeCommand(ctx, result, command, env)
+	return s.probeCommandWithReadyAfter(ctx, result, command, env, s.probeReadyAfterForSpec(spec))
 }
 
 func (s Service) RunAction(ctx context.Context, input RunActionInput) (RunActionResult, error) {
@@ -436,6 +437,23 @@ func (s Service) shouldProbeAdapterCommandForStatus(spec ProviderSpec, runtimeRe
 		return true
 	}
 	return spec.Provider == agentprovider.Codex && s.executableFile(runtimeResolution.AdapterPath)
+}
+
+func (s Service) probeReadyAfterForSpec(spec ProviderSpec) time.Duration {
+	if strings.TrimSpace(spec.ExternalRegistryID) != "" && spec.AdapterInstall.RegistryNPM != nil {
+		return externalRegistryNPMProbeReadyAfter(s.probeTimeout())
+	}
+	return s.probeReadyAfter()
+}
+
+func externalRegistryNPMProbeReadyAfter(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		timeout = defaultProbeTimeout
+	}
+	if timeout <= 200*time.Millisecond {
+		return timeout / 2
+	}
+	return timeout - externalRegistryNPMProbeTimeoutPadding
 }
 
 func agentProviderProbeAdapterUnavailableMessage(reasonCode string) string {

@@ -17,16 +17,22 @@ import (
 )
 
 func (s Service) probeCommand(ctx context.Context, result ProbeResult, command []string, env []string) ProbeResult {
+	return s.probeCommandWithReadyAfter(ctx, result, command, env, s.probeReadyAfter())
+}
+
+func (s Service) probeCommandWithReadyAfter(
+	ctx context.Context,
+	result ProbeResult,
+	command []string,
+	env []string,
+	readyAfter time.Duration,
+) ProbeResult {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	timeout := s.ProbeTimeout
-	if timeout <= 0 {
-		timeout = defaultProbeTimeout
-	}
-	readyAfter := s.ProbeReadyAfter
+	timeout := s.probeTimeout()
 	if readyAfter <= 0 {
-		readyAfter = defaultProbeReadyAfter
+		readyAfter = s.probeReadyAfter()
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -76,6 +82,20 @@ func (s Service) probeCommand(ctx context.Context, result ProbeResult, command [
 		result.Message = probeCtx.Err().Error()
 		return result
 	}
+}
+
+func (s Service) probeReadyAfter() time.Duration {
+	if s.ProbeReadyAfter > 0 {
+		return s.ProbeReadyAfter
+	}
+	return defaultProbeReadyAfter
+}
+
+func (s Service) probeTimeout() time.Duration {
+	if s.ProbeTimeout > 0 {
+		return s.ProbeTimeout
+	}
+	return defaultProbeTimeout
 }
 
 func finishProbeWaitResult(result ProbeResult, err error, stdout string, stderr string) ProbeResult {

@@ -410,6 +410,66 @@ func TestServiceListReportsInstallActionWhenExternalAdapterCommandFails(t *testi
 	}
 }
 
+func TestServiceListReportsInstallActionWhenExternalAdapterCommandFailsAfterReadyWindow(t *testing.T) {
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	claudePath := filepath.Join(binDir, "claude")
+	writeExecutable(t, claudePath, "#!/bin/sh\nexit 0\n")
+
+	registryStore, prefixDir := fakeClaudeExternalRegistry(t)
+	runtimeRoot := fakeManagedRuntimeRoot(t)
+	writeExecutable(
+		t,
+		filepath.Join(runtimeRoot, "node", "bin", npmBinaryNameForTest()),
+		"#!/bin/sh\nsleep 0.1\necho 'sh: claude-agent-acp: command not found' >&2\nexit 127\n",
+	)
+	packageDir := npmPackageInstallDir(prefixDir, "@agentclientprotocol/claude-agent-acp")
+	writePackageManifest(t, packageDir, "@agentclientprotocol/claude-agent-acp", "0.46.0")
+
+	service := Service{
+		Environ: func() []string {
+			return []string{"PATH=/usr/bin:/bin"}
+		},
+		HomeDir: func() (string, error) {
+			return home, nil
+		},
+		LookPath: func(name string) (string, error) {
+			if name == "claude" {
+				return claudePath, nil
+			}
+			return "", errors.New("not found")
+		},
+		IsExecutableFile: isTestExecutableUnderHome(home),
+		Now: func() time.Time {
+			return time.Date(2026, 6, 2, 8, 0, 0, 0, time.UTC)
+		},
+		ProbeReadyAfter: 10 * time.Millisecond,
+		ProbeTimeout:    500 * time.Millisecond,
+		RunAuthStatusCommand: func(context.Context, ProviderSpec, string) (AuthInfo, bool) {
+			return AuthInfo{Status: AuthAuthenticated}, true
+		},
+		ExternalAgentRegistry: registryStore,
+		ManagedRuntime:        fakeManagedRuntimeResolver(t, runtimeRoot),
+	}
+
+	snapshot, err := service.List(context.Background(), ListInput{Providers: []string{"claude-code"}})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	status := onlyStatus(t, snapshot)
+	if status.Availability.Status != AvailabilityNotInstalled {
+		t.Fatalf("Availability.Status = %q, want %q", status.Availability.Status, AvailabilityNotInstalled)
+	}
+	if status.Availability.ReasonCode != "acp_adapter_launch_failed" {
+		t.Fatalf("ReasonCode = %q, want acp_adapter_launch_failed", status.Availability.ReasonCode)
+	}
+	action := firstAction(t, status.Actions)
+	if action.ID != ActionInstall || action.Kind != ActionKindDaemonAction {
+		t.Fatalf("first action = %#v, want daemon install action", action)
+	}
+}
+
 func TestServiceListTreatsUnknownAuthAsAuthRequired(t *testing.T) {
 	service := testService(func(name string) (string, error) {
 		return "/usr/local/bin/" + name, nil
