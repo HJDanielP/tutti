@@ -2252,11 +2252,12 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    expect(
-      screen.getByText("agentHost.workspaceAgentStatusWorking").parentElement
-    ).toHaveAttribute(
+    // The session status group surfaces the failed-sync hint: the label is shown
+    // and its containing group carries the hint as a hover title.
+    const syncHint = screen.getByText("agentHost.agentGui.syncFailed");
+    expect(syncHint.parentElement).toHaveAttribute(
       "title",
-      "agentHost.workspaceAgentStatusWorking · agentHost.agentGui.syncFailed"
+      "agentHost.agentGui.syncFailed"
     );
   });
 
@@ -2494,7 +2495,6 @@ describe("AgentGUINode", () => {
         modelUnavailable: false,
         reasoningUnavailable: false,
         permissionModeUnavailable: false,
-        planUnavailable: false,
         selectedPermissionModeValue: "preset",
         availableModels: [
           { value: "gpt-5", label: "GPT-5" },
@@ -2560,7 +2560,7 @@ describe("AgentGUINode", () => {
     view.unmount();
   }, 15000);
 
-  it("offers plan mode in the permission dropdown when supported", async () => {
+  it("renders the plan badge when plan mode is active and clears it on click", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       composerSettings: {
@@ -2568,17 +2568,16 @@ describe("AgentGUINode", () => {
           model: "claude-4",
           reasoningEffort: "high",
           speed: null,
-          planMode: false,
+          planMode: true,
           permissionModeId: "default"
         },
         draftSettings: {
           model: "claude-4",
           reasoningEffort: "high",
           speed: null,
-          planMode: false,
+          planMode: true,
           permissionModeId: "default"
         },
-        effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
         supportsSpeed: true,
@@ -2590,7 +2589,6 @@ describe("AgentGUINode", () => {
         modelUnavailable: false,
         reasoningUnavailable: false,
         permissionModeUnavailable: false,
-        planUnavailable: false,
         selectedPermissionModeValue: "default",
         availableModels: [{ value: "claude-4", label: "Claude 4" }],
         availableReasoningEfforts: [{ value: "high", label: "High" }],
@@ -2601,25 +2599,24 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    fireEvent.keyDown(
-      screen.getByRole("combobox", {
-        name: "agentHost.agentGui.permissionLabel"
-      }),
-      { key: "Enter" }
-    );
-    fireEvent.pointerDown(
-      await screen.findByRole("option", {
+    // Plan mode is no longer a dropdown option; it rides as a separate badge.
+    expect(
+      screen.queryByRole("option", {
         name: "agentHost.agentGui.planModeLabel"
-      }),
-      { button: 0, ctrlKey: false, pointerId: 5, pointerType: "mouse" }
-    );
+      })
+    ).toBeNull();
+
+    const badge = screen.getByRole("button", {
+      name: "agentHost.agentGui.planModeLabel"
+    });
+    fireEvent.click(badge);
 
     expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
-      planMode: true
+      planMode: false
     });
   });
 
-  it("cycles composer modes with shift+tab including plan mode", () => {
+  it("enables plan mode on shift+tab", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       composerSettings: {
@@ -2631,7 +2628,6 @@ describe("AgentGUINode", () => {
           planMode: false,
           permissionModeId: "acceptEdits"
         },
-        effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
         supportsSpeed: true,
@@ -2643,7 +2639,6 @@ describe("AgentGUINode", () => {
         modelUnavailable: false,
         reasoningUnavailable: false,
         permissionModeUnavailable: false,
-        planUnavailable: false,
         selectedPermissionModeValue: "acceptEdits",
         availableModels: [{ value: "claude-4", label: "Claude 4" }],
         availableReasoningEfforts: [{ value: "high", label: "High" }],
@@ -2655,7 +2650,6 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    // acceptEdits is the last permission mode, so shift+tab enters plan mode.
     fireEvent.keyDown(getComposerEditor(), { key: "Tab", shiftKey: true });
 
     expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
@@ -2663,7 +2657,7 @@ describe("AgentGUINode", () => {
     });
   });
 
-  it("cycles out of plan mode with shift+tab back to the first permission mode", () => {
+  it("disables plan mode on shift+tab", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       composerSettings: {
@@ -2675,7 +2669,6 @@ describe("AgentGUINode", () => {
           planMode: true,
           permissionModeId: "acceptEdits"
         },
-        effectivePlanMode: true,
         supportsModel: true,
         supportsReasoningEffort: true,
         supportsSpeed: true,
@@ -2687,7 +2680,6 @@ describe("AgentGUINode", () => {
         modelUnavailable: false,
         reasoningUnavailable: false,
         permissionModeUnavailable: false,
-        planUnavailable: false,
         selectedPermissionModeValue: "acceptEdits",
         availableModels: [{ value: "claude-4", label: "Claude 4" }],
         availableReasoningEfforts: [{ value: "high", label: "High" }],
@@ -2702,7 +2694,6 @@ describe("AgentGUINode", () => {
     fireEvent.keyDown(getComposerEditor(), { key: "Tab", shiftKey: true });
 
     expect(mockUpdateComposerSettings).toHaveBeenCalledWith({
-      permissionModeId: "default",
       planMode: false
     });
   });
@@ -2759,7 +2750,6 @@ describe("AgentGUINode", () => {
           planMode: false,
           permissionModeId: "auto"
         },
-        effectivePlanMode: false,
         supportsModel: true,
         supportsReasoningEffort: true,
         supportsSpeed: true,
@@ -2771,7 +2761,6 @@ describe("AgentGUINode", () => {
         modelUnavailable: false,
         reasoningUnavailable: false,
         permissionModeUnavailable: false,
-        planUnavailable: false,
         selectedPermissionModeValue: "auto",
         availableModels: [{ value: "gpt-5", label: "GPT-5" }],
         availableReasoningEfforts: [{ value: "high", label: "High" }],
@@ -2828,7 +2817,6 @@ describe("AgentGUINode", () => {
         isSettingsLoading: false,
         modelUnavailable: false,
         reasoningUnavailable: false,
-        planUnavailable: false,
         availableModels: [{ value: "gpt-5", label: "gpt-5" }],
         availableReasoningEfforts: [{ value: "high", label: "High" }]
       }
@@ -2866,7 +2854,6 @@ describe("AgentGUINode", () => {
         isSettingsLoading: false,
         modelUnavailable: false,
         reasoningUnavailable: false,
-        planUnavailable: false,
         availableModels: [],
         availableReasoningEfforts: []
       }
@@ -2908,7 +2895,6 @@ describe("AgentGUINode", () => {
         isSettingsLoading: false,
         modelUnavailable: false,
         reasoningUnavailable: false,
-        planUnavailable: false,
         availableModels: [
           { value: "gpt-5.5", label: "GPT-5.5" },
           { value: "gpt-5.4", label: "GPT-5.4" }
@@ -3383,9 +3369,11 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
+    // A completed conversation must not appear busy even when older transcript
+    // rows still contain a running tool call: the composer shows Send, not Stop.
     expect(
-      screen.getAllByText("agentHost.workspaceAgentStatusCompleted").length
-    ).toBeGreaterThan(0);
+      screen.getByRole("button", { name: "agentHost.agentGui.send" })
+    ).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "agentHost.agentGui.stop" })
     ).toBeNull();
@@ -3558,7 +3546,8 @@ describe("AgentGUINode", () => {
 
     expect(screen.getByText("compact")).toBeTruthy();
     expect(screen.getByText("status")).toBeTruthy();
-    expect(screen.queryByText("plan")).toBeNull();
+    // Plan rides as a local slash command when the capability is negotiated.
+    expect(screen.getByText("plan")).toBeTruthy();
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
@@ -3577,7 +3566,7 @@ describe("AgentGUINode", () => {
 
     expect(screen.queryByText("compact")).toBeNull();
     expect(screen.getByText("status")).toBeTruthy();
-    expect(screen.queryByText("plan")).toBeNull();
+    expect(screen.getByText("plan")).toBeTruthy();
   });
 
   it("handles Codex status as a local slash command without submitting", () => {
@@ -3595,7 +3584,7 @@ describe("AgentGUINode", () => {
     expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
-  it("does not expose Codex plan as a local slash command from palette selection", () => {
+  it("exposes /plan in the palette when plan mode is supported", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       draftPrompt: "/pla",
@@ -3603,14 +3592,10 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
-
-    expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
-    expect(mockSubmitPrompt).toHaveBeenCalledWith(promptBlocks("/pla"));
-    expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
+    expect(screen.getByText("plan")).toBeTruthy();
   });
 
-  it("blocks manual Codex plan text", () => {
+  it("toggles plan mode on manual Codex /plan text instead of submitting", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       draftPrompt: "/plan refactor auth",
@@ -3620,12 +3605,12 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
+    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({ planMode: true });
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
     expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
 
-  it("blocks advertised Claude Code plan commands", () => {
+  it("toggles plan mode on advertised Claude Code /plan instead of submitting", () => {
     mockViewModel = createViewModel({
       activeConversationId: "session-1",
       data: {
@@ -3640,7 +3625,7 @@ describe("AgentGUINode", () => {
 
     fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(mockUpdateComposerSettings).not.toHaveBeenCalled();
+    expect(mockUpdateComposerSettings).toHaveBeenCalledWith({ planMode: true });
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
     expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft(""));
   });
@@ -3736,7 +3721,7 @@ describe("AgentGUINode", () => {
     expect(palette).toHaveClass("h-full");
     expect(palette).toHaveClass("overflow-y-auto");
     expect(palette).not.toHaveClass("grid");
-    const firstOption = screen.getByText("web").closest("button");
+    const firstOption = screen.getByText("web").closest('[role="option"]');
     expect(firstOption).toHaveClass("nodrag");
     expect(firstOption).toHaveClass("flex");
     expect(firstOption).toHaveClass("min-h-9");
@@ -3825,7 +3810,7 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    fireEvent.click(screen.getByText("read").closest("button")!);
+    fireEvent.click(screen.getByText("read").closest('[role="option"]')!);
 
     expect(mockUpdateDraftContent).toHaveBeenCalledWith(createDraft("/read "));
     expect(mockSubmitPrompt).not.toHaveBeenCalled();
@@ -3842,7 +3827,7 @@ describe("AgentGUINode", () => {
     });
     renderAgentGUINode();
 
-    const readOption = screen.getByText("read").closest("button");
+    const readOption = screen.getByText("read").closest('[role="option"]');
     expect(readOption).not.toBeNull();
     expect(readOption).toHaveAttribute("aria-selected", "false");
     expect(readOption).not.toHaveClass("bg-[var(--transparency-block)]");
@@ -6968,7 +6953,6 @@ function createViewModel(
       isSettingsLoading: false,
       modelUnavailable: false,
       reasoningUnavailable: false,
-      planUnavailable: false,
       availableModels: [],
       availableReasoningEfforts: [
         { value: "low", label: "Low" },
