@@ -2466,10 +2466,10 @@ export function useAgentGUINodeController({
     (
       conversationId: string,
       patch:
-        | Partial<AgentGUIConversationSummary>
+        | Partial<Omit<AgentGUIConversationSummary, "project">>
         | ((
             conversation: AgentGUIConversationSummary
-          ) => Partial<AgentGUIConversationSummary> | null)
+          ) => Partial<Omit<AgentGUIConversationSummary, "project">> | null)
     ) => {
       if (!conversationListQuery) {
         return;
@@ -3421,7 +3421,17 @@ export function useAgentGUINodeController({
         });
       }
     },
-    [conversationListQuery, sessionViewRef, setTransientConversation]
+    // resolveSessionMessages is intentionally NOT listed: it changes whenever the
+    // activity snapshot's sessionMessagesById changes, and this callback feeds an
+    // effect that would then re-fire on every snapshot tick (pre-existing design;
+    // adding it regresses ~50 tests). The session-message read is best-effort here
+    // and the timeline projection drives detail freshness regardless.
+    [
+      conversationListQuery,
+      patchConversation,
+      sessionViewRef,
+      setTransientConversation
+    ]
   );
 
   useEffect(() => {
@@ -3609,6 +3619,7 @@ export function useAgentGUINodeController({
       clearSelectedConversationNotFoundRetryWhenInitialLoadsSettled,
       markFailedLiveState,
       persistActiveConversation,
+      removeConversations,
       scheduleSelectedConversationNotFoundRetry,
       workspaceId,
       conversationListQuery,
@@ -3953,7 +3964,12 @@ export function useAgentGUINodeController({
         }
       }
     },
-    [resolveSessionMessages, sessionViewRef, setTransientConversation]
+    [
+      patchConversation,
+      resolveSessionMessages,
+      sessionViewRef,
+      setTransientConversation
+    ]
   );
 
   const applyBackgroundTimelineStatusUpdate = useCallback(
@@ -4169,6 +4185,7 @@ export function useAgentGUINodeController({
       }
     },
     [
+      patchConversation,
       resolveSessionMessages,
       sessionViewRef,
       setTransientConversation,

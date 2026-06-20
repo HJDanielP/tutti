@@ -1166,6 +1166,27 @@ export function scheduleAgentGUIConversationListProjection(
 // arbitrary `(current[]) => next[]` updater was the seam that let a per-window
 // view-derived value (project) be written back into the shared store and churn
 // across windows; keeping it un-exported makes that impossible to express.
+// `project` is a per-window JOIN of cwd x userProjects derived in the view layer;
+// it must never become canonical store state (writing it back caused the
+// cross-window update storm this module fixes). Strip it at the single write
+// choke point so no path - merge, upsert, patch, seed - can leak a resolved
+// project, regardless of what a caller returns. Returns the same array reference
+// when nothing needed stripping, preserving the no-op identity short-circuit.
+function stripProjectFromConversations(
+  conversations: AgentGUIConversationSummary[]
+): AgentGUIConversationSummary[] {
+  let changed = false;
+  const next = conversations.map((conversation) => {
+    if (conversation.project == null) {
+      return conversation;
+    }
+    changed = true;
+    const { project: _project, ...rest } = conversation;
+    return rest;
+  });
+  return changed ? next : conversations;
+}
+
 function updateAgentGUIConversationListConversations(
   query: AgentGUIConversationListQuery,
   updater: (
@@ -1174,7 +1195,9 @@ function updateAgentGUIConversationListConversations(
   _reason: ConversationListUpdateReason = "external-update"
 ): void {
   updateQueryState(query, (current) => {
-    const nextConversations = updater(current.conversations);
+    const nextConversations = stripProjectFromConversations(
+      updater(current.conversations)
+    );
     if (nextConversations === current.conversations) {
       return current;
     }
@@ -1380,11 +1403,13 @@ export function setAgentGUIConversationPinned(input: {
 export function patchAgentGUIConversationSummary(input: {
   query: AgentGUIConversationListQuery;
   conversationId: string;
+  // `project` is omitted from the patch type: it is view-derived, never store
+  // state. (Even if it slipped through, stripProjectFromConversations drops it.)
   patch:
-    | Partial<AgentGUIConversationSummary>
+    | Partial<Omit<AgentGUIConversationSummary, "project">>
     | ((
         conversation: AgentGUIConversationSummary
-      ) => Partial<AgentGUIConversationSummary> | null);
+      ) => Partial<Omit<AgentGUIConversationSummary, "project">> | null);
 }): void {
   const conversationId = input.conversationId.trim();
   if (!conversationId) {

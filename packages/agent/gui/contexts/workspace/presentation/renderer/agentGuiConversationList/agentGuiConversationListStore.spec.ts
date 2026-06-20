@@ -272,10 +272,38 @@ describe("agentGuiConversationListStore", () => {
 
   // NOTE: project metadata is no longer canonical store state — it is a
   // view-only JOIN of cwd × userProjects derived per-window in the view-model
-  // layer (see useAgentGUINodeController visibleConversations). The store never
-  // preserves or drops `project`, so the former store-merge project tests were
-  // removed. View derivation is covered by the controller and groupConversations
-  // specs.
+  // layer (see useAgentGUINodeController visibleConversations). The store
+  // structurally strips `project` at its write choke point, so the former
+  // store-merge project tests were removed. View derivation is covered by the
+  // controller and groupConversations specs.
+
+  it("strips project metadata so it never becomes canonical store state", () => {
+    const query: AgentGUIConversationListQuery = {
+      workspaceId: "workspace-1",
+      userId: "user-1",
+      provider: "codex",
+      sessionOrigin: "WORKSPACE_AGENT_SESSION_ORIGIN_RUNTIME"
+    };
+    ensureAgentGUIConversationListQuery(query);
+
+    // Even if a write path hands the store a resolved project, it must not land
+    // in canonical state (this is what prevented the cross-window storm).
+    setAgentGUIConversationListConversationsForTests(query, [
+      conversation("session-1", {
+        cwd: "/workspace/app",
+        project: {
+          id: "app",
+          path: "/workspace/app",
+          label: "App"
+        }
+      })
+    ]);
+
+    const stored =
+      getAgentGUIConversationListQuerySnapshot(query)?.conversations[0];
+    expect(stored?.id).toBe("session-1");
+    expect(stored?.project ?? null).toBeNull();
+  });
 
   it("logs diagnostics when conversation updates churn in a short window", () => {
     const logRuntimeDiagnostics = vi.fn();
