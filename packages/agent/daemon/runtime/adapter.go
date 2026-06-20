@@ -35,6 +35,7 @@ type ProcessTransport interface {
 }
 
 type EventSink func([]activityshared.Event)
+type SessionEventSink func(string, []activityshared.Event)
 type CommandSnapshotSink func(AgentSessionCommandSnapshot)
 type ConfigOptionsUpdateSink func(AgentSessionConfigOptionsUpdate)
 
@@ -65,6 +66,10 @@ type CommandSnapshotAdapter interface {
 
 type CommandSnapshotSinkAdapter interface {
 	SetCommandSnapshotSink(CommandSnapshotSink)
+}
+
+type SessionEventSinkAdapter interface {
+	SetSessionEventSink(SessionEventSink)
 }
 
 type ConfigOptionsUpdateSinkAdapter interface {

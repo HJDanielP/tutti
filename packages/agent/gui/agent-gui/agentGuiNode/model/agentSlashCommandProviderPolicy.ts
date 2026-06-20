@@ -100,6 +100,15 @@ const CLAUDE_CODE_FALLBACK_COMMANDS: readonly AgentSessionCommand[] = [
   ...ACP_FALLBACK_COMMANDS,
   { name: REVIEW_COMMAND }
 ];
+const CLAUDE_CODE_SLASH_PALETTE_COMMANDS = new Set([
+  "compact",
+  "context",
+  "fast",
+  "goal",
+  "review",
+  "status",
+  "usage"
+]);
 const BROWSER_USE_CAPABILITY_COMMAND: AgentSlashCommandCapability = {
   kind: "capability",
   capability: "browserUse",
@@ -176,9 +185,13 @@ export function resolveSlashCommandsForProvider({
   );
   // `/plan` is a local plan-mode toggle, not an agent prompt: drop any
   // agent-advertised `plan` and re-surface our own entry only when supported.
-  const commandEntries = mergedEntries.filter(
-    (entry) => normalizedCommandName(entry) !== "plan"
-  );
+  const commandEntries = mergedEntries.filter((entry) => {
+    const commandName = normalizedCommandName(entry);
+    return (
+      commandName !== "plan" &&
+      isSlashPaletteCommandVisible(provider, commandName)
+    );
+  });
   const planEntries =
     planSupported && isACPProvider(provider) ? [PLAN_MODE_COMMAND] : [];
   const capabilityEntries: AgentSlashCommandCapability[] = [];
@@ -332,6 +345,16 @@ function fallbackCommandsForProvider(
   provider: AgentSlashCommandProvider
 ): readonly AgentSessionCommand[] {
   return providerSlashPolicy(provider)?.fallbackCommands ?? [];
+}
+
+function isSlashPaletteCommandVisible(
+  provider: AgentSlashCommandProvider,
+  commandName: string
+): boolean {
+  return (
+    provider !== "claude-code" ||
+    CLAUDE_CODE_SLASH_PALETTE_COMMANDS.has(commandName)
+  );
 }
 
 function isLocalStatusCommand(

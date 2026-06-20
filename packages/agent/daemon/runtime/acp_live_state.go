@@ -13,6 +13,7 @@ type acpLiveState struct {
 	configOptions           map[string]any
 	configOptionDescriptors []map[string]any
 	usage                   acpUsageState
+	goal                    map[string]any
 }
 
 type acpLiveStateSnapshot struct {
@@ -21,6 +22,7 @@ type acpLiveStateSnapshot struct {
 	configOptions           map[string]any
 	configOptionDescriptors []map[string]any
 	usage                   acpUsageState
+	goal                    map[string]any
 }
 
 type acpUsageState struct {
@@ -52,6 +54,7 @@ func cloneACPLiveState(state acpLiveState) acpLiveState {
 		commandsKnown:           state.commandsKnown,
 		configOptionDescriptors: cloneConfigOptionDescriptors(state.configOptionDescriptors),
 		usage:                   state.usage,
+		goal:                    clonePayload(state.goal),
 	}
 	if len(state.configOptions) > 0 {
 		cloned.configOptions = clonePayload(state.configOptions)
@@ -68,6 +71,7 @@ func snapshotACPLiveState(state acpLiveState) acpLiveStateSnapshot {
 		configOptions:           clonePayload(state.configOptions),
 		configOptionDescriptors: cloneConfigOptionDescriptors(state.configOptionDescriptors),
 		usage:                   state.usage,
+		goal:                    clonePayload(state.goal),
 	}
 }
 
@@ -141,6 +145,12 @@ func applyACPUpdateToLiveState(
 		if usage, ok := acpUsageValue(params.Update); ok {
 			state.usage = mergeACPUsageState(state.usage, usage)
 		}
+	case "thread_goal_update":
+		if goal := payloadObject(params.Update["goal"]); len(goal) > 0 {
+			state.goal = clonePayload(goal)
+		}
+	case "thread_goal_clear", "thread_goal_cleared":
+		state.goal = nil
 	}
 	return nil
 }

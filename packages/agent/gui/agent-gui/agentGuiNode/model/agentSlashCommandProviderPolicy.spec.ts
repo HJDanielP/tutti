@@ -107,6 +107,30 @@ describe("agentSlashCommandProviderPolicy", () => {
     ).toEqual(["compact", "status", "fast", "goal", "review"]);
   });
 
+  it("keeps noisy Claude Code discovered commands out of the slash palette", () => {
+    expect(
+      resolveSlashCommandsForProvider({
+        provider: "claude-code",
+        commands: [
+          { name: "browser-use-tutti-10" },
+          { name: "lark-mail" },
+          { name: "context", description: "Show context" },
+          { name: "goal" },
+          { name: "security-review" },
+          { name: "usage" }
+        ]
+      }).map((command) => command.name)
+    ).toEqual([
+      "context",
+      "goal",
+      "usage",
+      "compact",
+      "status",
+      "fast",
+      "review"
+    ]);
+  });
+
   it("filters compact when the session has no compactable context", () => {
     expect(
       resolveSlashCommandsForProvider({

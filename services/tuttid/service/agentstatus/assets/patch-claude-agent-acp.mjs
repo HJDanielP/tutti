@@ -1,8 +1,16 @@
 #!/usr/bin/env node
-// Patches the @agentclientprotocol/claude-agent-acp bridge bundle to expose an
-// orthogonal "fast" config option backed by the Claude Agent SDK's
-// `Settings.fastMode` (via `query.applyFlagSettings({ fastMode })`) — the same
-// flag-layer path the bridge already uses for `effortLevel`.
+// Patches/verifies Tutti-required behavior in the
+// @agentclientprotocol/claude-agent-acp bridge bundle.
+//
+// Current patches:
+// - expose an orthogonal "fast" config option backed by the Claude Agent SDK's
+//   `Settings.fastMode` (via `query.applyFlagSettings({ fastMode })`) — the same
+//   flag-layer path the bridge already uses for `effortLevel`
+// - verify that the bridge publishes discovered slash commands after session
+//   creation/resume so Tutti can expose provider-native commands without
+//   waiting for a user turn
+// - publish Claude Code's native /goal status attachments as ACP goal updates
+//   so Tutti can show the active goal without reimplementing the command
 //
 // Why a codemod and not a unified diff: the bridge ships only a bundled
 // `dist/acp-agent.js` and is provisioned from the ACP external agent registry,
@@ -50,7 +58,7 @@ function resolveDistPath() {
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
 }
 
-const EDITS = [
+const FAST_MODE_EDITS = [
   {
     name: "buildConfigOptions signature",
     find: "function buildConfigOptions(modes, models, modelInfos, currentEffortLevel) {",
@@ -117,6 +125,373 @@ const EDITS = [
   }
 ];
 
+const GOAL_STATUS_EDITS = [
+  {
+    name: "add Claude goal status helpers",
+    find: `export function isLocalCommandMetadata(content) {
+    return stripLocalCommandMetadata(content) === null;
+}
+const PERMISSION_MODE_ALIASES = {`,
+    replace: `export function isLocalCommandMetadata(content) {
+    return stripLocalCommandMetadata(content) === null;
+}
+function tuttiClaudeGoalStatusUpdate(message) {
+    const attachment = message?.attachment;
+    if (!attachment || attachment.type !== "goal_status") {
+        return null;
+    }
+    const objective = typeof attachment.condition === "string" ? attachment.condition.trim() : "";
+    if (!objective) {
+        return { sessionUpdate: "thread_goal_cleared" };
+    }
+    const goal = {
+        objective,
+        status: attachment.met === true ? "complete" : "active",
+    };
+    if (typeof attachment.reason === "string" && attachment.reason.trim() !== "") {
+        goal.reason = attachment.reason.trim();
+    }
+    for (const key of ["iterations", "durationMs", "tokens"]) {
+        if (typeof attachment[key] === "number" && Number.isFinite(attachment[key])) {
+            goal[key] = attachment[key];
+        }
+    }
+    return { sessionUpdate: "thread_goal_update", goal };
+}
+function tuttiClaudeGoalCommandOutputUpdate(content) {
+    if (typeof content !== "string") {
+        return null;
+    }
+    const text = stripMarkerTags(content).trim();
+    if (text === "" || text.startsWith("No goal set.") || /^Goal cleared\\.?$/i.test(text)) {
+        return { sessionUpdate: "thread_goal_cleared" };
+    }
+    const match = text.match(/^Goal set:\\s*([\\s\\S]+)$/i);
+    if (!match) {
+        return null;
+    }
+    const objective = match[1]?.trim();
+    if (!objective) {
+        return null;
+    }
+    return {
+        sessionUpdate: "thread_goal_update",
+        goal: { objective, status: "active" },
+    };
+}
+const PERMISSION_MODE_ALIASES = {`
+  },
+  {
+    name: "forward Claude goal status attachments",
+    find: `                switch (message.type) {
+                    case "system":`,
+    replace: `                switch (message.type) {
+                    case "attachment": {
+                        const goalUpdate = tuttiClaudeGoalStatusUpdate(message);
+                        if (goalUpdate) {
+                            await this.client.sessionUpdate({
+                                sessionId: message.sessionId ?? message.session_id ?? params.sessionId,
+                                update: goalUpdate,
+                            });
+                        }
+                        break;
+                    }
+                    case "system":`
+  },
+  {
+    name: "forward Claude local command goal output",
+    find: `                            case "local_command_output": {
+                                await this.client.sessionUpdate({
+                                    sessionId: message.session_id,
+                                    update: {
+                                        sessionUpdate: "agent_message_chunk",
+                                        content: { type: "text", text: message.content },
+                                    },
+                                });
+                                break;
+                            }`,
+    replace: `                            case "local_command_output": {
+                                const goalUpdate = tuttiClaudeGoalCommandOutputUpdate(message.content);
+                                if (goalUpdate) {
+                                    await this.client.sessionUpdate({
+                                        sessionId: message.session_id,
+                                        update: goalUpdate,
+                                    });
+                                }
+                                await this.client.sessionUpdate({
+                                    sessionId: message.session_id,
+                                    update: {
+                                        sessionUpdate: "agent_message_chunk",
+                                        content: { type: "text", text: message.content },
+                                    },
+                                });
+                                break;
+                            }`
+  },
+  {
+    name: "forward Claude persisted local command goal output",
+    find: `                            const stripped = stripLocalCommandMetadata(message.message.content);
+                            if (typeof stripped === "string") {`,
+    replace: `                            const goalUpdate = tuttiClaudeGoalCommandOutputUpdate(message.message.content);
+                            if (goalUpdate) {
+                                await this.client.sessionUpdate({
+                                    sessionId: message.session_id ?? params.sessionId,
+                                    update: goalUpdate,
+                                });
+                            }
+                            const stripped = stripLocalCommandMetadata(message.message.content);
+                            if (typeof stripped === "string") {`
+  }
+];
+
+const GOAL_TRANSCRIPT_STATUS_EDITS = [
+  {
+    name: "add Claude transcript goal status helper",
+    find: `    return { sessionUpdate: "thread_goal_update", goal };
+}
+function tuttiClaudeGoalCommandOutputUpdate(content) {`,
+    replace: `    return { sessionUpdate: "thread_goal_update", goal };
+}
+async function tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId) {
+    if (typeof cwd !== "string" || !cwd || typeof sessionId !== "string" || !sessionId) {
+        return null;
+    }
+    const transcriptPath = path.join(CLAUDE_CONFIG_DIR, "projects", cwd.replace(/[^A-Za-z0-9_-]/g, "-"), \`\${sessionId}.jsonl\`);
+    let transcript;
+    try {
+        transcript = await fs.readFile(transcriptPath, "utf8");
+    } catch {
+        return null;
+    }
+    let latest = null;
+    for (const line of transcript.trimEnd().split("\\n")) {
+        if (!line) {
+            continue;
+        }
+        try {
+            const entry = JSON.parse(line);
+            latest = tuttiClaudeGoalStatusUpdate(entry.message ?? entry) ?? latest;
+        } catch {
+            continue;
+        }
+    }
+    return latest;
+}
+async function tuttiClaudeSettledTranscriptGoalStatusUpdate(cwd, sessionId) {
+    let latest = await tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId);
+    if (!latest || latest.sessionUpdate === "thread_goal_cleared" || latest.goal?.status === "complete") {
+        return latest;
+    }
+    // ponytail: fixed settle delays, replace with direct final attachment forwarding if the bridge exposes it.
+    for (const delayMs of [75, 200]) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const next = await tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId);
+        if (next) {
+            latest = next;
+        }
+        if (latest.sessionUpdate === "thread_goal_cleared" || latest.goal?.status === "complete") {
+            return latest;
+        }
+    }
+    return latest;
+}
+function tuttiClaudeGoalCommandOutputUpdate(content) {`
+  },
+  {
+    name: "forward Claude transcript goal status after result",
+    find: `                        // Settle the user turn at its terminal result so the client unlocks`,
+    replace: `                        const transcriptGoalUpdate = await tuttiClaudeSettledTranscriptGoalStatusUpdate(session.cwd, message.session_id ?? params.sessionId);
+                        if (transcriptGoalUpdate) {
+                            await this.client.sessionUpdate({
+                                sessionId: params.sessionId,
+                                update: transcriptGoalUpdate,
+                            });
+                        }
+                        // Settle the user turn at its terminal result so the client unlocks`
+  }
+];
+
+const GOAL_TRANSCRIPT_STATUS_UPGRADE_EDITS = [
+  {
+    name: "upgrade Claude transcript goal status helper",
+    find: `async function tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId) {
+    if (typeof cwd !== "string" || !cwd || typeof sessionId !== "string" || !sessionId) {
+        return null;
+    }
+    const transcriptPath = path.join(CLAUDE_CONFIG_DIR, "projects", cwd.replace(/[^A-Za-z0-9_-]/g, "-"), \`\${sessionId}.jsonl\`);
+    let transcript;
+    try {
+        transcript = await fs.readFile(transcriptPath, "utf8");
+    } catch {
+        return null;
+    }
+    let latest = null;
+    for (const line of transcript.trimEnd().split("\\n")) {
+        if (!line) {
+            continue;
+        }
+        try {
+            const entry = JSON.parse(line);
+            latest = tuttiClaudeGoalStatusUpdate(entry.message ?? entry) ?? latest;
+        } catch {
+            continue;
+        }
+    }
+    return latest;
+}
+function tuttiClaudeGoalCommandOutputUpdate(content) {`,
+    replace: `async function tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId) {
+    if (typeof cwd !== "string" || !cwd || typeof sessionId !== "string" || !sessionId) {
+        return null;
+    }
+    const transcriptPath = path.join(CLAUDE_CONFIG_DIR, "projects", cwd.replace(/[^A-Za-z0-9_-]/g, "-"), \`\${sessionId}.jsonl\`);
+    let transcript;
+    try {
+        transcript = await fs.readFile(transcriptPath, "utf8");
+    } catch {
+        return null;
+    }
+    let latest = null;
+    for (const line of transcript.trimEnd().split("\\n")) {
+        if (!line) {
+            continue;
+        }
+        try {
+            const entry = JSON.parse(line);
+            latest = tuttiClaudeGoalStatusUpdate(entry.message ?? entry) ?? latest;
+        } catch {
+            continue;
+        }
+    }
+    return latest;
+}
+async function tuttiClaudeSettledTranscriptGoalStatusUpdate(cwd, sessionId) {
+    let latest = await tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId);
+    if (!latest || latest.sessionUpdate === "thread_goal_cleared" || latest.goal?.status === "complete") {
+        return latest;
+    }
+    // ponytail: fixed settle delays, replace with direct final attachment forwarding if the bridge exposes it.
+    for (const delayMs of [75, 200]) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const next = await tuttiClaudeLatestTranscriptGoalStatusUpdate(cwd, sessionId);
+        if (next) {
+            latest = next;
+        }
+        if (latest.sessionUpdate === "thread_goal_cleared" || latest.goal?.status === "complete") {
+            return latest;
+        }
+    }
+    return latest;
+}
+function tuttiClaudeGoalCommandOutputUpdate(content) {`
+  },
+  {
+    name: "upgrade Claude transcript goal status result forwarding",
+    find: `                        const transcriptGoalUpdate = await tuttiClaudeLatestTranscriptGoalStatusUpdate(session.cwd, message.session_id ?? params.sessionId);
+                        if (transcriptGoalUpdate) {
+                            await this.client.sessionUpdate({
+                                sessionId: params.sessionId,
+                                update: transcriptGoalUpdate,
+                            });
+                        }`,
+    replace: `                        const transcriptGoalUpdate = await tuttiClaudeSettledTranscriptGoalStatusUpdate(session.cwd, message.session_id ?? params.sessionId);
+                        if (transcriptGoalUpdate) {
+                            await this.client.sessionUpdate({
+                                sessionId: params.sessionId,
+                                update: transcriptGoalUpdate,
+                            });
+                        }`
+  }
+];
+
+const GOAL_PROMPT_EDITS = [
+  {
+    name: "add Claude goal prompt mirror helper",
+    find: "const PERMISSION_MODE_ALIASES = {",
+    replace: `function tuttiClaudeGoalPromptUpdate(text) {
+    if (typeof text !== "string") {
+        return null;
+    }
+    const match = text.trim().match(/^\\/goal(?:\\s+([\\s\\S]*))?$/);
+    if (!match) {
+        return null;
+    }
+    const args = (match[1] ?? "").trim();
+    if (!args) {
+        return null;
+    }
+    if (args.toLowerCase() === "clear") {
+        return { sessionUpdate: "thread_goal_cleared" };
+    }
+    return {
+        sessionUpdate: "thread_goal_update",
+        goal: { objective: args, status: "active" },
+    };
+}
+const PERMISSION_MODE_ALIASES = {`
+  },
+  {
+    name: "mirror Claude goal prompt before native execution",
+    find: `        const firstText = params.prompt[0]?.type === "text" ? params.prompt[0].text : "";
+        const isLocalOnlyCommand = firstText.startsWith("/") && LOCAL_ONLY_COMMANDS.has(firstText.split(" ", 1)[0]);`,
+    replace: `        const firstText = params.prompt[0]?.type === "text" ? params.prompt[0].text : "";
+        const goalPromptUpdate = tuttiClaudeGoalPromptUpdate(firstText);
+        if (goalPromptUpdate) {
+            await this.client.sessionUpdate({
+                sessionId: params.sessionId,
+                update: goalPromptUpdate,
+            });
+        }
+        const isLocalOnlyCommand = firstText.startsWith("/") && LOCAL_ONLY_COMMANDS.has(firstText.split(" ", 1)[0]);`
+  }
+];
+
+function applyEdits(source, edits) {
+  let nextSource = source;
+  for (const edit of edits) {
+    const occurrences = nextSource.split(edit.find).length - 1;
+    if (occurrences !== 1) {
+      throw new Error(
+        `Anchor not uniquely found (${occurrences}x) for "${edit.name}".`
+      );
+    }
+    nextSource = nextSource.replace(edit.find, edit.replace);
+  }
+  return nextSource;
+}
+
+function hasLifecycleCommandUpdates(source) {
+  return (
+    source.includes("this.sendAvailableCommandsUpdate(response.sessionId)") &&
+    source.includes("this.sendAvailableCommandsUpdate(params.sessionId)")
+  );
+}
+
+function hasGoalStatusUpdates(source) {
+  return (
+    source.includes("function tuttiClaudeGoalStatusUpdate") &&
+    source.includes('sessionUpdate: "thread_goal_update"')
+  );
+}
+
+function hasGoalTranscriptStatusUpdates(source) {
+  return (
+    source.includes("function tuttiClaudeSettledTranscriptGoalStatusUpdate") &&
+    source.includes(
+      "const transcriptGoalUpdate = await tuttiClaudeSettledTranscriptGoalStatusUpdate"
+    )
+  );
+}
+
+function hasGoalPromptUpdates(source) {
+  return (
+    source.includes("function tuttiClaudeGoalPromptUpdate") &&
+    source.includes(
+      "const goalPromptUpdate = tuttiClaudeGoalPromptUpdate(firstText)"
+    )
+  );
+}
+
 const distPath = resolveDistPath();
 if (!existsSync(distPath)) {
   console.error(`claude-agent-acp bundle not found at: ${distPath}`);
@@ -127,21 +502,83 @@ if (!existsSync(distPath)) {
 }
 
 let source = readFileSync(distPath, "utf8");
+let changed = false;
 if (/id:\s*"fast"/.test(source)) {
   console.log(`Already patched (fast config option present): ${distPath}`);
-  process.exit(0);
+} else {
+  try {
+    source = applyEdits(source, FAST_MODE_EDITS);
+    changed = true;
+  } catch (error) {
+    console.error(
+      `claude-agent-acp fast-mode patch skipped: ${error.message} Bridge layout changed; update services/tuttid/service/agentstatus/assets/patch-claude-agent-acp.mjs.`
+    );
+  }
 }
 
-for (const edit of EDITS) {
-  const occurrences = source.split(edit.find).length - 1;
-  if (occurrences !== 1) {
+if (hasLifecycleCommandUpdates(source)) {
+  console.log(
+    `Already supports lifecycle slash-command discovery updates: ${distPath}`
+  );
+} else {
+  console.error(
+    "claude-agent-acp does not publish slash-command discovery after session lifecycle events; update the bridge or this patch script."
+  );
+  process.exit(1);
+}
+
+if (hasGoalStatusUpdates(source)) {
+  console.log(`Already supports Claude /goal status updates: ${distPath}`);
+} else {
+  try {
+    source = applyEdits(source, GOAL_STATUS_EDITS);
+    changed = true;
+  } catch (error) {
     console.error(
-      `Anchor not uniquely found (${occurrences}x) for "${edit.name}". Bridge layout changed; update tools/scripts/patch-claude-agent-acp.mjs.`
+      `claude-agent-acp goal-status patch failed: ${error.message} Bridge layout changed; update services/tuttid/service/agentstatus/assets/patch-claude-agent-acp.mjs.`
     );
     process.exit(1);
   }
-  source = source.replace(edit.find, edit.replace);
 }
 
-writeFileSync(distPath, source);
-console.log(`Patched ${distPath} with the fast/speed config option.`);
+if (hasGoalTranscriptStatusUpdates(source)) {
+  console.log(
+    `Already mirrors Claude /goal transcript status updates: ${distPath}`
+  );
+} else {
+  try {
+    source = applyEdits(
+      source,
+      source.includes("function tuttiClaudeLatestTranscriptGoalStatusUpdate")
+        ? GOAL_TRANSCRIPT_STATUS_UPGRADE_EDITS
+        : GOAL_TRANSCRIPT_STATUS_EDITS
+    );
+    changed = true;
+  } catch (error) {
+    console.error(
+      `claude-agent-acp goal-transcript-status patch failed: ${error.message} Bridge layout changed; update services/tuttid/service/agentstatus/assets/patch-claude-agent-acp.mjs.`
+    );
+    process.exit(1);
+  }
+}
+
+if (hasGoalPromptUpdates(source)) {
+  console.log(`Already mirrors Claude /goal prompt updates: ${distPath}`);
+} else {
+  try {
+    source = applyEdits(source, GOAL_PROMPT_EDITS);
+    changed = true;
+  } catch (error) {
+    console.error(
+      `claude-agent-acp goal-prompt patch failed: ${error.message} Bridge layout changed; update services/tuttid/service/agentstatus/assets/patch-claude-agent-acp.mjs.`
+    );
+    process.exit(1);
+  }
+}
+
+if (changed) {
+  writeFileSync(distPath, source);
+  console.log(`Patched ${distPath} with Tutti bridge extensions.`);
+} else {
+  console.log(`No bridge patch changes needed: ${distPath}`);
+}

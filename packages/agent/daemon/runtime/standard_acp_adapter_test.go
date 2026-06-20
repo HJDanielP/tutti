@@ -618,7 +618,7 @@ func TestClaudeCodeAdapterExecTreatsContextCanceledAsInterrupted(t *testing.T) {
 
 	transport := newStandardACPTransport("Claude Agent", "claude-session-1")
 	gate := make(chan struct{})
-	transport.conn.pauseBeforePromptResult = gate
+	transport.conn.pauseBeforeToolCallCompletion = gate
 	adapter := NewClaudeCodeAdapter(transport)
 	session := standardTestSession(ProviderClaudeCode)
 	if _, err := adapter.Start(context.Background(), session); err != nil {
@@ -1995,6 +1995,140 @@ func TestStandardACPAdapterExecDoesNotPrependClaudeMentionRoutingForGemini(t *te
 	}
 }
 
+func TestClaudeCodeAdapterMirrorsGoalSlashPromptIntoRuntimeContext(t *testing.T) {
+	t.Parallel()
+
+	transport := newStandardACPTransport("Claude Agent", "claude-session-goal")
+	adapter := NewClaudeCodeAdapter(transport)
+	session := standardTestSession(ProviderClaudeCode)
+	if _, err := adapter.Start(context.Background(), session); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	prompt := "/goal ship native goal"
+	events, err := adapter.Exec(context.Background(), session, textPrompt(prompt), "", "turn-goal", nil, nil)
+	if err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(activityEventsWithType(events, activityshared.EventSessionUpdated)) == 0 {
+		t.Fatalf("events = %#v, want session.updated for goal mirror", events)
+	}
+	if text := firstPromptText(t, transport.conn.lastPromptParamsSnapshot); text != prompt {
+		t.Fatalf("prompt text = %q, want original prompt %q", text, prompt)
+	}
+	snapshot := adapter.SessionState(session)
+	goal := payloadObject(snapshot.RuntimeContext["goal"])
+	if asString(goal["objective"]) != "ship native goal" || asString(goal["status"]) != "active" {
+		t.Fatalf("runtime goal = %#v, want active objective", goal)
+	}
+
+	if _, err := adapter.Exec(context.Background(), session, textPrompt("/goal clear"), "", "turn-clear", nil, nil); err != nil {
+		t.Fatalf("Exec clear: %v", err)
+	}
+	snapshot = adapter.SessionState(session)
+	if goal := payloadObject(snapshot.RuntimeContext["goal"]); len(goal) != 0 {
+		t.Fatalf("runtime goal after clear = %#v, want empty", goal)
+	}
+}
+
+func TestClaudeCodeAdapterMirrorsSDKGoalStatusIntoRuntimeContext(t *testing.T) {
+	t.Parallel()
+
+	transport := newStandardACPTransport("Claude Agent", "claude-session-sdk-goal")
+	adapter := NewClaudeCodeAdapter(transport)
+	session := standardTestSession(ProviderClaudeCode)
+	if _, err := adapter.Start(context.Background(), session); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	activeRaw, err := json.Marshal(map[string]any{
+		"message": map[string]any{
+			"type": "attachment",
+			"attachment": map[string]any{
+				"type":      "goal_status",
+				"met":       false,
+				"sentinel":  true,
+				"condition": "ship native goal",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal active goal status: %v", err)
+	}
+	events, err := adapter.handleACPMessage(context.Background(), nil, session, "turn-goal", acpMessage{
+		Method: claudeSDKMessageMethod,
+		Params: activeRaw,
+	}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("handle active goal status: %v", err)
+	}
+	if len(activityEventsWithType(events, activityshared.EventSessionUpdated)) == 0 {
+		t.Fatalf("events = %#v, want session.updated for SDK goal status", events)
+	}
+	snapshot := adapter.SessionState(session)
+	goal := payloadObject(snapshot.RuntimeContext["goal"])
+	if asString(goal["objective"]) != "ship native goal" || asString(goal["status"]) != "active" || goal["sentinel"] != true {
+		t.Fatalf("runtime goal = %#v, want active SDK goal status", goal)
+	}
+
+	completeRaw, err := json.Marshal(map[string]any{
+		"message": map[string]any{
+			"type": "attachment",
+			"attachment": map[string]any{
+				"type":       "goal_status",
+				"met":        true,
+				"condition":  "ship native goal",
+				"reason":     "done",
+				"iterations": float64(1),
+				"durationMs": float64(42),
+				"tokens":     float64(123),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal complete goal status: %v", err)
+	}
+	if _, err := adapter.handleACPMessage(context.Background(), nil, session, "turn-goal", acpMessage{
+		Method: claudeSDKMessageMethod,
+		Params: completeRaw,
+	}, nil, nil, nil); err != nil {
+		t.Fatalf("handle complete goal status: %v", err)
+	}
+	snapshot = adapter.SessionState(session)
+	goal = payloadObject(snapshot.RuntimeContext["goal"])
+	if asString(goal["objective"]) != "ship native goal" || asString(goal["status"]) != "complete" || asString(goal["reason"]) != "done" {
+		t.Fatalf("runtime goal = %#v, want complete SDK goal status", goal)
+	}
+
+	topLevelRaw, err := json.Marshal(map[string]any{
+		"type": "attachment",
+		"attachment": map[string]any{
+			"type":      "goal_status",
+			"met":       true,
+			"condition": "ship native goal from transcript",
+			"reason":    "top-level done",
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal top-level goal status: %v", err)
+	}
+	events, err = adapter.handleACPMessage(context.Background(), nil, session, "turn-goal", acpMessage{
+		Method: claudeSDKMessageMethod,
+		Params: topLevelRaw,
+	}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("handle top-level goal status: %v", err)
+	}
+	if len(activityEventsWithType(events, activityshared.EventSessionUpdated)) == 0 {
+		t.Fatalf("events = %#v, want session.updated for top-level SDK goal status", events)
+	}
+	snapshot = adapter.SessionState(session)
+	goal = payloadObject(snapshot.RuntimeContext["goal"])
+	if asString(goal["objective"]) != "ship native goal from transcript" || asString(goal["status"]) != "complete" || asString(goal["reason"]) != "top-level done" {
+		t.Fatalf("runtime goal = %#v, want complete top-level SDK goal status", goal)
+	}
+}
+
 func firstPromptText(t *testing.T, params map[string]any) string {
 	t.Helper()
 	items, ok := params["prompt"].([]any)
@@ -2779,6 +2913,67 @@ func TestControllerPublishesIdleStandardACPCommandUpdatesAfterStart(t *testing.T
 	}
 }
 
+func TestControllerPublishesIdleStandardACPGoalUpdatesAfterStart(t *testing.T) {
+	t.Parallel()
+
+	transport := newStandardACPTransport("Claude Agent", "claude-session-idle-goal")
+	adapter := NewClaudeCodeAdapter(transport)
+	controller := NewController([]Adapter{adapter}, nil)
+	session := standardTestSession(ProviderClaudeCode)
+
+	started, err := controller.Start(context.Background(), StartInput{
+		RoomID:           session.RoomID,
+		AgentSessionID:   session.AgentSessionID,
+		Provider:         session.Provider,
+		CWD:              session.CWD,
+		PermissionModeID: session.PermissionModeID,
+	})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	stream, unsubscribe, ok := controller.Subscribe(started.Session.RoomID, started.Session.AgentSessionID)
+	if !ok {
+		t.Fatal("Subscribe ok=false, want live session stream")
+	}
+	defer unsubscribe()
+
+	transport.conn.sendJSON(map[string]any{
+		"jsonrpc": "2.0",
+		"method":  acpMethodUpdate,
+		"params": map[string]any{
+			"sessionId": transport.conn.sessionID,
+			"update": map[string]any{
+				"sessionUpdate": "thread_goal_update",
+				"goal": map[string]any{
+					"objective": "ship slash commands",
+					"status":    "active",
+				},
+			},
+		},
+	})
+
+	deadline := time.After(time.Second)
+	for {
+		select {
+		case event := <-stream:
+			if event.EventType != StreamEventStatePatch {
+				continue
+			}
+			patch, ok := event.Data.(agentsessionstore.WorkspaceAgentStatePatch)
+			if !ok {
+				t.Fatalf("event data = %#v, want WorkspaceAgentStatePatch", event.Data)
+			}
+			goal := payloadObject(patch.RuntimeContext["goal"])
+			if asString(goal["objective"]) == "ship slash commands" {
+				return
+			}
+		case <-deadline:
+			t.Fatal("idle thread_goal_update was not published")
+		}
+	}
+}
+
 func TestControllerPublishesIdleStandardACPConfigOptionsUpdatesAfterStart(t *testing.T) {
 	t.Parallel()
 
@@ -2904,31 +3099,32 @@ func (t *standardACPTransport) Start(_ context.Context, spec ProcessSpec) (Proce
 }
 
 type standardACPConnection struct {
-	mu                           sync.Mutex
-	recv                         chan ProcessFrame
-	agentTitle                   string
-	sessionID                    string
-	lastInitializeParamsSnapshot map[string]any
-	commandUpdateOnNewSession    bool
-	commandUpdateOnLoadSession   bool
-	promptPermission             bool
-	promptKind                   string
-	pauseBeforePromptResult      chan struct{}
-	pendingPermissionCallID      json.RawMessage
-	selectedPermissionOption     string
-	selectedInteractiveResult    map[string]any
-	appliedModeID                string
-	lastSetModeParamsSnapshot    map[string]any
-	lastAuthenticatedMethodID    string
-	setModeError                 *acpError
-	loadSessionError             *acpError
-	rejectModelValue             string
-	supportsLoadSession          bool
-	isClosed                     bool
-	lastNewSessionParams         map[string]any
-	lastLoadSessionParams        map[string]any
-	lastPromptParamsSnapshot     map[string]any
-	setConfigOptionSnapshots     []map[string]any
+	mu                            sync.Mutex
+	recv                          chan ProcessFrame
+	agentTitle                    string
+	sessionID                     string
+	lastInitializeParamsSnapshot  map[string]any
+	commandUpdateOnNewSession     bool
+	commandUpdateOnLoadSession    bool
+	promptPermission              bool
+	promptKind                    string
+	pauseBeforePromptResult       chan struct{}
+	pauseBeforeToolCallCompletion chan struct{}
+	pendingPermissionCallID       json.RawMessage
+	selectedPermissionOption      string
+	selectedInteractiveResult     map[string]any
+	appliedModeID                 string
+	lastSetModeParamsSnapshot     map[string]any
+	lastAuthenticatedMethodID     string
+	setModeError                  *acpError
+	loadSessionError              *acpError
+	rejectModelValue              string
+	supportsLoadSession           bool
+	isClosed                      bool
+	lastNewSessionParams          map[string]any
+	lastLoadSessionParams         map[string]any
+	lastPromptParamsSnapshot      map[string]any
+	setConfigOptionSnapshots      []map[string]any
 }
 
 func (c *standardACPConnection) Send(data []byte) error {
@@ -3209,6 +3405,9 @@ func (c *standardACPConnection) streamPromptResult(promptID json.RawMessage) {
 			},
 		},
 	})
+	if c.pauseBeforeToolCallCompletion != nil {
+		<-c.pauseBeforeToolCallCompletion
+	}
 	c.sendJSON(map[string]any{
 		"jsonrpc": "2.0",
 		"method":  acpMethodUpdate,

@@ -44,6 +44,7 @@ type standardACPAdapter struct {
 	mu          sync.Mutex
 	sessions    map[string]*standardACPSession
 	commandSink CommandSnapshotSink
+	eventSink   SessionEventSink
 	configSink  ConfigOptionsUpdateSink
 }
 
@@ -432,6 +433,15 @@ func (a *standardACPAdapter) SetCommandSnapshotSink(sink CommandSnapshotSink) {
 	a.mu.Unlock()
 }
 
+func (a *standardACPAdapter) SetSessionEventSink(sink SessionEventSink) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	a.eventSink = sink
+	a.mu.Unlock()
+}
+
 func (a *standardACPAdapter) Start(ctx context.Context, session Session) ([]activityshared.Event, error) {
 	a.logHermesStartupDiagnostics("start.enter", map[string]any{
 		"room_id":            session.RoomID,
@@ -808,6 +818,9 @@ func (a *standardACPAdapter) Exec(
 		newTurnActivityEvent(session, EventMessage, turnID, "", RoleUser, visibleText, userPromptActivityPayload(content, explicitDisplayPrompt, nil)),
 		newTurnActivityEvent(session, EventTurnStarted, turnID, SessionStatusWorking, "", "", nil),
 	)
+	if event, ok := a.mirrorClaudeGoalSlashPrompt(session, visibleText); ok {
+		startEvents = append(startEvents, event)
+	}
 	emitEvents(startEvents)
 	slog.Info("agent session ACP exec started",
 		"event", "agent_session.acp.exec.start",
@@ -946,6 +959,53 @@ func (a *standardACPAdapter) Exec(
 		"final_event_type_counts", activityEventTypeCounts(events),
 	)
 	return events, nil
+}
+
+func (a *standardACPAdapter) mirrorClaudeGoalSlashPrompt(session Session, prompt string) (activityshared.Event, bool) {
+	if a == nil || a.config.provider != ProviderClaudeCode {
+		return activityshared.Event{}, false
+	}
+	goal, updateType, ok := claudeGoalSlashPromptUpdate(prompt)
+	if !ok {
+		return activityshared.Event{}, false
+	}
+	a.mu.Lock()
+	if acpSession := a.sessions[strings.TrimSpace(session.AgentSessionID)]; acpSession != nil {
+		if updateType == "thread_goal_update" {
+			acpSession.goal = clonePayload(goal)
+		} else {
+			acpSession.goal = nil
+		}
+	}
+	a.mu.Unlock()
+	return acpGoalUpdatedEvent(session, updateType)
+}
+
+func claudeGoalSlashPromptUpdate(prompt string) (map[string]any, string, bool) {
+	text := strings.TrimSpace(prompt)
+	if !strings.HasPrefix(text, "/goal") {
+		return nil, "", false
+	}
+	if len(text) > len("/goal") {
+		switch text[len("/goal")] {
+		case ' ', '\t', '\n', '\r':
+		default:
+			return nil, "", false
+		}
+	}
+	objective := strings.TrimSpace(text[len("/goal"):])
+	if objective == "" {
+		return nil, "", false
+	}
+	switch strings.ToLower(objective) {
+	case "clear", "reset":
+		return nil, "thread_goal_cleared", true
+	default:
+		return map[string]any{
+			"objective": objective,
+			"status":    "active",
+		}, "thread_goal_update", true
+	}
 }
 
 func claudeCodePromptContentWithMentionRouting(provider string, content []PromptContentBlock, visibleText string) ([]PromptContentBlock, bool, []string) {
@@ -1551,6 +1611,9 @@ func (a *standardACPAdapter) SessionState(session Session) SessionStateSnapshot 
 	if usage := acpUsageRuntimeContext(state.usage); len(usage) > 0 {
 		snapshot.RuntimeContext["usage"] = usage
 	}
+	if len(state.goal) > 0 {
+		snapshot.RuntimeContext["goal"] = state.goal
+	}
 	capabilities := standardACPCapabilities(a.config.provider, promptImage, state)
 	capabilities = appendBrowserUseCapability(capabilities, session.Env)
 	capabilities = appendComputerUseCapability(capabilities, session.Env)
@@ -1730,6 +1793,9 @@ func (a *standardACPAdapter) handleACPMessage(
 			"event_count", len(events),
 			"event_type_counts", activityEventTypeCounts(events),
 		)
+		if len(events) > 0 && emit == nil {
+			a.emitSessionEvents(session.AgentSessionID, events)
+		}
 		return events, nil
 	case acpMethodPermission:
 		if strings.TrimSpace(turnID) == "" || emit == nil {
@@ -1762,7 +1828,11 @@ func (a *standardACPAdapter) handleACPMessage(
 		return acpPermissionResolvedEvents(session, turnID, pending, selection, nil), nil
 	case claudeSDKMessageMethod:
 		a.logClaudeSDKMessage(session, turnID, message.Params)
-		return nil, nil
+		events := a.mirrorClaudeSDKGoalStatus(session, message.Params)
+		if len(events) > 0 && emit == nil {
+			a.emitSessionEvents(session.AgentSessionID, events)
+		}
+		return events, nil
 	default:
 		slog.Warn("agent session ACP ignored unsupported message",
 			"event", "agent_session.acp.handle_message.unsupported",
@@ -1811,6 +1881,19 @@ func (a *standardACPAdapter) emitConfigOptionsUpdate(session Session, raw json.R
 		OccurredAtUnixMS:  unixMS(now()),
 	}
 	sink(update)
+}
+
+func (a *standardACPAdapter) emitSessionEvents(agentSessionID string, events []activityshared.Event) {
+	if a == nil || len(events) == 0 {
+		return
+	}
+	a.mu.Lock()
+	sink := a.eventSink
+	a.mu.Unlock()
+	if sink == nil {
+		return
+	}
+	sink(agentSessionID, events)
 }
 
 func activityEventTypeCounts(events []activityshared.Event) []string {
@@ -1902,6 +1985,100 @@ func (a *standardACPAdapter) logClaudeSDKMessage(session Session, turnID string,
 			"detail", detail,
 		)
 	}
+}
+
+func (a *standardACPAdapter) mirrorClaudeSDKGoalStatus(session Session, raw json.RawMessage) []activityshared.Event {
+	if a == nil || a.config.provider != ProviderClaudeCode {
+		return nil
+	}
+	goal, ok := claudeSDKGoalStatusPayload(raw)
+	if !ok {
+		return nil
+	}
+	a.mu.Lock()
+	if acpSession := a.sessions[strings.TrimSpace(session.AgentSessionID)]; acpSession != nil {
+		acpSession.goal = clonePayload(goal)
+	}
+	a.mu.Unlock()
+	slog.Info("agent session Claude SDK goal status mirrored",
+		"event", "agent_session.claude_sdk.goal_status_mirrored",
+		"provider", a.config.provider,
+		"adapter", a.config.adapterName,
+		"room_id", session.RoomID,
+		"agent_session_id", session.AgentSessionID,
+		"provider_session_id", session.ProviderSessionID,
+		"goal_status", strings.TrimSpace(asString(goal["status"])),
+		"goal_objective_len", len(strings.TrimSpace(asString(goal["objective"]))),
+		"goal_has_reason", strings.TrimSpace(asString(goal["reason"])) != "",
+	)
+	if event, ok := acpGoalUpdatedEvent(session, "thread_goal_update"); ok {
+		return []activityshared.Event{event}
+	}
+	return nil
+}
+
+func claudeSDKGoalStatusPayload(raw json.RawMessage) (map[string]any, bool) {
+	var params any
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return nil, false
+	}
+	attachment := claudeSDKGoalStatusAttachment(params, 6)
+	if len(attachment) == 0 {
+		return nil, false
+	}
+	objective := strings.TrimSpace(asString(attachment["condition"]))
+	if objective == "" {
+		return nil, false
+	}
+	goal := map[string]any{
+		"objective": objective,
+		"status":    "active",
+	}
+	if met, ok := attachment["met"].(bool); ok && met {
+		goal["status"] = "complete"
+	}
+	for _, key := range []string{"reason", "iterations", "durationMs", "tokens", "sentinel"} {
+		if value, ok := attachment[key]; ok {
+			goal[key] = value
+		}
+	}
+	return goal, true
+}
+
+func claudeSDKGoalStatusAttachment(value any, depth int) map[string]any {
+	if depth <= 0 {
+		return nil
+	}
+	obj := payloadObject(value)
+	if len(obj) > 0 {
+		if strings.TrimSpace(asString(obj["type"])) == "goal_status" {
+			return obj
+		}
+		if attachment := payloadObject(obj["attachment"]); strings.TrimSpace(asString(attachment["type"])) == "goal_status" {
+			return attachment
+		}
+		for _, child := range obj {
+			if attachment := claudeSDKGoalStatusAttachment(child, depth-1); len(attachment) > 0 {
+				return attachment
+			}
+		}
+		return nil
+	}
+	switch items := value.(type) {
+	case []any:
+		for _, item := range items {
+			if attachment := claudeSDKGoalStatusAttachment(item, depth-1); len(attachment) > 0 {
+				return attachment
+			}
+		}
+	case []map[string]any:
+		for _, item := range items {
+			if attachment := claudeSDKGoalStatusAttachment(item, depth-1); len(attachment) > 0 {
+				return attachment
+			}
+		}
+	}
+	return nil
 }
 
 // claudeSDKAuthFailureDetail returns the auth-related text from a raw SDK
@@ -2385,6 +2562,12 @@ func standardACPUpdateEvents(config standardACPConfig, session Session, turnID s
 			return []activityshared.Event{event}
 		}
 		return nil
+	case "thread_goal_update", "thread_goal_clear", "thread_goal_cleared":
+		logACPGoalUpdate(config, session, turnID, updateType, params.Update)
+		if event, ok := acpGoalUpdatedEvent(session, updateType); ok {
+			return []activityshared.Event{event}
+		}
+		return nil
 	case "stream_error", "warning", "system_notice":
 		if events, ok := acpSystemNoticeEvents(session, turnID, params.Update, normalizer, updateType, config.provider == ProviderCodex); ok {
 			return events
@@ -2395,6 +2578,23 @@ func standardACPUpdateEvents(config standardACPConfig, session Session, turnID s
 	default:
 		return nil
 	}
+}
+
+func logACPGoalUpdate(config standardACPConfig, session Session, turnID string, updateType string, update map[string]any) {
+	goal := payloadObject(update["goal"])
+	slog.Info("agent session ACP goal update",
+		"event", "agent_session.acp.goal_update",
+		"provider", config.provider,
+		"adapter", config.adapterName,
+		"room_id", session.RoomID,
+		"agent_session_id", session.AgentSessionID,
+		"provider_session_id", session.ProviderSessionID,
+		"turn_id", turnID,
+		"update_type", strings.TrimSpace(updateType),
+		"goal_status", strings.TrimSpace(asString(goal["status"])),
+		"goal_objective_len", len(strings.TrimSpace(asString(goal["objective"]))),
+		"goal_has_reason", strings.TrimSpace(asString(goal["reason"])) != "",
+	)
 }
 
 func standardACPStderrMessageMapper(provider string) acpStderrMessageMapper {

@@ -86,6 +86,9 @@ func NewController(adapters []Adapter, reporter ActivityReporter) *Controller {
 		if sinkAdapter, ok := adapter.(CommandSnapshotSinkAdapter); ok {
 			sinkAdapter.SetCommandSnapshotSink(controller.applyCommandSnapshotByAgentSessionID)
 		}
+		if sinkAdapter, ok := adapter.(SessionEventSinkAdapter); ok {
+			sinkAdapter.SetSessionEventSink(controller.applySessionEventsByAgentSessionID)
+		}
 		if sinkAdapter, ok := adapter.(ConfigOptionsUpdateSinkAdapter); ok {
 			sinkAdapter.SetConfigOptionsUpdateSink(controller.applyConfigOptionsUpdateByAgentSessionID)
 		}
@@ -1591,6 +1594,37 @@ func (c *Controller) applyCommandSnapshotByAgentSessionID(snapshot AgentSessionC
 		return
 	}
 	c.applyCommandSnapshot(session, snapshot)
+}
+
+func (c *Controller) applySessionEventsByAgentSessionID(agentSessionID string, events []activityshared.Event) {
+	if c == nil || len(events) == 0 {
+		return
+	}
+	agentSessionID = strings.TrimSpace(agentSessionID)
+	if agentSessionID == "" {
+		return
+	}
+	c.mu.Lock()
+	var session Session
+	found := false
+	for _, candidate := range c.sessions {
+		if strings.TrimSpace(candidate.AgentSessionID) == agentSessionID {
+			session = candidate
+			found = true
+			break
+		}
+	}
+	c.mu.Unlock()
+	if !found {
+		return
+	}
+	session = applySessionEvents(session, events)
+	if shouldAdvanceSessionUpdatedAtFromEvents(events) {
+		session.UpdatedAtUnixMS = unixMS(now())
+	}
+	c.store(session)
+	c.publish(session, events)
+	c.enqueueSessionReport(context.Background(), session, events)
 }
 
 func commandSnapshotStreamEvent(snapshot AgentSessionCommandSnapshot) StreamEvent {

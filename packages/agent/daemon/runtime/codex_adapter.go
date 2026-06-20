@@ -59,6 +59,7 @@ type CodexAdapter struct {
 	mu          sync.Mutex
 	sessions    map[string]*codexACPSession
 	commandSink CommandSnapshotSink
+	eventSink   SessionEventSink
 	configSink  ConfigOptionsUpdateSink
 }
 
@@ -177,6 +178,15 @@ func (a *CodexAdapter) SetCommandSnapshotSink(sink CommandSnapshotSink) {
 	}
 	a.mu.Lock()
 	a.commandSink = sink
+	a.mu.Unlock()
+}
+
+func (a *CodexAdapter) SetSessionEventSink(sink SessionEventSink) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	a.eventSink = sink
 	a.mu.Unlock()
 }
 
@@ -923,7 +933,11 @@ func (a *CodexAdapter) handleACPMessage(
 			}
 		}
 		a.emitConfigOptionsUpdate(session, message.Params)
-		return acpUpdateEvents(session, turnID, message.Params, normalizer), nil
+		events := acpUpdateEvents(session, turnID, message.Params, normalizer)
+		if len(events) > 0 && emit == nil {
+			a.emitSessionEvents(session.AgentSessionID, events)
+		}
+		return events, nil
 	case acpMethodPermission:
 		if strings.TrimSpace(turnID) == "" || emit == nil {
 			err := errors.New("permission request outside active prompt turn is not supported")
@@ -992,6 +1006,19 @@ func (a *CodexAdapter) emitConfigOptionsUpdate(session Session, raw json.RawMess
 		OccurredAtUnixMS:  unixMS(now()),
 	}
 	sink(update)
+}
+
+func (a *CodexAdapter) emitSessionEvents(agentSessionID string, events []activityshared.Event) {
+	if a == nil || len(events) == 0 {
+		return
+	}
+	a.mu.Lock()
+	sink := a.eventSink
+	a.mu.Unlock()
+	if sink == nil {
+		return
+	}
+	sink(agentSessionID, events)
 }
 
 func (a *CodexAdapter) submitPermissionOption(ctx context.Context, session Session, input PermissionOptionInput) (string, error) {
@@ -1999,6 +2026,18 @@ func acpUsageUpdatedEvent(session Session) (activityshared.Event, bool) {
 	event := activityshared.NewSessionUpdated(ctx, "")
 	event.Payload.Metadata = map[string]any{
 		"acpSessionUpdate": "usage_update",
+	}
+	return event, true
+}
+
+func acpGoalUpdatedEvent(session Session, updateType string) (activityshared.Event, bool) {
+	ctx, ok := activityEventContext(session, newID(), "")
+	if !ok {
+		return activityshared.Event{}, false
+	}
+	event := activityshared.NewSessionUpdated(ctx, "")
+	event.Payload.Metadata = map[string]any{
+		"acpSessionUpdate": strings.TrimSpace(updateType),
 	}
 	return event, true
 }
