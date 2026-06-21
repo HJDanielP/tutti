@@ -2,8 +2,10 @@ package agentcontext
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	agentactivitybiz "github.com/tutti-os/tutti/services/tuttid/biz/agentactivity"
 	agentservice "github.com/tutti-os/tutti/services/tuttid/service/agent"
 	cliservice "github.com/tutti-os/tutti/services/tuttid/service/cli"
 	"github.com/tutti-os/tutti/services/tuttid/service/cli/framework"
@@ -17,9 +19,11 @@ var sessionColumns = []cliservice.TableColumn{
 }
 
 type sessionSummaryInput struct {
-	SessionID    string `cli:"session-id" validate:"required" description:"Agent session id to inspect."`
-	Limit        int    `cli:"limit" validate:"min=0" description:"Maximum number of recent messages to return."`
-	AfterVersion int64  `cli:"after-version" validate:"min=0" description:"Return messages after this message version."`
+	SessionID     string `cli:"session-id" validate:"required" description:"Agent session id to inspect."`
+	Limit         int    `cli:"limit" validate:"min=0" description:"Maximum number of recent messages to return."`
+	AfterVersion  int64  `cli:"after-version" validate:"min=0" description:"Return messages after this message version."`
+	BeforeVersion int64  `cli:"before-version" validate:"min=0" description:"Return messages before this message version when order is desc."`
+	Order         string `cli:"order" description:"Message order: asc or desc."`
 }
 
 type sessionSummaryResult struct {
@@ -89,9 +93,15 @@ func (p Provider) runSessionSummary(ctx context.Context, invoke framework.Invoke
 	if err := p.requireSessions(); err != nil {
 		return nil, err
 	}
+	order, err := normalizeSessionSummaryOrder(input.Order)
+	if err != nil {
+		return nil, err
+	}
 	page, err := p.sessions.ListMessages(ctx, invoke.WorkspaceID, input.SessionID, agentservice.ListMessagesInput{
-		AfterVersion: uint64(input.AfterVersion),
-		Limit:        input.Limit,
+		AfterVersion:  uint64(input.AfterVersion),
+		BeforeVersion: uint64(input.BeforeVersion),
+		Limit:         input.Limit,
+		Order:         order,
 	})
 	if err != nil {
 		return nil, err
@@ -111,6 +121,17 @@ func sessionSummaryJSONValue(result any) map[string]any {
 		"messages":       messageCompactValues(summary.Page.Messages),
 		"latestVersion":  summary.Page.LatestVersion,
 		"hasMore":        summary.Page.HasMore,
+	}
+}
+
+func normalizeSessionSummaryOrder(value string) (agentactivitybiz.MessageOrder, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", string(agentactivitybiz.MessageOrderAsc):
+		return agentactivitybiz.MessageOrderAsc, nil
+	case string(agentactivitybiz.MessageOrderDesc):
+		return agentactivitybiz.MessageOrderDesc, nil
+	default:
+		return "", fmt.Errorf("%w: order must be asc or desc", cliservice.ErrInvalidInput)
 	}
 }
 
