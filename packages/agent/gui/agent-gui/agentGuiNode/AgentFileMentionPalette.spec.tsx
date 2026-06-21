@@ -1798,6 +1798,15 @@ describe("AgentFileMentionPalette", () => {
     expect(css).toMatch(
       /\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):hover,\s*\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):focus-visible,\s*\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):active\s*{[^}]*color:\s*var\(--agent-gui-accent\)/s
     );
+    const openWindowIconHoverRule = css.match(
+      /\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-open-window-button:not\(:disabled\):hover\s+svg,[\s\S]*?\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-open-window-button:not\(:disabled\):active\s+svg\s*{(?<body>[^}]*)}/
+    );
+    expect(openWindowIconHoverRule?.groups?.body).toMatch(
+      /color:\s*var\(--text-primary\)/
+    );
+    expect(openWindowIconHoverRule?.groups?.body).not.toMatch(
+      /fill:\s*currentColor/
+    );
     expect(css).toMatch(
       /\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):hover\s+svg,\s*\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):focus-visible\s+svg,\s*\.agent-gui-node__conversation-actions\s+>\s+button\.agent-gui-node__conversation-pin-button:not\(:disabled\):active\s+svg\s*{[^}]*color:\s*var\(--agent-gui-accent\)[^}]*fill:\s*currentColor/s
     );

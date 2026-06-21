@@ -4793,7 +4793,6 @@ button.agent-gui-node__conversation-section-toggle:hover
   > button.agent-gui-node__conversation-open-window-button:not(:disabled):active
   svg {
   color: var(--text-primary);
-  fill: currentColor;
 }
 
 .agent-gui-node__conversation-actions
