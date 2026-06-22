@@ -453,6 +453,7 @@ function createDependenciesStub(): {
     },
     tuttidClient: {
       listCliCapabilities: fail,
+      listWorkspaceAppMentionCandidates: fail,
       addWorkspaceIssueContextRefs: fail,
       addWorkspaceIssueTaskContextRefs: fail,
       installWorkspaceApp: fail,

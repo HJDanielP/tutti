@@ -190,6 +190,9 @@ import type {
   ListWorkspaceAppFactoryJobsData,
   ListWorkspaceAppFactoryJobsErrors,
   ListWorkspaceAppFactoryJobsResponses,
+  ListWorkspaceAppMentionCandidatesData,
+  ListWorkspaceAppMentionCandidatesErrors,
+  ListWorkspaceAppMentionCandidatesResponses,
   ListWorkspaceAppReferencesData,
   ListWorkspaceAppReferencesErrors,
   ListWorkspaceAppReferencesResponses,
@@ -445,6 +448,27 @@ export const invokeCliCommand = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers
     }
+  });
+
+/**
+ * List workspace app mention candidates for agent context pickers
+ *
+ * Returns daemon-owned application mention candidates for Agent GUI and rich-text context pickers. Real workspace apps are filtered by App Center installation and enabled state. CLI capabilities only enrich search metadata; this endpoint does not run command-routing availability filters or agent provider auth checks.
+ *
+ */
+export const listWorkspaceAppMentionCandidates = <
+  ThrowOnError extends boolean = false
+>(
+  options: Options<ListWorkspaceAppMentionCandidatesData, ThrowOnError>
+) =>
+  (options.client ?? client).get<
+    ListWorkspaceAppMentionCandidatesResponses,
+    ListWorkspaceAppMentionCandidatesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/workspaces/{workspaceID}/agent-context/workspace-app-mentions",
+    ...options
   });
 
 /**

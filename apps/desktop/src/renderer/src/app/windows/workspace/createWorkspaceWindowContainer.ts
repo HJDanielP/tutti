@@ -133,7 +133,7 @@ export function createWorkspaceWindowContainer(): WorkspaceWindowContainerResult
     platformApi: desktopApi.platform,
     reporterService
   });
-  const appCenterService = registerWorkspaceAppCenterServices(registry, {
+  registerWorkspaceAppCenterServices(registry, {
     eventStreamClient: tuttidEventStreamClient,
     hostFilesApi: desktopApi.host.files,
     hostWorkspaceApi: desktopApi.host.workspace,
@@ -165,7 +165,6 @@ export function createWorkspaceWindowContainer(): WorkspaceWindowContainerResult
   });
   registerRichTextAtServices(registry, {
     tuttidClient,
-    appCenterApps: () => appCenterService.store.apps,
     getLocale: getActiveLocale,
     resolveAgentIconUrl: resolveWorkspaceRichTextAgentIconUrl,
     userAvatarPlaceholderUrl,

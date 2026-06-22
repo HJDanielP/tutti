@@ -49,7 +49,6 @@ import {
   type DesktopAgentGUIPrefillPromptRequest
 } from "../services/desktopAgentGUIPrefillPromptActivation.ts";
 import { isDesktopManagedAgentProvider } from "../services/internal/desktopManagedAgentProviders.ts";
-import { createDesktopWorkspaceAppMentionProvider } from "../../rich-text-at/providers/desktopWorkspaceAppMentionProvider.ts";
 import { AGENT_CONTEXT_MENTION_PROVIDER_IDS } from "@tutti-os/agent-gui/context-mention-provider";
 import { resolveWorkbenchDockFileMentionItems } from "../services/internal/resolveWorkbenchDockFileMentionItems.ts";
 import { createDesktopAgentGeneratedFileMentionProvider } from "../services/internal/createDesktopAgentGeneratedFileMentionProvider.ts";
@@ -190,20 +189,14 @@ export function DesktopAgentGUIWorkbenchBody({
       }),
     [appCenterState.apps, workspaceId]
   );
-  const workspaceAppMentionProvider = useMemo(() => {
-    const baseProvider = contextMentionProviders.find(
-      (provider) =>
-        provider.id === AGENT_CONTEXT_MENTION_PROVIDER_IDS.workspaceApp
-    );
-    return baseProvider
-      ? createDesktopWorkspaceAppMentionProvider({
-          apps: appCenterState.apps,
-          baseProvider,
-          locale,
-          workspaceId
-        })
-      : null;
-  }, [appCenterState.apps, locale, contextMentionProviders, workspaceId]);
+  const workspaceAppMentionProvider = useMemo(
+    () =>
+      contextMentionProviders.find(
+        (provider) =>
+          provider.id === AGENT_CONTEXT_MENTION_PROVIDER_IDS.workspaceApp
+      ) ?? null,
+    [contextMentionProviders]
+  );
   const resolveDockFiles = useCallback(
     () =>
       resolveWorkbenchDockFileMentionItems({

@@ -33,7 +33,6 @@ import {
   requestWorkspaceAgentGuiLaunch,
   type AgentProviderStatusService
 } from "@renderer/features/workspace-agent";
-import { getActiveLocale } from "@renderer/i18n";
 import { runDesktopAgentGUILinkAction } from "@renderer/features/workspace-agent/services/desktopAgentGUILinkActions.ts";
 import {
   workspaceWorkbenchDesktopI18nKeys,
@@ -89,9 +88,7 @@ export function createWorkspaceAgentGuiContribution(input: {
   preloadDesktopAgentGuiMentionBrowse({
     workspaceId: input.workspaceId,
     baseProviders: agentGUIWorkbenchHostInput.contextMentionProviders,
-    agentActivityRuntime: agentGUIWorkbenchHostInput.agentActivityRuntime,
-    apps: input.appCenterService.store.apps,
-    locale: getActiveLocale()
+    agentActivityRuntime: agentGUIWorkbenchHostInput.agentActivityRuntime
   });
   const handleLinkAction: NonNullable<
     Parameters<typeof DesktopAgentGUIWorkbenchBody>[0]["onLinkAction"]

@@ -26,6 +26,9 @@ function createTransportClient(
     async listCliCapabilities() {
       throw new Error("not used");
     },
+    async listWorkspaceAppMentionCandidates() {
+      throw new Error("not used");
+    },
     async addWorkspaceIssueContextRefs() {
       throw new Error("not used");
     },

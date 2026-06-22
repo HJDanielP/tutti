@@ -18,6 +18,7 @@ tags:
   - name: workspace
   - name: terminal
   - name: agent-session
+  - name: agent-context
   - name: app-factory
   - name: user-project
 paths:
@@ -124,6 +125,39 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/InvalidRequestError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowedError"
+        "502":
+          $ref: "#/components/responses/WorkspaceOperationError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailableError"
+  /v1/workspaces/{workspaceID}/agent-context/workspace-app-mentions:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceID"
+    get:
+      operationId: listWorkspaceAppMentionCandidates
+      tags:
+        - agent-context
+      summary: List workspace app mention candidates for agent context pickers
+      description: >
+        Returns daemon-owned application mention candidates for Agent GUI and
+        rich-text context pickers. Real workspace apps are filtered by App Center
+        installation and enabled state. CLI capabilities only enrich search
+        metadata; this endpoint does not run command-routing availability
+        filters or agent provider auth checks.
+      responses:
+        "200":
+          description: Workspace app mention candidates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceAppMentionCandidatesResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/WorkspaceNotFoundError"
         "405":
           $ref: "#/components/responses/MethodNotAllowedError"
         "502":
@@ -3213,6 +3247,98 @@ components:
           allOf:
             - $ref: "#/components/schemas/CliCommandOutput"
           nullable: true
+    WorkspaceAppMentionCandidateSource:
+      type: string
+      enum:
+        - workspace_app
+        - cli_app
+    WorkspaceAppMentionCliMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - commandCount
+        - commandDescriptions
+        - commandPaths
+        - commandSummaries
+        - scopes
+      properties:
+        commandCount:
+          type: integer
+          minimum: 0
+        commandDescriptions:
+          type: array
+          items:
+            type: string
+        commandPaths:
+          type: array
+          items:
+            type: string
+        commandSummaries:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    WorkspaceAppMentionCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - appId
+        - displayName
+        - description
+        - iconUrl
+        - availableIconUrl
+        - installed
+        - enabled
+        - source
+        - localizations
+        - references
+        - cli
+      properties:
+        appId:
+          type: string
+          minLength: 1
+        displayName:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        iconUrl:
+          type: string
+          nullable: true
+        availableIconUrl:
+          type: string
+          nullable: true
+        installed:
+          type: boolean
+        enabled:
+          type: boolean
+        source:
+          $ref: "#/components/schemas/WorkspaceAppMentionCandidateSource"
+        localizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceAppLocalization"
+        references:
+          $ref: "#/components/schemas/WorkspaceAppReferencesState"
+        cli:
+          $ref: "#/components/schemas/WorkspaceAppMentionCliMetadata"
+    WorkspaceAppMentionCandidatesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - workspaceId
+        - apps
+      properties:
+        workspaceId:
+          type: string
+          minLength: 1
+        apps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceAppMentionCandidate"
     ApiErrorDetails:
       type: object
       additionalProperties: false

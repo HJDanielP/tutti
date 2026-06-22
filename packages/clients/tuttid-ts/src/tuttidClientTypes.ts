@@ -96,6 +96,7 @@ import type {
   WorkspaceAppFactoryJob,
   WorkspaceAppFactoryJobListResponse,
   WorkspaceAppListResponse,
+  WorkspaceAppMentionCandidatesResponse,
   PublishWorkspaceAppFactoryJobResponse,
   RollbackWorkspaceAppRequest,
   WorkspaceSummary,
@@ -121,6 +122,9 @@ export interface TuttidClient {
     workspaceID?: string,
     options?: { includeHidden?: boolean }
   ): Promise<CliCapabilitiesResponse>;
+  listWorkspaceAppMentionCandidates(
+    workspaceID: string
+  ): Promise<WorkspaceAppMentionCandidatesResponse>;
   addWorkspaceIssueContextRefs(
     workspaceID: string,
     issueID: string,

@@ -147,6 +147,35 @@ export type CliInvokeResponse = {
   output?: CliCommandOutput | null;
 };
 
+export type WorkspaceAppMentionCandidateSource = "workspace_app" | "cli_app";
+
+export type WorkspaceAppMentionCliMetadata = {
+  commandCount: number;
+  commandDescriptions: Array<string>;
+  commandPaths: Array<string>;
+  commandSummaries: Array<string>;
+  scopes: Array<string>;
+};
+
+export type WorkspaceAppMentionCandidate = {
+  appId: string;
+  displayName: string;
+  description: string;
+  iconUrl: string | null;
+  availableIconUrl: string | null;
+  installed: boolean;
+  enabled: boolean;
+  source: WorkspaceAppMentionCandidateSource;
+  localizations: Array<WorkspaceAppLocalization>;
+  references: WorkspaceAppReferencesState;
+  cli: WorkspaceAppMentionCliMetadata;
+};
+
+export type WorkspaceAppMentionCandidatesResponse = {
+  workspaceId: string;
+  apps: Array<WorkspaceAppMentionCandidate>;
+};
+
 export type ApiErrorDetails = {
   code:
     | "invalid_request"
@@ -1925,6 +1954,55 @@ export type InvokeCliCommandResponses = {
 
 export type InvokeCliCommandResponse =
   InvokeCliCommandResponses[keyof InvokeCliCommandResponses];
+
+export type ListWorkspaceAppMentionCandidatesData = {
+  body?: never;
+  path: {
+    workspaceID: string;
+  };
+  query?: never;
+  url: "/v1/workspaces/{workspaceID}/agent-context/workspace-app-mentions";
+};
+
+export type ListWorkspaceAppMentionCandidatesErrors = {
+  /**
+   * Request payload or parameters are invalid
+   */
+  400: ApiErrorResponse;
+  /**
+   * Bearer token is missing or invalid
+   */
+  401: ApiErrorResponse;
+  /**
+   * Workspace id was not found
+   */
+  404: ApiErrorResponse;
+  /**
+   * HTTP method is not supported on this route
+   */
+  405: ApiErrorResponse;
+  /**
+   * Workspace operation failed in an upstream adapter or command
+   */
+  502: ApiErrorResponse;
+  /**
+   * Required daemon service dependency is unavailable
+   */
+  503: ApiErrorResponse;
+};
+
+export type ListWorkspaceAppMentionCandidatesError =
+  ListWorkspaceAppMentionCandidatesErrors[keyof ListWorkspaceAppMentionCandidatesErrors];
+
+export type ListWorkspaceAppMentionCandidatesResponses = {
+  /**
+   * Workspace app mention candidates
+   */
+  200: WorkspaceAppMentionCandidatesResponse;
+};
+
+export type ListWorkspaceAppMentionCandidatesResponse =
+  ListWorkspaceAppMentionCandidatesResponses[keyof ListWorkspaceAppMentionCandidatesResponses];
 
 export type GetDesktopPreferencesData = {
   body?: never;

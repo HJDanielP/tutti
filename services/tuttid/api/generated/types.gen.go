@@ -1069,6 +1069,24 @@ func (e WorkspaceAppInstallUserPhase) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceAppMentionCandidateSource.
+const (
+	WorkspaceAppMentionCandidateSourceCliApp       WorkspaceAppMentionCandidateSource = "cli_app"
+	WorkspaceAppMentionCandidateSourceWorkspaceApp WorkspaceAppMentionCandidateSource = "workspace_app"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceAppMentionCandidateSource enum.
+func (e WorkspaceAppMentionCandidateSource) Valid() bool {
+	switch e {
+	case WorkspaceAppMentionCandidateSourceCliApp:
+		return true
+	case WorkspaceAppMentionCandidateSourceWorkspaceApp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkspaceAppMinimizeBehavior.
 const (
 	Hibernate   WorkspaceAppMinimizeBehavior = "hibernate"
@@ -2907,6 +2925,39 @@ type WorkspaceAppLocalization struct {
 	DisplayName *string  `json:"displayName"`
 	Locale      string   `json:"locale"`
 	Tags        []string `json:"tags"`
+}
+
+// WorkspaceAppMentionCandidate defines model for WorkspaceAppMentionCandidate.
+type WorkspaceAppMentionCandidate struct {
+	AppId            string                             `json:"appId"`
+	AvailableIconUrl *string                            `json:"availableIconUrl"`
+	Cli              WorkspaceAppMentionCliMetadata     `json:"cli"`
+	Description      string                             `json:"description"`
+	DisplayName      string                             `json:"displayName"`
+	Enabled          bool                               `json:"enabled"`
+	IconUrl          *string                            `json:"iconUrl"`
+	Installed        bool                               `json:"installed"`
+	Localizations    []WorkspaceAppLocalization         `json:"localizations"`
+	References       WorkspaceAppReferencesState        `json:"references"`
+	Source           WorkspaceAppMentionCandidateSource `json:"source"`
+}
+
+// WorkspaceAppMentionCandidateSource defines model for WorkspaceAppMentionCandidateSource.
+type WorkspaceAppMentionCandidateSource string
+
+// WorkspaceAppMentionCandidatesResponse defines model for WorkspaceAppMentionCandidatesResponse.
+type WorkspaceAppMentionCandidatesResponse struct {
+	Apps        []WorkspaceAppMentionCandidate `json:"apps"`
+	WorkspaceId string                         `json:"workspaceId"`
+}
+
+// WorkspaceAppMentionCliMetadata defines model for WorkspaceAppMentionCliMetadata.
+type WorkspaceAppMentionCliMetadata struct {
+	CommandCount        int      `json:"commandCount"`
+	CommandDescriptions []string `json:"commandDescriptions"`
+	CommandPaths        []string `json:"commandPaths"`
+	CommandSummaries    []string `json:"commandSummaries"`
+	Scopes              []string `json:"scopes"`
 }
 
 // WorkspaceAppMinimizeBehavior defines model for WorkspaceAppMinimizeBehavior.

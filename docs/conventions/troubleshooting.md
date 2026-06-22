@@ -212,6 +212,40 @@ delimited by ---`, and the composer skill picker may show partial or
   [WorkspaceFileReferencePickerTree.tsx](../../packages/workspace/file-reference/src/ui/internal/reference/WorkspaceFileReferencePickerTree.tsx:131)
   [IssueManagerSidebarSections.tsx](../../packages/workspace/issue-manager/src/ui/internal/shell/IssueManagerSidebarSections.tsx:190)
 
+### Agent GUI app mentions show unavailable workspace apps
+
+- Symptom:
+  Agent GUI or rich-text `@` app search shows App Center apps that are not
+  installed or are disabled. A related slow path is the picker waiting on agent
+  provider auth/status checks before showing app candidates.
+- Quick checks:
+  Confirm the renderer calls the daemon-owned
+  `listWorkspaceAppMentionCandidates` client method instead of
+  `listCliCapabilities(..., { includeHidden: true })`. In the daemon, confirm
+  the mention endpoint calls App Center `List` for app visibility and calls
+  CLI capabilities only with `SkipCapabilityFilters: true` for metadata.
+- Root cause:
+  CLI capability listing is a command-routing surface, not an app picker
+  visibility contract. Using the filtered CLI path can trigger provider
+  availability/auth checks; using the hidden CLI path avoids the slow checks but
+  exposes uninstalled or disabled app capabilities unless App Center visibility
+  is applied by the daemon.
+- Fix:
+  Keep Agent GUI app mention candidates behind
+  `/v1/workspaces/{workspaceID}/agent-context/workspace-app-mentions`. The
+  daemon should include real App Center apps only when installed and enabled,
+  merge cheap CLI command/search metadata without provider filters, and expose
+  CLI pseudo apps only when they do not correspond to a known App Center app.
+- Validation:
+  Add route-level daemon tests for installed, disabled, uninstalled, and CLI
+  pseudo apps. Add renderer tests that the `workspace-app` provider consumes
+  mention candidates and only reads the cached agent-provider status snapshot
+  when hiding unavailable agent pseudo apps.
+- References:
+  [daemon_app_mentions.go](../../services/tuttid/api/daemon_app_mentions.go)
+  [desktopRichTextAtService.ts](../../apps/desktop/src/renderer/src/features/rich-text-at/services/internal/desktopRichTextAtService.ts)
+  [desktopAgentProviderStatusService.ts](../../apps/desktop/src/renderer/src/features/workspace-agent/services/internal/desktopAgentProviderStatusService.ts)
+
 ### Electron main/preload crashes on a workspace package `.ts` export
 
 - Symptom:
