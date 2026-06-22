@@ -63,6 +63,7 @@ test("agent provider dock status shows connect and refresh for not installed pro
     { id: "install", label: "Connect" },
     { id: "refresh", label: "refresh" }
   ]);
+  assert.ok(props.state);
   assert.equal(props.state.reason, "Connect local agent to continue");
 });
 
