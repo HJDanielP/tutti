@@ -4,6 +4,7 @@ import type {
 } from "@shared/contracts/ipc";
 
 export type WorkspaceSettingsSectionID =
+  | "about"
   | "appearance"
   | "apps"
   | "developer"

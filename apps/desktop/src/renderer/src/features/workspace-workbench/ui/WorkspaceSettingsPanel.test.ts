@@ -23,7 +23,7 @@ test("workspace settings developer panel exposes analytics debug switch only whe
 test("workspace settings panel lists appearance below general", () => {
   assert.match(
     source,
-    /id: "general" as const,[\s\S]*id: "appearance" as const,[\s\S]*id: "developer" as const/
+    /id: "general" as const,[\s\S]*id: "appearance" as const,[\s\S]*id: "apps" as const,[\s\S]*id: "about" as const,[\s\S]*id: "developer" as const/
   );
 });
 
@@ -86,6 +86,30 @@ test("workspace settings version value stays vertically centered", () => {
   assert.match(
     source,
     /inline-flex h-5 cursor-default select-none items-center justify-end[\s\S]*font-mono text-\[13px\] leading-5/
+  );
+});
+
+test("workspace settings version lives in about settings and keeps developer unlock tap", () => {
+  const generalSectionStart = source.indexOf(
+    "function WorkspaceGeneralSettingsSection"
+  );
+  const aboutSectionStart = source.indexOf(
+    "function WorkspaceAboutSettingsSection"
+  );
+  const appearanceSectionStart = source.indexOf(
+    "function WorkspaceAppearanceSettingsSection"
+  );
+
+  assert.ok(generalSectionStart >= 0);
+  assert.ok(aboutSectionStart > generalSectionStart);
+  assert.ok(appearanceSectionStart > aboutSectionStart);
+  assert.doesNotMatch(
+    source.slice(generalSectionStart, aboutSectionStart),
+    /versionLabel/
+  );
+  assert.match(
+    source.slice(aboutSectionStart, appearanceSectionStart),
+    /versionLabel[\s\S]*onClick=\{onVersionTap\}/
   );
 });
 

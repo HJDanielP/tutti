@@ -374,6 +374,7 @@ export const en = {
         versionLabel: "Desktop version"
       },
       nav: {
+        about: "About",
         apps: "Apps",
         sectionsLabel: "Settings sections",
         appearance: "Appearance",
@@ -496,7 +497,7 @@ export const en = {
         addFileDefaultOpener: "Add",
         removeFileDefaultOpener: "Remove .{{extension}}",
         visibilityDescription:
-          "Hide this panel from settings. Tap the version number in General seven times to bring it back",
+          "Hide this panel from settings. Tap the version number in About seven times to bring it back",
         visibilityLabel: "Show developer panel"
       },
       title: "Settings",

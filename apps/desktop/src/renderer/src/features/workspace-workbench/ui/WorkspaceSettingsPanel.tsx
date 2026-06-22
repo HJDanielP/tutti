@@ -214,6 +214,10 @@ export function WorkspaceSettingsPanel({
               id: "apps" as const,
               label: t("workspace.settings.nav.apps")
             },
+            {
+              id: "about" as const,
+              label: t("workspace.settings.nav.about")
+            },
             ...(settingsState.developerPanelVisible
               ? [
                   {
@@ -263,7 +267,6 @@ export function WorkspaceSettingsPanel({
                 browserUseConnectionMode={
                   desktopPreferencesState.browserUseConnectionMode
                 }
-                developerLogs={settingsState.developerLogs}
                 focusedAnchor={settingsState.generalFocusAnchor}
                 focusRequestID={settingsState.generalFocusRequestID}
                 locale={desktopPreferencesState.locale}
@@ -280,7 +283,6 @@ export function WorkspaceSettingsPanel({
                 onSleepPreventionModeChange={(mode) => {
                   void settingsService.changeSleepPreventionMode(mode);
                 }}
-                onVersionTap={handleVersionTap}
                 sleepPreventionMode={
                   desktopPreferencesState.sleepPreventionMode
                 }
@@ -348,6 +350,11 @@ export function WorkspaceSettingsPanel({
                     patch
                   );
                 }}
+              />
+            ) : settingsState.activeSection === "about" ? (
+              <WorkspaceAboutSettingsSection
+                developerLogs={settingsState.developerLogs}
+                onVersionTap={handleVersionTap}
               />
             ) : (
               <WorkspaceDeveloperSettingsSection
@@ -1638,13 +1645,24 @@ function AppCatalogChannelControl({
               type="button"
               onClick={() => onAppCatalogChannelChange(channel)}
             >
-              {t(`workspace.settings.apps.appCatalogChannelOptions.${channel}`)}
+              {t(workspaceSettingsAppCatalogChannelOptionLabelKey(channel))}
             </button>
           );
         })}
       </div>
     </div>
   );
+}
+
+function workspaceSettingsAppCatalogChannelOptionLabelKey(
+  channel: DesktopAppCatalogChannel
+): DesktopI18nKey {
+  switch (channel) {
+    case "production":
+      return "workspace.settings.apps.appCatalogChannelOptions.production";
+    case "staging":
+      return "workspace.settings.apps.appCatalogChannelOptions.staging";
+  }
 }
 
 function workspaceSettingsFileDefaultOpenerLabelKey(
@@ -2107,7 +2125,6 @@ function WorkspaceGeneralSettingsSection({
   changingLocale,
   changingSleepPreventionMode,
   defaultAgentProvider,
-  developerLogs,
   focusedAnchor,
   focusRequestID,
   locale,
@@ -2116,7 +2133,6 @@ function WorkspaceGeneralSettingsSection({
   onLocaleChange,
   onOpenExternalAgentImport,
   onSleepPreventionModeChange,
-  onVersionTap,
   sleepPreventionMode
 }: {
   browserUseConnectionMode: DesktopBrowserUseConnectionMode;
@@ -2125,7 +2141,6 @@ function WorkspaceGeneralSettingsSection({
   changingLocale: DesktopLocale | null;
   changingSleepPreventionMode: DesktopSleepPreventionMode | null;
   defaultAgentProvider: DesktopAgentProvider;
-  developerLogs: WorkspaceSettingsDeveloperLogsSnapshotState;
   focusedAnchor: WorkspaceSettingsGeneralFocusAnchor | null;
   focusRequestID: number;
   locale: DesktopLocale;
@@ -2136,7 +2151,6 @@ function WorkspaceGeneralSettingsSection({
   onLocaleChange: (locale: DesktopLocale) => void;
   onOpenExternalAgentImport: () => void;
   onSleepPreventionModeChange: (mode: DesktopSleepPreventionMode) => void;
-  onVersionTap: () => void;
   sleepPreventionMode: DesktopSleepPreventionMode;
 }) {
   const { t } = useTranslation();
@@ -2159,7 +2173,6 @@ function WorkspaceGeneralSettingsSection({
   const isUpdatingSleepPrevention = changingSleepPreventionMode !== null;
   const pendingSleepPreventionMode =
     changingSleepPreventionMode ?? sleepPreventionMode;
-  const logs = developerLogs.logs;
 
   useEffect(() => {
     if (!focusedAnchor || focusRequestID === 0) {
@@ -2393,7 +2406,22 @@ function WorkspaceGeneralSettingsSection({
           </Select>
         </div>
       </div>
+    </div>
+  );
+}
 
+function WorkspaceAboutSettingsSection({
+  developerLogs,
+  onVersionTap
+}: {
+  developerLogs: WorkspaceSettingsDeveloperLogsSnapshotState;
+  onVersionTap: () => void;
+}) {
+  const { t } = useTranslation();
+  const logs = developerLogs.logs;
+
+  return (
+    <SettingsRows>
       <div className="flex w-full items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
         <div className="min-w-0">
           <strong className="text-[13px] font-semibold text-[var(--text-primary)]">
@@ -2410,7 +2438,7 @@ function WorkspaceGeneralSettingsSection({
             : (logs?.desktopVersion ?? "0.0.0")}
         </button>
       </div>
-    </div>
+    </SettingsRows>
   );
 }
 
