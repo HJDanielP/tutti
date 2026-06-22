@@ -8,6 +8,7 @@ import {
   type RefObject
 } from "react";
 import { createPortal } from "react-dom";
+import { useComposedInputValue } from "@tutti-os/ui-react-hooks";
 import {
   ArrowRightIcon,
   Badge,
@@ -158,6 +159,10 @@ export function ReferenceSourcePicker({
     view.setFilters([...next]);
   };
   const clearFilters = () => view.setFilters([]);
+  const searchInput = useComposedInputValue({
+    onCommit: view.setSearchQuery,
+    value: view.searchQuery
+  });
 
   // 三栏可拖拽 + 双击自动适配:layoutRef 量整体宽度,content/panel ref 用于双击适配。
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -264,10 +269,11 @@ export function ReferenceSourcePicker({
                         placeholder={copy.t(
                           "referencePicker.searchPlaceholder"
                         )}
-                        value={view.searchQuery}
-                        onChange={(event) =>
-                          view.setSearchQuery(event.target.value)
-                        }
+                        value={searchInput.value}
+                        onBlur={searchInput.onBlur}
+                        onChange={searchInput.onChange}
+                        onCompositionEnd={searchInput.onCompositionEnd}
+                        onCompositionStart={searchInput.onCompositionStart}
                       />
                     </div>
                     {view.capabilities?.filterable &&
