@@ -309,14 +309,7 @@ export function WorkspaceSettingsPanel({
               />
             ) : settingsState.activeSection === "apps" ? (
               <WorkspaceAppsSettingsSection
-                appCatalogChannel={desktopPreferencesState.appCatalogChannel}
-                changingAppCatalogChannel={
-                  desktopPreferencesState.changingAppCatalogChannel
-                }
                 managedModels={settingsState.managedModels}
-                onAppCatalogChannelChange={(channel) => {
-                  void settingsService.changeAppCatalogChannel(channel);
-                }}
                 onBeginDraft={(provider) => {
                   settingsService.beginManagedModelProviderDraft(provider);
                 }}
@@ -362,11 +355,18 @@ export function WorkspaceSettingsPanel({
                   analyticsDebugPreferenceState.available
                 }
                 analyticsDebugEnabled={analyticsDebugPreferenceState.enabled}
+                appCatalogChannel={desktopPreferencesState.appCatalogChannel}
+                changingAppCatalogChannel={
+                  desktopPreferencesState.changingAppCatalogChannel
+                }
                 developerLogs={settingsState.developerLogs}
                 developerPanelVisible={settingsState.developerPanelVisible}
                 fileDefaultOpenersByExtension={
                   desktopPreferencesState.fileDefaultOpenersByExtension
                 }
+                onAppCatalogChannelChange={(channel) => {
+                  void settingsService.changeAppCatalogChannel(channel);
+                }}
                 onAnalyticsDebugEnabledChange={(enabled) => {
                   analyticsDebugPreferenceService.setEnabled(enabled);
                 }}
@@ -669,10 +669,7 @@ function normalizeWorkspaceManagedModelRows(
 }
 
 function WorkspaceAppsSettingsSection({
-  appCatalogChannel,
-  changingAppCatalogChannel,
   managedModels,
-  onAppCatalogChannelChange,
   onBeginDraft,
   onCancelDraft,
   onDeleteProvider,
@@ -684,10 +681,7 @@ function WorkspaceAppsSettingsSection({
   onUpdateDraft,
   onUpdateProvider
 }: {
-  appCatalogChannel: DesktopAppCatalogChannel;
-  changingAppCatalogChannel: DesktopAppCatalogChannel | null;
   managedModels: WorkspaceSettingsManagedModelsSnapshotState;
-  onAppCatalogChannelChange: (channel: DesktopAppCatalogChannel) => void;
   onBeginDraft: (provider: WorkspaceManagedModelProviderID) => void;
   onCancelDraft: () => void;
   onDeleteProvider: (providerID: WorkspaceManagedModelProviderID) => void;
@@ -706,8 +700,6 @@ function WorkspaceAppsSettingsSection({
   ) => void;
 }) {
   const { t } = useTranslation();
-  const effectiveAppCatalogChannel =
-    changingAppCatalogChannel ?? appCatalogChannel;
   const { draft, providers } = managedModels;
   const [expandedProviderID, setExpandedProviderID] =
     useState<WorkspaceManagedModelProviderID | null>(
@@ -758,45 +750,6 @@ function WorkspaceAppsSettingsSection({
 
   return (
     <SettingsRows>
-      <div className="flex w-full items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <strong className="text-[13px] font-semibold text-[var(--text-primary)]">
-            {t("workspace.settings.apps.appCatalogChannelLabel")}
-          </strong>
-          <p className="m-0 text-[13px] leading-[1.35] text-[var(--text-secondary)]">
-            {t("workspace.settings.apps.appCatalogChannelDescription")}
-          </p>
-        </div>
-        <div
-          aria-label={t("workspace.settings.apps.appCatalogChannelLabel")}
-          className="grid h-8 shrink-0 grid-cols-2 overflow-hidden rounded-[6px] bg-[var(--transparency-block)] p-0.5"
-          role="group"
-        >
-          {desktopAppCatalogChannels.map((channel) => {
-            const selected = effectiveAppCatalogChannel === channel;
-            return (
-              <button
-                key={channel}
-                aria-pressed={selected}
-                className={cn(
-                  "min-w-[92px] rounded-[5px] border-0 px-3 text-[13px] font-semibold leading-none outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]",
-                  selected
-                    ? "bg-[var(--background-fronted)] text-[var(--text-primary)] shadow-sm"
-                    : "bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                )}
-                disabled={changingAppCatalogChannel !== null}
-                type="button"
-                onClick={() => onAppCatalogChannelChange(channel)}
-              >
-                {t(
-                  `workspace.settings.apps.appCatalogChannelOptions.${channel}`
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div className="flex w-full items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-2">
           <strong className="text-[13px] font-semibold text-[var(--text-primary)]">
@@ -1381,10 +1334,13 @@ function ManagedModelProviderFields({
 function WorkspaceDeveloperSettingsSection({
   analyticsDebugAvailable,
   analyticsDebugEnabled,
+  appCatalogChannel,
+  changingAppCatalogChannel,
   developerLogs,
   developerPanelVisible,
   fileDefaultOpenersByExtension,
   onAnalyticsDebugEnabledChange,
+  onAppCatalogChannelChange,
   onClearConversationHistory,
   onClearLogs,
   onDeveloperPanelVisibleChange,
@@ -1393,10 +1349,13 @@ function WorkspaceDeveloperSettingsSection({
 }: {
   analyticsDebugAvailable: boolean;
   analyticsDebugEnabled: boolean;
+  appCatalogChannel: DesktopAppCatalogChannel;
+  changingAppCatalogChannel: DesktopAppCatalogChannel | null;
   developerLogs: WorkspaceSettingsDeveloperLogsSnapshotState;
   developerPanelVisible: boolean;
   fileDefaultOpenersByExtension: DesktopFileDefaultOpenersByExtension;
   onAnalyticsDebugEnabledChange: (enabled: boolean) => void;
+  onAppCatalogChannelChange: (channel: DesktopAppCatalogChannel) => void;
   onClearConversationHistory: () => void;
   onClearLogs: () => void;
   onDeveloperPanelVisibleChange: (visible: boolean) => void;
@@ -1435,6 +1394,12 @@ function WorkspaceDeveloperSettingsSection({
           onCheckedChange={onDeveloperPanelVisibleChange}
         />
       </div>
+
+      <AppCatalogChannelControl
+        appCatalogChannel={appCatalogChannel}
+        changingAppCatalogChannel={changingAppCatalogChannel}
+        onAppCatalogChannelChange={onAppCatalogChannelChange}
+      />
 
       {analyticsDebugAvailable ? (
         <div className="flex w-full items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
@@ -1626,6 +1591,59 @@ function WorkspaceDeveloperSettingsSection({
         </div>
       </SettingsRow>
     </SettingsRows>
+  );
+}
+
+function AppCatalogChannelControl({
+  appCatalogChannel,
+  changingAppCatalogChannel,
+  onAppCatalogChannelChange
+}: {
+  appCatalogChannel: DesktopAppCatalogChannel;
+  changingAppCatalogChannel: DesktopAppCatalogChannel | null;
+  onAppCatalogChannelChange: (channel: DesktopAppCatalogChannel) => void;
+}) {
+  const { t } = useTranslation();
+  const effectiveAppCatalogChannel =
+    changingAppCatalogChannel ?? appCatalogChannel;
+
+  return (
+    <div className="flex w-full items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 max-[560px]:w-full">
+        <strong className="text-[13px] font-semibold text-[var(--text-primary)]">
+          {t("workspace.settings.apps.appCatalogChannelLabel")}
+        </strong>
+        <p className="m-0 text-[13px] leading-[1.3] text-[var(--text-secondary)]">
+          {t("workspace.settings.apps.appCatalogChannelDescription")}
+        </p>
+      </div>
+      <div
+        aria-label={t("workspace.settings.apps.appCatalogChannelLabel")}
+        className="grid h-8 shrink-0 grid-cols-2 overflow-hidden rounded-[6px] bg-[var(--transparency-block)] p-0.5"
+        role="group"
+      >
+        {desktopAppCatalogChannels.map((channel) => {
+          const selected = effectiveAppCatalogChannel === channel;
+          return (
+            <button
+              key={channel}
+              aria-pressed={selected}
+              className={cn(
+                "min-w-[92px] rounded-[5px] border-0 px-3 text-[13px] font-semibold leading-none outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]",
+                selected
+                  ? "bg-[var(--background-fronted)] text-[var(--text-primary)] shadow-sm"
+                  : "bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+              disabled={changingAppCatalogChannel !== null}
+              type="button"
+              onClick={() => onAppCatalogChannelChange(channel)}
+            >
+              {t(`workspace.settings.apps.appCatalogChannelOptions.${channel}`)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

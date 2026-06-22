@@ -96,6 +96,28 @@ test("workspace settings appearance panel owns visual settings", () => {
   assert.match(source, /workspace\.settings\.appearance\.wallpaperLabel/);
 });
 
+test("workspace settings app source control lives in developer settings", () => {
+  const appsSectionStart = source.indexOf(
+    "function WorkspaceAppsSettingsSection"
+  );
+  const developerSectionStart = source.indexOf(
+    "function WorkspaceDeveloperSettingsSection"
+  );
+  const controlStart = source.indexOf("function AppCatalogChannelControl");
+
+  assert.ok(appsSectionStart >= 0);
+  assert.ok(developerSectionStart > appsSectionStart);
+  assert.ok(controlStart > developerSectionStart);
+  assert.doesNotMatch(
+    source.slice(appsSectionStart, developerSectionStart),
+    /appCatalogChannel/
+  );
+  assert.match(
+    source.slice(developerSectionStart, controlStart),
+    /<AppCatalogChannelControl/
+  );
+});
+
 test("workspace managed provider API key is masked until toggled visible", () => {
   assert.match(source, /type=\{apiKeyVisible \? "text" : "password"\}/);
   assert.match(source, /setVisibleAPIKeyProviderID/);
