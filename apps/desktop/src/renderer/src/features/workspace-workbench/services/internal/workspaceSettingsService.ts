@@ -70,11 +70,11 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
   private readonly desktopPreferences: DesktopPreferencesService;
   private readonly notifications: NotificationService;
   private readonly reporterService: Pick<ReporterService, "trackEvents"> | null;
-  private readonly reporterNow?: () => number;
   private readonly appCenterService: Pick<
     WorkspaceAppCenterService,
     "refreshCatalog"
   > | null;
+  private readonly reporterNow?: () => number;
   private logsLoadSequence = 0;
 
   constructor(
@@ -82,18 +82,18 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
     desktopPreferences: DesktopPreferencesService = noopDesktopPreferences,
     notifications: NotificationService = noopNotifications,
     reporterService: Pick<ReporterService, "trackEvents"> | null = null,
-    reporterNow?: () => number,
     appCenterService: Pick<
       WorkspaceAppCenterService,
       "refreshCatalog"
-    > | null = null
+    > | null = null,
+    reporterNow?: () => number
   ) {
     this.dependencies = dependencies;
     this.desktopPreferences = desktopPreferences;
     this.notifications = notifications;
     this.reporterService = reporterService;
-    this.reporterNow = reporterNow;
     this.appCenterService = appCenterService;
+    this.reporterNow = reporterNow;
   }
 
   openPanel(
@@ -1000,7 +1000,7 @@ function normalizeManagedModels(
 IDesktopPreferencesService(WorkspaceSettingsService, undefined, 1);
 INotificationService(WorkspaceSettingsService, undefined, 2);
 IReporterService(WorkspaceSettingsService, undefined, 3);
-IWorkspaceAppCenterService(WorkspaceSettingsService, undefined, 5);
+IWorkspaceAppCenterService(WorkspaceSettingsService, undefined, 4);
 
 const noopDesktopPreferencesStore: DesktopPreferencesReadableStoreState = {
   agentComposerDefaultsByProvider: {},

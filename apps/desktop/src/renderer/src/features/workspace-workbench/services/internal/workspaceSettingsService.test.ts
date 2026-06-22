@@ -754,7 +754,6 @@ test("WorkspaceSettingsService refreshes App Center after changing catalog chann
     }),
     createNotificationRecorder().service,
     null,
-    undefined,
     {
       refreshCatalog: async (workspaceID) => {
         refreshedWorkspaceIDs.push(workspaceID);
@@ -816,6 +815,7 @@ test("WorkspaceSettingsService tracks settings panel open and section switches",
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -856,6 +856,7 @@ test("WorkspaceSettingsService tracks theme changes without developer log clear 
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -913,6 +914,7 @@ test("WorkspaceSettingsService tracks language changes", async () => {
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -927,6 +929,42 @@ test("WorkspaceSettingsService tracks language changes", async () => {
           from_language: "en",
           to_language: "zh-CN"
         }
+      }
+    ]
+  ]);
+});
+
+test("WorkspaceSettingsService keeps reporter clock separate from App Center injection", () => {
+  const reporterCalls: ReporterEventInput[][] = [];
+  const refreshedWorkspaceIDs: string[] = [];
+  const service = new WorkspaceSettingsService(
+    {
+      client: createWorkspaceSettingsClient({})
+    },
+    createDesktopPreferencesService({
+      state: createPreferencesState({})
+    }),
+    createNotificationRecorder().service,
+    createReporterService(reporterCalls),
+    {
+      refreshCatalog: async (workspaceID) => {
+        refreshedWorkspaceIDs.push(workspaceID);
+      }
+    },
+    () => 1749124800000
+  );
+
+  assert.doesNotThrow(() => {
+    service.openPanel({ id: "workspace-1" });
+  });
+
+  assert.deepEqual(refreshedWorkspaceIDs, []);
+  assert.deepEqual(reporterCalls, [
+    [
+      {
+        clientTS: 1749124800000,
+        name: "settings.opened",
+        params: {}
       }
     ]
   ]);
