@@ -663,7 +663,6 @@ export const en = {
       searchNoConversations: "No related sessions",
       conversationUnavailable: "Session unavailable.",
       contextPickerBrowseHint: "Search workspace files based on your input",
-      contextPickerBrowseAllHint: "Search workspace files based on your input",
       contextPickerBrowseFileHint:
         "No opened or Agent-generated files yet. Type a file name to search your computer.",
       mentionFileSearchMoreHint:
@@ -688,7 +687,7 @@ export const en = {
       sectionToday: "Today",
       sectionYesterday: "Yesterday",
       sectionEarlier: "Earlier",
-      projectSectionEdit: "Edit",
+      projectSectionEdit: "New session",
       projectSectionMoreActions: "Project actions",
       projectRailCreateProject: "New project",
       projectRailLinkExistingProject: "Link existing project folder",
@@ -892,7 +891,6 @@ export const en = {
         "This conversation's working directory no longer exists",
       fileMentionSwitchCategory: "Switch category",
       fileMentionSwitchSelection: "Switch selection",
-      mentionFilterAll: "All",
       mentionFilterFile: "Files",
       mentionFilterApp: "Apps",
       mentionFilterSession: "Sessions",
