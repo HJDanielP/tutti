@@ -8,6 +8,7 @@ import {
   type RefObject
 } from "react";
 import { createPortal } from "react-dom";
+import { useComposedInputValue } from "@tutti-os/ui-react-hooks";
 import {
   ArrowRightIcon,
   Badge,
@@ -57,6 +58,7 @@ import {
   type ReferenceNodePreviewState,
   type ReferenceGroupedSelection
 } from "../../../react/internal/reference/useReferenceSourcePickerView.ts";
+import { formatReferencePreviewDateTime } from "./referenceSourcePickerPresentation.ts";
 
 export interface ReferenceSourcePickerProps {
   aggregator: ReferenceSourceAggregator;
@@ -157,6 +159,10 @@ export function ReferenceSourcePicker({
     view.setFilters([...next]);
   };
   const clearFilters = () => view.setFilters([]);
+  const searchInput = useComposedInputValue({
+    onCommit: view.setSearchQuery,
+    value: view.searchQuery
+  });
 
   // 三栏可拖拽 + 双击自动适配:layoutRef 量整体宽度,content/panel ref 用于双击适配。
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -263,10 +269,11 @@ export function ReferenceSourcePicker({
                         placeholder={copy.t(
                           "referencePicker.searchPlaceholder"
                         )}
-                        value={view.searchQuery}
-                        onChange={(event) =>
-                          view.setSearchQuery(event.target.value)
-                        }
+                        value={searchInput.value}
+                        onBlur={searchInput.onBlur}
+                        onChange={searchInput.onChange}
+                        onCompositionEnd={searchInput.onCompositionEnd}
+                        onCompositionStart={searchInput.onCompositionStart}
                       />
                     </div>
                     {view.capabilities?.filterable &&
@@ -813,7 +820,7 @@ function PreviewInfoPane({
             </InfoRow>
             {node.mtimeMs != null ? (
               <InfoRow label={copy.t("referencePicker.previewModified")}>
-                {formatDateTime(node.mtimeMs)}
+                {formatReferencePreviewDateTime(node.mtimeMs)}
               </InfoRow>
             ) : null}
             {node.sizeBytes != null ? (
@@ -1331,12 +1338,6 @@ function TreeNodeRow({
       ) : null}
     </div>
   );
-}
-
-function formatDateTime(ms: number): string {
-  const date = new Date(ms);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatBytes(bytes: number): string {

@@ -661,11 +661,18 @@ export function createReferenceSourcePickerController(
         nodeId: SOURCE_ROOT_NODE_ID
       };
       for (const ref of refs) {
-        const { entries } = await aggregator.listChildren(scope, parent);
         const targetKey = nodeRefKey(ref);
-        const node = entries.find(
-          (entry) => nodeRefKey(entry.ref) === targetKey
-        );
+        let cursor: string | null = null;
+        let node: ReferenceNode | undefined;
+        do {
+          const { entries, nextCursor } = await aggregator.listChildren(
+            scope,
+            parent,
+            { cursor }
+          );
+          node = entries.find((entry) => nodeRefKey(entry.ref) === targetKey);
+          cursor = nextCursor ?? null;
+        } while (!node && cursor);
         if (!node) {
           break;
         }
