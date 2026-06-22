@@ -57,6 +57,7 @@ import {
   type ReferenceNodePreviewState,
   type ReferenceGroupedSelection
 } from "../../../react/internal/reference/useReferenceSourcePickerView.ts";
+import { formatReferencePreviewDateTime } from "./referenceSourcePickerPresentation.ts";
 
 export interface ReferenceSourcePickerProps {
   aggregator: ReferenceSourceAggregator;
@@ -813,7 +814,7 @@ function PreviewInfoPane({
             </InfoRow>
             {node.mtimeMs != null ? (
               <InfoRow label={copy.t("referencePicker.previewModified")}>
-                {formatDateTime(node.mtimeMs)}
+                {formatReferencePreviewDateTime(node.mtimeMs)}
               </InfoRow>
             ) : null}
             {node.sizeBytes != null ? (
@@ -1331,12 +1332,6 @@ function TreeNodeRow({
       ) : null}
     </div>
   );
-}
-
-function formatDateTime(ms: number): string {
-  const date = new Date(ms);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatBytes(bytes: number): string {
