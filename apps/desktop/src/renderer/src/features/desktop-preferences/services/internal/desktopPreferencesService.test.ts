@@ -648,6 +648,78 @@ test("DesktopPreferencesService applies HTTP-confirmed authoritative preferences
   service.dispose();
 });
 
+test("DesktopPreferencesService rejects mismatched App Center source confirmations", async () => {
+  const tuttidClient = createSequentialTuttidClient([
+    {
+      initialized: true,
+      preferences: {
+        agentComposerDefaultsByProvider: {},
+        agentGuiConversationRailCollapsedByProvider: {},
+        appCatalogChannel: "production",
+        browserUseConnectionMode: "isolated",
+        defaultAgentProvider: "codex",
+
+        dockIconStyle: "default",
+        dockPlacement: "bottom",
+        fileDefaultOpenersByExtension: { html: "defaultBrowser" },
+        locale: "en",
+        sleepPreventionMode: "never",
+        themeSource: "system",
+        updateChannel: "stable",
+        updatePolicy: "prompt"
+      }
+    },
+    {
+      initialized: true,
+      preferences: {
+        agentComposerDefaultsByProvider: {},
+        agentGuiConversationRailCollapsedByProvider: {},
+        appCatalogChannel: "production",
+        browserUseConnectionMode: "isolated",
+        defaultAgentProvider: "codex",
+
+        dockIconStyle: "default",
+        dockPlacement: "bottom",
+        fileDefaultOpenersByExtension: { html: "defaultBrowser" },
+        locale: "en",
+        sleepPreventionMode: "never",
+        themeSource: "system",
+        updateChannel: "stable",
+        updatePolicy: "prompt"
+      }
+    }
+  ]);
+  const client = createDesktopPreferencesFeatureClient(
+    tuttidClient,
+    createFallbackConfirmingEventStreamClient(),
+    {
+      authoritativeEventTimeoutMs: 0
+    }
+  );
+  const service = new DesktopPreferencesService({
+    applyLocale() {},
+    applyTheme() {},
+    client,
+    initialLocale: "en",
+    initialTheme: {
+      appearance: "light",
+      source: "system"
+    },
+    resolveTheme
+  });
+
+  await settle();
+
+  await assert.rejects(
+    () => service.setAppCatalogChannel("staging"),
+    /authoritative update did not arrive/u
+  );
+  assert.equal(service.store.appCatalogChannel, "production");
+  assert.equal(tuttidClient.getDesktopPreferencesCalls, 2);
+
+  service.dispose();
+});
+
 test("DesktopPreferencesService remembers agent composer defaults per provider", async () => {
   const client = createDesktopPreferencesClient({});
   const service = new DesktopPreferencesService({

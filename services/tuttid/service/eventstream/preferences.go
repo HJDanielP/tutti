@@ -31,6 +31,7 @@ func (p DesktopPreferencesPublisher) PublishDesktopPreferencesUpdated(ctx contex
 			AgentGUIConversationRailCollapsedByProvider: agentGUIConversationRailCollapsedByProviderPayloadFromBiz(
 				preferences.AgentGUIConversationRailCollapsedByProvider,
 			),
+			AppCatalogChannel:        preferences.AppCatalogChannel,
 			BrowserUseConnectionMode: preferences.BrowserUseConnectionMode,
 			DefaultAgentProvider:     preferences.DefaultAgentProvider,
 			DockIconStyle:            preferences.DockIconStyle,
@@ -65,6 +66,7 @@ func NewPreferencesDesktopUpdateRequestedHandler(mutator PreferencesMutator) Int
 		_, err = mutator.Put(ctx, preferencesservice.PutInput{
 			AgentComposerDefaultsByProvider:             decoded.AgentComposerDefaultsByProvider,
 			AgentGUIConversationRailCollapsedByProvider: decoded.AgentGUIConversationRailCollapsedByProvider,
+			AppCatalogChannel:                           decoded.AppCatalogChannel,
 			BrowserUseConnectionMode:                    decoded.BrowserUseConnectionMode,
 			DefaultAgentProvider:                        decoded.DefaultAgentProvider,
 			DockIconStyle:                               decoded.DockIconStyle,
@@ -86,6 +88,7 @@ func NewPreferencesDesktopUpdateRequestedHandler(mutator PreferencesMutator) Int
 type decodedDesktopPreferencesMutationPayload struct {
 	AgentComposerDefaultsByProvider             map[string]preferencesbiz.AgentComposerDefaults
 	AgentGUIConversationRailCollapsedByProvider map[string]bool
+	AppCatalogChannel                           string
 	BrowserUseConnectionMode                    string
 	DefaultAgentProvider                        string
 	DockIconStyle                               string
@@ -110,6 +113,7 @@ func decodeDesktopPreferencesMutationPayload(payload []byte) (decodedDesktopPref
 		AgentGUIConversationRailCollapsedByProvider: agentGUIConversationRailCollapsedByProviderFromPayload(
 			decoded.Preferences.AgentGUIConversationRailCollapsedByProvider,
 		),
+		AppCatalogChannel:        decoded.Preferences.AppCatalogChannel,
 		BrowserUseConnectionMode: decoded.Preferences.BrowserUseConnectionMode,
 		DefaultAgentProvider:     decoded.Preferences.DefaultAgentProvider,
 		DockIconStyle:            decoded.Preferences.DockIconStyle,

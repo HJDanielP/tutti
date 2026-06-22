@@ -223,6 +223,7 @@ function createPreferencesKey(
     stableAgentGuiConversationRailCollapsedByProviderKey(
       preferences.agentGuiConversationRailCollapsedByProvider
     ),
+    preferences.appCatalogChannel,
     preferences.browserUseConnectionMode ?? "isolated",
     preferences.defaultAgentProvider,
     preferences.dockIconStyle,
@@ -232,7 +233,9 @@ function createPreferencesKey(
     ),
     preferences.locale,
     preferences.sleepPreventionMode,
-    preferences.themeSource
+    preferences.themeSource,
+    preferences.updateChannel,
+    preferences.updatePolicy
   ].join("::");
 }
 
@@ -251,6 +254,7 @@ function preferencesEqual(
       ) &&
     (left.browserUseConnectionMode ?? "isolated") ===
       (right.browserUseConnectionMode ?? "isolated") &&
+    left.appCatalogChannel === right.appCatalogChannel &&
     left.defaultAgentProvider === right.defaultAgentProvider &&
     left.dockIconStyle === right.dockIconStyle &&
     left.dockPlacement === right.dockPlacement &&
@@ -262,7 +266,9 @@ function preferencesEqual(
       ) &&
     left.locale === right.locale &&
     left.sleepPreventionMode === right.sleepPreventionMode &&
-    left.themeSource === right.themeSource
+    left.themeSource === right.themeSource &&
+    left.updateChannel === right.updateChannel &&
+    left.updatePolicy === right.updatePolicy
   );
 }
 
