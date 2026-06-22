@@ -9,6 +9,7 @@ func GeneratedDesktopPreferencesFromBiz(value preferencesbiz.DesktopPreferences)
 	return tuttigenerated.DesktopPreferences{
 		AgentComposerDefaultsByProvider:             generatedAgentComposerDefaultsByProvider(value.AgentComposerDefaultsByProvider),
 		AgentGuiConversationRailCollapsedByProvider: generatedAgentGUIConversationRailCollapsedByProvider(value.AgentGUIConversationRailCollapsedByProvider),
+		AppCatalogChannel:                           tuttigenerated.DesktopAppCatalogChannel(value.AppCatalogChannel),
 		BrowserUseConnectionMode:                    generatedBrowserUseConnectionModePointer(value.BrowserUseConnectionMode),
 		DefaultAgentProvider:                        tuttigenerated.WorkspaceAgentProvider(value.DefaultAgentProvider),
 		DockIconStyle:                               tuttigenerated.DesktopDockIconStyle(value.DockIconStyle),

@@ -194,6 +194,7 @@ func TestTuttidBlackBoxEventStreamPreferenceIntentPublishesUpdatedEvent(t *testi
 			EmittedAt: time.Now().UTC().Format(time.RFC3339Nano),
 			Payload: mustMarshalRawJSON(t, eventprotocol.PreferencesDesktopUpdateRequestedPayload{
 				Preferences: eventprotocol.PreferencesDesktopPreferences{
+					AppCatalogChannel:    "staging",
 					DefaultAgentProvider: "codex",
 
 					DockIconStyle:       "default",
@@ -242,12 +243,13 @@ func TestTuttidBlackBoxEventStreamPreferenceIntentPublishesUpdatedEvent(t *testi
 		t.Fatal("updated initialized = false, want true")
 	}
 	if updated.Preferences.DefaultAgentProvider != "codex" ||
+		updated.Preferences.AppCatalogChannel != "staging" ||
 		updated.Preferences.DockPlacement != "bottom" ||
 		updated.Preferences.Locale != "zh-CN" ||
 		updated.Preferences.ThemeSource != "dark" ||
 		updated.Preferences.UpdateChannel != "stable" ||
 		updated.Preferences.UpdatePolicy != "prompt" {
-		t.Fatalf("updated payload = %#v, want codex/bottom/zh-CN/dark/stable/prompt", updated)
+		t.Fatalf("updated payload = %#v, want staging/codex/bottom/zh-CN/dark/stable/prompt", updated)
 	}
 
 	after := mustRequestJSON[tuttigenerated.DesktopPreferencesStateResponse](
@@ -266,6 +268,9 @@ func TestTuttidBlackBoxEventStreamPreferenceIntentPublishesUpdatedEvent(t *testi
 	}
 	if after.Preferences.DefaultAgentProvider != tuttigenerated.Codex {
 		t.Fatalf("stored defaultAgentProvider = %q, want %q", after.Preferences.DefaultAgentProvider, tuttigenerated.Codex)
+	}
+	if after.Preferences.AppCatalogChannel != tuttigenerated.Staging {
+		t.Fatalf("stored appCatalogChannel = %q, want %q", after.Preferences.AppCatalogChannel, tuttigenerated.Staging)
 	}
 	if after.Preferences.DockPlacement != tuttigenerated.Bottom {
 		t.Fatalf("stored dockPlacement = %q, want %q", after.Preferences.DockPlacement, tuttigenerated.Bottom)

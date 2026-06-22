@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	DefaultDesktopAppCatalogChannel        = "production"
 	DefaultDesktopDefaultAgentProvider     = agentproviderbiz.Codex
 	DefaultDesktopDockIconStyle            = "default"
 	DefaultDesktopDockPlacement            = "bottom"
@@ -21,6 +22,7 @@ const (
 type DesktopPreferences struct {
 	AgentComposerDefaultsByProvider             map[string]AgentComposerDefaults
 	AgentGUIConversationRailCollapsedByProvider map[string]bool
+	AppCatalogChannel                           string
 	BrowserUseConnectionMode                    string
 	DefaultAgentProvider                        string
 	DockIconStyle                               string
@@ -44,6 +46,7 @@ func DefaultDesktopPreferences() DesktopPreferences {
 	return DesktopPreferences{
 		AgentComposerDefaultsByProvider:             map[string]AgentComposerDefaults{},
 		AgentGUIConversationRailCollapsedByProvider: map[string]bool{},
+		AppCatalogChannel:                           DefaultDesktopAppCatalogChannel,
 		BrowserUseConnectionMode:                    DefaultDesktopBrowserUseConnectionMode,
 		DefaultAgentProvider:                        DefaultDesktopDefaultAgentProvider,
 		DockIconStyle:                               DefaultDesktopDockIconStyle,
@@ -60,6 +63,15 @@ func DefaultDesktopPreferences() DesktopPreferences {
 		ThemeSource:         DefaultDesktopThemeSource,
 		UpdateChannel:       DefaultDesktopUpdateChannel,
 		UpdatePolicy:        DefaultDesktopUpdatePolicy,
+	}
+}
+
+func IsDesktopAppCatalogChannel(value string) bool {
+	switch value {
+	case "production", "staging":
+		return true
+	default:
+		return false
 	}
 }
 

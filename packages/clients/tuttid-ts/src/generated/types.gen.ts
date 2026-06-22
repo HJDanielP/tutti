@@ -199,9 +199,12 @@ export type DesktopDockIconStyle = "default" | "flat";
 
 export type DesktopBrowserUseConnectionMode = "isolated" | "autoConnect";
 
+export type DesktopAppCatalogChannel = "production" | "staging";
+
 export type DesktopPreferences = {
   agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
   agentGuiConversationRailCollapsedByProvider: DesktopAgentGuiConversationRailCollapsedByProvider;
+  appCatalogChannel: DesktopAppCatalogChannel;
   browserUseConnectionMode?: DesktopBrowserUseConnectionMode;
   defaultAgentProvider: WorkspaceAgentProvider;
   dockIconStyle: DesktopDockIconStyle;

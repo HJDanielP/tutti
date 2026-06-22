@@ -182,7 +182,7 @@ func (s *AppCenterService) shouldDeleteRemoteBuiltinPackageAfterUninstall(ctx co
 	if appPackage.Source != workspacebiz.AppPackageSourceBuiltin {
 		return false, nil
 	}
-	_, ok, err := s.remoteBuiltinForAppID(appPackage.AppID)
+	_, ok, err := s.remoteBuiltinForAppID(ctx, appPackage.AppID)
 	if err != nil {
 		return false, err
 	}

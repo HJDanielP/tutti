@@ -40,6 +40,9 @@ func TestSQLiteStoreGetDesktopPreferencesDefaultsWhenUnset(t *testing.T) {
 	if preferences.BrowserUseConnectionMode != "isolated" {
 		t.Fatalf("GetDesktopPreferences() browserUseConnectionMode = %q, want isolated", preferences.BrowserUseConnectionMode)
 	}
+	if preferences.AppCatalogChannel != "production" {
+		t.Fatalf("GetDesktopPreferences() appCatalogChannel = %q, want production", preferences.AppCatalogChannel)
+	}
 	if preferences.FileDefaultOpenersByExtension["html"] != "appBrowser" {
 		t.Fatalf("GetDesktopPreferences() html opener = %q, want appBrowser", preferences.FileDefaultOpenersByExtension["html"])
 	}
@@ -75,6 +78,7 @@ func TestSQLiteStorePutDesktopPreferencesPersistsValue(t *testing.T) {
 		DefaultAgentProvider: "claude-code",
 
 		BrowserUseConnectionMode: "autoConnect",
+		AppCatalogChannel:        "staging",
 		DockIconStyle:            "default",
 		DockPlacement:            "left",
 		FileDefaultOpenersByExtension: map[string]string{
@@ -119,6 +123,9 @@ func TestSQLiteStorePutDesktopPreferencesPersistsValue(t *testing.T) {
 	}
 	if reloaded.BrowserUseConnectionMode != "autoConnect" {
 		t.Fatalf("GetDesktopPreferences() browserUseConnectionMode = %q, want autoConnect", reloaded.BrowserUseConnectionMode)
+	}
+	if reloaded.AppCatalogChannel != "staging" {
+		t.Fatalf("GetDesktopPreferences() appCatalogChannel = %q, want staging", reloaded.AppCatalogChannel)
 	}
 	if reloaded.FileDefaultOpenersByExtension["html"] != "fileViewer" || reloaded.FileDefaultOpenersByExtension["pdf"] != "defaultBrowser" {
 		t.Fatalf("GetDesktopPreferences() file default openers = %#v, want html/pdf", reloaded.FileDefaultOpenersByExtension)

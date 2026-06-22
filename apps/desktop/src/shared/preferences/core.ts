@@ -21,6 +21,14 @@ export type DesktopBrowserUseConnectionMode =
 export const defaultDesktopBrowserUseConnectionMode: DesktopBrowserUseConnectionMode =
   "isolated";
 
+export const desktopAppCatalogChannels = ["production", "staging"] as const;
+
+export type DesktopAppCatalogChannel =
+  (typeof desktopAppCatalogChannels)[number];
+
+export const defaultDesktopAppCatalogChannel: DesktopAppCatalogChannel =
+  "production";
+
 export function readInitialDockPlacementFromLocation(
   locationSearch?: string
 ): DesktopDockPlacement {
@@ -60,6 +68,15 @@ export function isDesktopBrowserUseConnectionMode(
     desktopBrowserUseConnectionModes.includes(
       value as DesktopBrowserUseConnectionMode
     )
+  );
+}
+
+export function isDesktopAppCatalogChannel(
+  value: unknown
+): value is DesktopAppCatalogChannel {
+  return (
+    typeof value === "string" &&
+    desktopAppCatalogChannels.includes(value as DesktopAppCatalogChannel)
   );
 }
 

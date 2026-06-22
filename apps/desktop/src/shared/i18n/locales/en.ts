@@ -374,13 +374,29 @@ export const en = {
         versionLabel: "Desktop version"
       },
       nav: {
+        about: "About",
         apps: "Apps",
         sectionsLabel: "Settings sections",
         appearance: "Appearance",
         developer: "Developer",
         general: "General"
       },
+      about: {
+        appName: "Tutti",
+        developerModeEnabled: "Developer mode is now on",
+        githubAction: "GitHub",
+        versionLabel: "Version",
+        websiteAction: "Website"
+      },
       apps: {
+        appCatalogChannelDescription:
+          "Choose whether App Center shows released apps or test versions.",
+        appCatalogChannelLabel: "App source",
+        appCatalogChannelOptions: {
+          production: "Released",
+          staging: "Test"
+        },
+        appCatalogChannelSaveFailed: "We couldn't switch the app source.",
         managedModels: {
           apiKey: "API key",
           addModel: "Add",
@@ -488,7 +504,7 @@ export const en = {
         addFileDefaultOpener: "Add",
         removeFileDefaultOpener: "Remove .{{extension}}",
         visibilityDescription:
-          "Hide this panel from settings. Tap the version number in General seven times to bring it back",
+          "Hide this panel from settings. Tap the version number in About seven times to bring it back",
         visibilityLabel: "Show developer panel"
       },
       title: "Settings",

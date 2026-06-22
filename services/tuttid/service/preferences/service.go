@@ -22,6 +22,7 @@ type Service struct {
 type PutInput struct {
 	AgentComposerDefaultsByProvider             map[string]preferencesbiz.AgentComposerDefaults
 	AgentGUIConversationRailCollapsedByProvider map[string]bool
+	AppCatalogChannel                           string
 	BrowserUseConnectionMode                    string
 	DefaultAgentProvider                        string
 	DockIconStyle                               string
@@ -50,6 +51,7 @@ func (s Service) Put(ctx context.Context, input PutInput) (preferencesbiz.Deskto
 	preferences, err := s.Store.PutDesktopPreferences(ctx, preferencesbiz.DesktopPreferences{
 		AgentComposerDefaultsByProvider:             normalizeAgentComposerDefaultsByProvider(input.AgentComposerDefaultsByProvider),
 		AgentGUIConversationRailCollapsedByProvider: normalizeAgentGUIConversationRailCollapsedByProvider(input.AgentGUIConversationRailCollapsedByProvider),
+		AppCatalogChannel:                           normalizeAppCatalogChannel(input.AppCatalogChannel),
 		BrowserUseConnectionMode:                    normalizeBrowserUseConnectionMode(input.BrowserUseConnectionMode),
 		DefaultAgentProvider:                        agentproviderbiz.Normalize(input.DefaultAgentProvider),
 		DockIconStyle:                               strings.TrimSpace(input.DockIconStyle),
@@ -69,6 +71,14 @@ func (s Service) Put(ctx context.Context, input PutInput) (preferencesbiz.Deskto
 		_ = s.Publisher.PublishDesktopPreferencesUpdated(ctx, preferences)
 	}
 	return preferences, nil
+}
+
+func normalizeAppCatalogChannel(value string) string {
+	normalized := strings.TrimSpace(value)
+	if preferencesbiz.IsDesktopAppCatalogChannel(normalized) {
+		return normalized
+	}
+	return preferencesbiz.DefaultDesktopAppCatalogChannel
 }
 
 func normalizeFileDefaultOpenersByExtension(input map[string]string) map[string]string {

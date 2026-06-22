@@ -3,6 +3,7 @@ import type {
   DesktopAgentComposerDefaultsByProvider,
   DesktopAgentGuiConversationRailCollapsedByProvider,
   DesktopAgentProvider,
+  DesktopAppCatalogChannel,
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
@@ -15,6 +16,7 @@ import type { DesktopThemeSource, DesktopThemeState } from "@shared/theme";
 
 export interface DesktopPreferencesStoreState {
   changingDefaultAgentProvider: DesktopAgentProvider | null;
+  changingAppCatalogChannel: DesktopAppCatalogChannel | null;
   changingBrowserUseConnectionMode: DesktopBrowserUseConnectionMode | null;
   changingDockIconStyle: DesktopDockIconStyle | null;
   changingDockPlacement: DesktopDockPlacement | null;
@@ -25,6 +27,7 @@ export interface DesktopPreferencesStoreState {
   changingUpdatePolicy: DesktopUpdatePolicy | null;
   agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
   agentGuiConversationRailCollapsedByProvider: DesktopAgentGuiConversationRailCollapsedByProvider;
+  appCatalogChannel: DesktopAppCatalogChannel;
   browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   defaultAgentProvider: DesktopAgentProvider;
   dockIconStyle: DesktopDockIconStyle;
@@ -39,6 +42,7 @@ export interface DesktopPreferencesStoreState {
 
 export interface DesktopPreferencesReadableStoreState {
   readonly changingDefaultAgentProvider: DesktopAgentProvider | null;
+  readonly changingAppCatalogChannel: DesktopAppCatalogChannel | null;
   readonly changingBrowserUseConnectionMode: DesktopBrowserUseConnectionMode | null;
   readonly changingDockIconStyle: DesktopDockIconStyle | null;
   readonly changingDockPlacement: DesktopDockPlacement | null;
@@ -49,6 +53,7 @@ export interface DesktopPreferencesReadableStoreState {
   readonly changingUpdatePolicy: DesktopUpdatePolicy | null;
   readonly agentComposerDefaultsByProvider: DesktopAgentComposerDefaultsByProvider;
   readonly agentGuiConversationRailCollapsedByProvider: DesktopAgentGuiConversationRailCollapsedByProvider;
+  readonly appCatalogChannel: DesktopAppCatalogChannel;
   readonly browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   readonly defaultAgentProvider: DesktopAgentProvider;
   readonly dockIconStyle: DesktopDockIconStyle;

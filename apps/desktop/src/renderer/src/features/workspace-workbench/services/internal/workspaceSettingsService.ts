@@ -2,6 +2,7 @@ import type { DesktopDeveloperLogKind } from "@shared/contracts/ipc";
 import type { DesktopLocale } from "@shared/i18n";
 import type {
   DesktopAgentProvider,
+  DesktopAppCatalogChannel,
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
@@ -18,6 +19,10 @@ import {
   IDesktopPreferencesService,
   type IDesktopPreferencesService as DesktopPreferencesService
 } from "../../../desktop-preferences/services/desktopPreferencesService.interface.ts";
+import {
+  IWorkspaceAppCenterService,
+  type IWorkspaceAppCenterService as WorkspaceAppCenterService
+} from "../../../workspace-app-center/services/workspaceAppCenterService.interface.ts";
 import { SettingsOpenedReporter } from "../../../analytics/reporters/settings-opened/settingsOpenedReporter.ts";
 import { SettingsSectionSwitchedReporter } from "../../../analytics/reporters/settings-section-switched/settingsSectionSwitchedReporter.ts";
 import { SettingsLanguageChangedReporter } from "../../../analytics/reporters/settings-language-changed/settingsLanguageChangedReporter.ts";
@@ -65,6 +70,10 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
   private readonly desktopPreferences: DesktopPreferencesService;
   private readonly notifications: NotificationService;
   private readonly reporterService: Pick<ReporterService, "trackEvents"> | null;
+  private readonly appCenterService: Pick<
+    WorkspaceAppCenterService,
+    "refreshCatalog"
+  > | null;
   private readonly reporterNow?: () => number;
   private logsLoadSequence = 0;
 
@@ -73,12 +82,17 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
     desktopPreferences: DesktopPreferencesService = noopDesktopPreferences,
     notifications: NotificationService = noopNotifications,
     reporterService: Pick<ReporterService, "trackEvents"> | null = null,
+    appCenterService: Pick<
+      WorkspaceAppCenterService,
+      "refreshCatalog"
+    > | null = null,
     reporterNow?: () => number
   ) {
     this.dependencies = dependencies;
     this.desktopPreferences = desktopPreferences;
     this.notifications = notifications;
     this.reporterService = reporterService;
+    this.appCenterService = appCenterService;
     this.reporterNow = reporterNow;
   }
 
@@ -357,6 +371,34 @@ export class WorkspaceSettingsService implements IWorkspaceSettingsService {
           "workspace.settings.general.updateChannelSaveFailed"
         )
       });
+    }
+  }
+
+  async changeAppCatalogChannel(
+    channel: DesktopAppCatalogChannel
+  ): Promise<void> {
+    if (
+      this.desktopPreferences.store.appCatalogChannel === channel ||
+      this.desktopPreferences.store.changingAppCatalogChannel === channel
+    ) {
+      return;
+    }
+
+    try {
+      await this.desktopPreferences.setAppCatalogChannel(channel);
+    } catch {
+      this.notifications.error({
+        title: createActiveTranslator().t(
+          "workspace.settings.apps.appCatalogChannelSaveFailed"
+        )
+      });
+      return;
+    }
+
+    if (this.store.workspaceID && this.appCenterService) {
+      await this.appCenterService
+        .refreshCatalog(this.store.workspaceID)
+        .catch(() => {});
     }
   }
 
@@ -958,11 +1000,14 @@ function normalizeManagedModels(
 IDesktopPreferencesService(WorkspaceSettingsService, undefined, 1);
 INotificationService(WorkspaceSettingsService, undefined, 2);
 IReporterService(WorkspaceSettingsService, undefined, 3);
+IWorkspaceAppCenterService(WorkspaceSettingsService, undefined, 4);
 
 const noopDesktopPreferencesStore: DesktopPreferencesReadableStoreState = {
   agentComposerDefaultsByProvider: {},
   agentGuiConversationRailCollapsedByProvider: {},
+  appCatalogChannel: "production",
   browserUseConnectionMode: "isolated",
+  changingAppCatalogChannel: null,
   changingBrowserUseConnectionMode: null,
   changingDefaultAgentProvider: null,
   changingDockIconStyle: null,
@@ -986,6 +1031,9 @@ const noopDesktopPreferencesStore: DesktopPreferencesReadableStoreState = {
 const noopDesktopPreferences: DesktopPreferencesService = {
   _serviceBrand: undefined,
   store: noopDesktopPreferencesStore,
+  setAppCatalogChannel(channel) {
+    return Promise.resolve(channel);
+  },
   setBrowserUseConnectionMode(mode) {
     return Promise.resolve(mode);
   },

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	preferencesbiz "github.com/tutti-os/tutti/services/tuttid/biz/preferences"
 	workspacebiz "github.com/tutti-os/tutti/services/tuttid/biz/workspace"
 	builtinapps "github.com/tutti-os/tutti/services/tuttid/builtin-apps"
 )
@@ -173,11 +174,41 @@ func (s *AppCenterService) downloadRemoteBuiltinPackage(ctx context.Context, bui
 	return appPackage, nil
 }
 
-func (s *AppCenterService) builtinCatalog() ([]builtinapps.App, error) {
+func (s *AppCenterService) builtinCatalog(ctx context.Context) ([]builtinapps.App, error) {
 	if s.BuiltinCatalog != nil {
 		return s.BuiltinCatalog()
 	}
-	return builtinapps.Catalog()
+	if builtinapps.RemoteCatalogEnvOverrideActive() {
+		return builtinapps.Catalog()
+	}
+	snapshot, err := builtinapps.SnapshotForRemoteURL(s.appCatalogRemoteURL(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.Apps, nil
+}
+
+func (s *AppCenterService) refreshBuiltinCatalogAndWait(ctx context.Context) (builtinapps.CatalogSnapshot, error) {
+	if builtinapps.RemoteCatalogEnvOverrideActive() {
+		return builtinapps.RefreshRemoteCatalogAndWait(ctx)
+	}
+	return builtinapps.RefreshRemoteCatalogAndWaitForRemoteURL(ctx, s.appCatalogRemoteURL(ctx))
+}
+
+func (s *AppCenterService) appCatalogRemoteURL(ctx context.Context) string {
+	channel := preferencesbiz.DefaultDesktopAppCatalogChannel
+	if s.PreferencesStore != nil {
+		preferences, err := s.PreferencesStore.GetDesktopPreferences(ctx)
+		if err == nil && preferencesbiz.IsDesktopAppCatalogChannel(preferences.AppCatalogChannel) {
+			channel = preferences.AppCatalogChannel
+		}
+	}
+	switch channel {
+	case "staging":
+		return builtinapps.StagingRemoteCatalogURL
+	default:
+		return builtinapps.ProductionRemoteCatalogURL
+	}
 }
 
 func (s *AppCenterService) CatalogLoadState() workspacebiz.AppCatalogLoadState {
@@ -186,7 +217,15 @@ func (s *AppCenterService) CatalogLoadState() workspacebiz.AppCatalogLoadState {
 			Status: workspacebiz.AppCatalogLoadStatusReady,
 		}
 	}
-	snapshot, err := builtinapps.Snapshot()
+	var (
+		snapshot builtinapps.CatalogSnapshot
+		err      error
+	)
+	if builtinapps.RemoteCatalogEnvOverrideActive() {
+		snapshot, err = builtinapps.Snapshot()
+	} else {
+		snapshot, err = builtinapps.SnapshotForRemoteURL(s.appCatalogRemoteURL(context.Background()))
+	}
 	if err != nil {
 		lastError := err.Error()
 		updatedAt := time.Now().UnixMilli()

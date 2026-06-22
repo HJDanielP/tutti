@@ -355,6 +355,7 @@ export type {
   DesktopAgentComposerDefaults,
   DesktopAgentComposerDefaultsByProvider,
   DesktopAgentGuiConversationRailCollapsedByProvider,
+  DesktopAppCatalogChannel,
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,

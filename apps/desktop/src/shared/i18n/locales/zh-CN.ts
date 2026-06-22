@@ -354,13 +354,29 @@ export const zhCN = {
         versionLabel: "桌面版本"
       },
       nav: {
+        about: "关于",
         apps: "应用",
         sectionsLabel: "设置分区",
         appearance: "外观",
         developer: "开发者",
         general: "通用"
       },
+      about: {
+        appName: "Tutti",
+        developerModeEnabled: "开发者模式已打开",
+        githubAction: "GitHub",
+        versionLabel: "版本",
+        websiteAction: "官方网站"
+      },
       apps: {
+        appCatalogChannelDescription:
+          "选择应用中心显示已正式发布的应用，还是用于试用的新版本。",
+        appCatalogChannelLabel: "应用来源",
+        appCatalogChannelOptions: {
+          production: "正式应用",
+          staging: "测试应用"
+        },
+        appCatalogChannelSaveFailed: "暂时无法切换应用来源。",
         managedModels: {
           apiKey: "API 密钥",
           addModel: "添加",
@@ -466,7 +482,7 @@ export const zhCN = {
         addFileDefaultOpener: "添加",
         removeFileDefaultOpener: "移除 .{{extension}}",
         visibilityDescription:
-          "在设置中隐藏此面板。在「通用」里连续点击版本号七次即可重新显示",
+          "在设置中隐藏此面板。在「关于」里连续点击版本号七次即可重新显示",
         visibilityLabel: "显示开发者面板"
       },
       title: "设置",

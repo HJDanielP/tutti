@@ -1344,15 +1344,16 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesPersistsAgentGUIConversati
 				captured = input
 				return preferencesbiz.DesktopPreferences{
 					AgentGUIConversationRailCollapsedByProvider: input.AgentGUIConversationRailCollapsedByProvider,
-					DefaultAgentProvider:                        input.DefaultAgentProvider,
-					DockIconStyle:                               input.DockIconStyle,
-					DockPlacement:                               input.DockPlacement,
-					Initialized:                                 true,
-					Locale:                                      input.Locale,
-					SleepPreventionMode:                         input.SleepPreventionMode,
-					ThemeSource:                                 input.ThemeSource,
-					UpdateChannel:                               input.UpdateChannel,
-					UpdatePolicy:                                input.UpdatePolicy,
+					AppCatalogChannel:    input.AppCatalogChannel,
+					DefaultAgentProvider: input.DefaultAgentProvider,
+					DockIconStyle:        input.DockIconStyle,
+					DockPlacement:        input.DockPlacement,
+					Initialized:          true,
+					Locale:               input.Locale,
+					SleepPreventionMode:  input.SleepPreventionMode,
+					ThemeSource:          input.ThemeSource,
+					UpdateChannel:        input.UpdateChannel,
+					UpdatePolicy:         input.UpdatePolicy,
 				}, nil
 			},
 		},
@@ -1366,6 +1367,7 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesPersistsAgentGUIConversati
 				"codex":       true,
 			},
 			"defaultAgentProvider": "codex",
+			"appCatalogChannel":    "staging",
 			"dockIconStyle":        "default",
 			"dockPlacement":        "bottom",
 			"locale":               "zh-CN",
@@ -1384,6 +1386,9 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesPersistsAgentGUIConversati
 	if collapsed, ok := captured.AgentGUIConversationRailCollapsedByProvider["claude-code"]; !ok || collapsed {
 		t.Fatalf("captured rail preference = %#v, want claude-code false", captured.AgentGUIConversationRailCollapsedByProvider)
 	}
+	if captured.AppCatalogChannel != "staging" {
+		t.Fatalf("captured appCatalogChannel = %q, want staging", captured.AppCatalogChannel)
+	}
 	var response tuttigenerated.DesktopPreferencesStateResponse
 	decodeGeneratedRouteResponse(t, recorder, &response)
 	if response.Preferences.AgentGuiConversationRailCollapsedByProvider.Codex == nil ||
@@ -1393,6 +1398,9 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesPersistsAgentGUIConversati
 	if response.Preferences.AgentGuiConversationRailCollapsedByProvider.ClaudeCode == nil ||
 		*response.Preferences.AgentGuiConversationRailCollapsedByProvider.ClaudeCode {
 		t.Fatalf("response rail claude-code = %#v, want false", response.Preferences.AgentGuiConversationRailCollapsedByProvider.ClaudeCode)
+	}
+	if response.Preferences.AppCatalogChannel != tuttigenerated.Staging {
+		t.Fatalf("response appCatalogChannel = %q, want staging", response.Preferences.AppCatalogChannel)
 	}
 }
 
@@ -1410,6 +1418,7 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesValidatesLocale(t *testing
 	recorder := performGeneratedRouteRequest(t, mux, http.MethodPut, "/v1/preferences/desktop", map[string]any{
 		"preferences": map[string]any{
 			"defaultAgentProvider": "codex",
+			"appCatalogChannel":    "production",
 			"dockIconStyle":        "default",
 			"dockPlacement":        "bottom",
 			"locale":               "fr",

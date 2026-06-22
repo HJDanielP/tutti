@@ -23,6 +23,7 @@ type AppCenterService struct {
 	AppFactoryStore       workspacedata.AppFactoryStore
 	WorkspaceRootResolver WorkspaceRootResolver
 	WorkspaceStore        workspacedata.CatalogStore
+	PreferencesStore      workspacedata.PreferencesStore
 	Runner                *AppRunner
 	AppCLIRegistry        *appcliservice.Registry
 	StateDir              string
@@ -87,7 +88,7 @@ func (s *AppCenterService) InitBuiltinPackages(ctx context.Context) error {
 		return errors.New("workspace app store is not configured")
 	}
 
-	builtins, err := s.builtinCatalog()
+	builtins, err := s.builtinCatalog(ctx)
 	if err != nil {
 		return err
 	}
@@ -126,7 +127,7 @@ func (s *AppCenterService) List(ctx context.Context, workspaceID string) ([]work
 		return nil, err
 	}
 
-	builtins, err := s.builtinCatalog()
+	builtins, err := s.builtinCatalog(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func (s *AppCenterService) RefreshCatalog(ctx context.Context, workspaceID strin
 		return nil, err
 	}
 	if s.BuiltinCatalog == nil {
-		if _, err := builtinapps.RefreshRemoteCatalogAndWait(ctx); err != nil {
+		if _, err := s.refreshBuiltinCatalogAndWait(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -339,7 +340,7 @@ func (s *AppCenterService) packageForInstall(ctx context.Context, appID string) 
 		}
 		return s.materializeRemoteBuiltinPackage(ctx, appID)
 	}
-	remoteBuiltin, ok, err := s.remoteBuiltinForAppID(appID)
+	remoteBuiltin, ok, err := s.remoteBuiltinForAppID(ctx, appID)
 	if err != nil {
 		return appPackage, nil
 	}
@@ -596,7 +597,7 @@ func (s *AppCenterService) withCurrentRevision(app workspacebiz.WorkspaceApp, wo
 }
 
 func (s *AppCenterService) materializeRemoteBuiltinPackage(ctx context.Context, appID string) (workspacebiz.AppPackage, error) {
-	builtins, err := s.builtinCatalog()
+	builtins, err := s.builtinCatalog(ctx)
 	if err != nil {
 		return workspacebiz.AppPackage{}, err
 	}
@@ -609,8 +610,8 @@ func (s *AppCenterService) materializeRemoteBuiltinPackage(ctx context.Context, 
 	return workspacebiz.AppPackage{}, workspacedata.ErrWorkspaceAppNotFound
 }
 
-func (s *AppCenterService) remoteBuiltinForAppID(appID string) (builtinapps.App, bool, error) {
-	builtins, err := s.builtinCatalog()
+func (s *AppCenterService) remoteBuiltinForAppID(ctx context.Context, appID string) (builtinapps.App, bool, error) {
+	builtins, err := s.builtinCatalog(ctx)
 	if err != nil {
 		return builtinapps.App{}, false, err
 	}
@@ -632,7 +633,7 @@ func (s *AppCenterService) remoteBuiltinWorkspaceApp(builtin builtinapps.App, wo
 
 func (s *AppCenterService) workspaceAppProjectionForInstall(ctx context.Context, workspaceID string, appID string) (workspacebiz.WorkspaceApp, error) {
 	appPackage, packageErr := s.Store.GetAppPackage(ctx, appID)
-	remoteBuiltin, hasRemoteBuiltin, remoteErr := s.remoteBuiltinForAppID(appID)
+	remoteBuiltin, hasRemoteBuiltin, remoteErr := s.remoteBuiltinForAppID(ctx, appID)
 	if packageErr != nil {
 		if !errors.Is(packageErr, workspacedata.ErrWorkspaceAppNotFound) {
 			return workspacebiz.WorkspaceApp{}, packageErr

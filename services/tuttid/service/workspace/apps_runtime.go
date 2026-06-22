@@ -84,7 +84,7 @@ func (s *AppCenterService) StartEnabled(ctx context.Context, workspaceID string)
 		}
 	}
 	var builtins []builtinapps.App
-	builtins, err = s.builtinCatalog()
+	builtins, err = s.builtinCatalog(ctx)
 	if err != nil {
 		slog.Warn("workspace app start remote builtin sync skipped; builtin catalog unavailable", "workspaceId", workspaceID, "error", err)
 	}

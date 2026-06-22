@@ -35,6 +35,7 @@ test("desktop host preferences follows authoritative preference events", async (
     preferences: {
       agentComposerDefaultsByProvider: {},
       agentGuiConversationRailCollapsedByProvider: {},
+      appCatalogChannel: "production",
       browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
@@ -69,6 +70,7 @@ test("desktop host preferences follows authoritative preference events", async (
       agentGuiConversationRailCollapsedByProvider: {
         codex: true
       },
+      appCatalogChannel: "production",
       browserUseConnectionMode: "isolated",
       defaultAgentProvider: "codex",
 
@@ -101,6 +103,8 @@ test("desktop host preferences follows authoritative preference events", async (
 function createHostPreferencesState(): DesktopHostPreferencesState {
   let agentGUIConversationRailCollapsedByProvider: DesktopPreferencesStateResponse["preferences"]["agentGuiConversationRailCollapsedByProvider"] =
     {};
+  let appCatalogChannel: DesktopPreferencesStateResponse["preferences"]["appCatalogChannel"] =
+    "production";
   let defaultAgentProvider: DesktopPreferencesStateResponse["preferences"]["defaultAgentProvider"] =
     "codex";
   let browserUseConnectionMode: NonNullable<
@@ -125,6 +129,9 @@ function createHostPreferencesState(): DesktopHostPreferencesState {
     },
     getAgentGUIConversationRailCollapsedByProvider() {
       return agentGUIConversationRailCollapsedByProvider;
+    },
+    getAppCatalogChannel() {
+      return appCatalogChannel;
     },
     getLocale() {
       return locale;
@@ -163,6 +170,9 @@ function createHostPreferencesState(): DesktopHostPreferencesState {
       if (input.agentGuiConversationRailCollapsedByProvider) {
         agentGUIConversationRailCollapsedByProvider =
           input.agentGuiConversationRailCollapsedByProvider;
+      }
+      if (input.appCatalogChannel) {
+        appCatalogChannel = input.appCatalogChannel;
       }
       if (input.locale) {
         locale = input.locale;

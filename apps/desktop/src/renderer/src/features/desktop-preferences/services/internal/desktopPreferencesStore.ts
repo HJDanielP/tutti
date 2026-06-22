@@ -3,6 +3,7 @@ import type {
   DesktopAgentComposerDefaultsByProvider,
   DesktopAgentGuiConversationRailCollapsedByProvider,
   DesktopAgentProvider,
+  DesktopAppCatalogChannel,
   DesktopBrowserUseConnectionMode,
   DesktopDockIconStyle,
   DesktopDockPlacement,
@@ -18,6 +19,7 @@ import type { DesktopPreferencesStoreState } from "../desktopPreferencesTypes.ts
 export function createDesktopPreferencesStore(input: {
   agentComposerDefaultsByProvider?: DesktopAgentComposerDefaultsByProvider;
   agentGuiConversationRailCollapsedByProvider?: DesktopAgentGuiConversationRailCollapsedByProvider;
+  appCatalogChannel: DesktopAppCatalogChannel;
   browserUseConnectionMode: DesktopBrowserUseConnectionMode;
   defaultAgentProvider: DesktopAgentProvider;
   dockIconStyle: DesktopDockIconStyle;
@@ -31,6 +33,7 @@ export function createDesktopPreferencesStore(input: {
 }): DesktopPreferencesStoreState {
   return proxy({
     changingDefaultAgentProvider: null,
+    changingAppCatalogChannel: null,
     changingBrowserUseConnectionMode: null,
     changingDockIconStyle: null,
     changingDockPlacement: null,
@@ -43,6 +46,7 @@ export function createDesktopPreferencesStore(input: {
       input.agentComposerDefaultsByProvider ?? {},
     agentGuiConversationRailCollapsedByProvider:
       input.agentGuiConversationRailCollapsedByProvider ?? {},
+    appCatalogChannel: input.appCatalogChannel,
     browserUseConnectionMode: input.browserUseConnectionMode,
     defaultAgentProvider: input.defaultAgentProvider,
     dockIconStyle: input.dockIconStyle,

@@ -6,6 +6,7 @@ import type {
 } from "@tutti-os/client-tuttid-ts";
 import {
   defaultDesktopBrowserUseConnectionMode,
+  defaultDesktopAppCatalogChannel,
   desktopAgentComposerDefaultsByProviderEqual,
   desktopAgentGuiConversationRailCollapsedByProviderEqual,
   isDesktopBrowserUseConnectionMode,
@@ -22,6 +23,7 @@ import {
   defaultDesktopUpdatePolicy,
   desktopFileDefaultOpenersByExtensionEqual,
   type DesktopAgentProvider,
+  type DesktopAppCatalogChannel,
   type DesktopBrowserUseConnectionMode,
   type DesktopDockIconStyle,
   type DesktopDockPlacement,
@@ -43,6 +45,7 @@ const updateChannelDefaultMigrationID = "desktop-update-channel-default-rc-v1";
 export interface DesktopHostPreferencesState {
   getAgentComposerDefaultsByProvider(): DesktopAgentComposerDefaultsByProvider;
   getAgentGUIConversationRailCollapsedByProvider(): DesktopAgentGuiConversationRailCollapsedByProvider;
+  getAppCatalogChannel(): DesktopAppCatalogChannel;
   getBrowserUseConnectionMode(): DesktopBrowserUseConnectionMode;
   getDefaultAgentProvider(): DesktopAgentProvider;
   getDockIconStyle(): DesktopDockIconStyle;
@@ -57,6 +60,7 @@ export interface DesktopHostPreferencesState {
   sync(input: {
     agentComposerDefaultsByProvider?: DesktopAgentComposerDefaultsByProvider;
     agentGuiConversationRailCollapsedByProvider?: DesktopAgentGuiConversationRailCollapsedByProvider;
+    appCatalogChannel?: DesktopAppCatalogChannel;
     browserUseConnectionMode?: DesktopBrowserUseConnectionMode;
     defaultAgentProvider?: DesktopAgentProvider;
     dockIconStyle?: DesktopDockIconStyle;
@@ -92,6 +96,8 @@ export async function createDesktopHostPreferencesState(
     normalizeDesktopAgentGuiConversationRailCollapsedByProvider(
       initialPreferences.agentGuiConversationRailCollapsedByProvider
     );
+  let appCatalogChannel =
+    initialPreferences.appCatalogChannel ?? defaultDesktopAppCatalogChannel;
   let browserUseConnectionMode = isDesktopBrowserUseConnectionMode(
     initialPreferences.browserUseConnectionMode
   )
@@ -116,6 +122,9 @@ export async function createDesktopHostPreferencesState(
     },
     getAgentGUIConversationRailCollapsedByProvider() {
       return agentGUIConversationRailCollapsedByProvider;
+    },
+    getAppCatalogChannel() {
+      return appCatalogChannel;
     },
     getBrowserUseConnectionMode() {
       return browserUseConnectionMode;
@@ -158,6 +167,7 @@ export async function createDesktopHostPreferencesState(
         agentComposerDefaultsByProvider;
       const previousAgentGUIConversationRailCollapsedByProvider =
         agentGUIConversationRailCollapsedByProvider;
+      const previousAppCatalogChannel = appCatalogChannel;
       const previousBrowserUseConnectionMode = browserUseConnectionMode;
       const previousDefaultAgentProvider = defaultAgentProvider;
       const previousDockIconStyle = dockIconStyle;
@@ -201,6 +211,9 @@ export async function createDesktopHostPreferencesState(
       if (input.browserUseConnectionMode) {
         browserUseConnectionMode = input.browserUseConnectionMode;
       }
+      if (input.appCatalogChannel) {
+        appCatalogChannel = input.appCatalogChannel;
+      }
       if (input.defaultAgentProvider) {
         defaultAgentProvider = input.defaultAgentProvider;
       }
@@ -242,6 +255,7 @@ export async function createDesktopHostPreferencesState(
           previousAgentComposerDefaultsByProvider ||
         agentGUIConversationRailCollapsedByProvider !==
           previousAgentGUIConversationRailCollapsedByProvider ||
+        appCatalogChannel !== previousAppCatalogChannel ||
         browserUseConnectionMode !== previousBrowserUseConnectionMode ||
         defaultAgentProvider !== previousDefaultAgentProvider ||
         dockIconStyle !== previousDockIconStyle ||
@@ -279,6 +293,7 @@ async function resolveInitialDesktopPreferences(
         preferences: {
           agentComposerDefaultsByProvider: {},
           agentGuiConversationRailCollapsedByProvider: {},
+          appCatalogChannel: defaultDesktopAppCatalogChannel,
           browserUseConnectionMode: defaultDesktopBrowserUseConnectionMode,
           defaultAgentProvider: defaultDesktopAgentProvider,
           dockIconStyle: defaultDesktopDockIconStyle,
@@ -300,6 +315,7 @@ async function resolveInitialDesktopPreferences(
     return {
       agentComposerDefaultsByProvider: {},
       agentGuiConversationRailCollapsedByProvider: {},
+      appCatalogChannel: defaultDesktopAppCatalogChannel,
       browserUseConnectionMode: defaultDesktopBrowserUseConnectionMode,
       defaultAgentProvider: defaultDesktopAgentProvider,
       dockIconStyle: defaultDesktopDockIconStyle,

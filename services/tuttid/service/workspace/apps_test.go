@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	preferencesbiz "github.com/tutti-os/tutti/services/tuttid/biz/preferences"
 	workspacebiz "github.com/tutti-os/tutti/services/tuttid/biz/workspace"
 	builtinapps "github.com/tutti-os/tutti/services/tuttid/builtin-apps"
 	workspacedata "github.com/tutti-os/tutti/services/tuttid/data/workspace"
@@ -24,9 +25,28 @@ type appStoreStub struct {
 	installations   map[string]workspacebiz.AppInstallation
 }
 
+type appCenterPreferencesStoreStub struct {
+	preferences preferencesbiz.DesktopPreferences
+	err         error
+}
+
 type workspaceAppPublisherStub struct {
 	published  []workspacebiz.WorkspaceApp
 	workspaces []string
+}
+
+func (s appCenterPreferencesStoreStub) GetDesktopPreferences(context.Context) (preferencesbiz.DesktopPreferences, error) {
+	if s.err != nil {
+		return preferencesbiz.DesktopPreferences{}, s.err
+	}
+	return s.preferences, nil
+}
+
+func (s appCenterPreferencesStoreStub) PutDesktopPreferences(_ context.Context, preferences preferencesbiz.DesktopPreferences) (preferencesbiz.DesktopPreferences, error) {
+	if s.err != nil {
+		return preferencesbiz.DesktopPreferences{}, s.err
+	}
+	return preferences, nil
 }
 
 type appArtifactFetcherStub struct {
@@ -603,6 +623,30 @@ func TestAppCenterServiceInitializesBuiltinPackagesWhenRemoteCatalogFails(t *tes
 	state := service.CatalogLoadState()
 	if state.Status != workspacebiz.AppCatalogLoadStatusLoading && state.Status != workspacebiz.AppCatalogLoadStatusFailed {
 		t.Fatalf("CatalogLoadState() = %#v, want loading or failed", state)
+	}
+}
+
+func TestAppCenterServiceAppCatalogRemoteURLFollowsPreferenceChannel(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	service := AppCenterService{}
+	if got := service.appCatalogRemoteURL(ctx); got != builtinapps.ProductionRemoteCatalogURL {
+		t.Fatalf("appCatalogRemoteURL() = %q, want production URL", got)
+	}
+
+	service.PreferencesStore = appCenterPreferencesStoreStub{
+		preferences: preferencesbiz.DesktopPreferences{
+			AppCatalogChannel: "staging",
+		},
+	}
+	if got := service.appCatalogRemoteURL(ctx); got != builtinapps.StagingRemoteCatalogURL {
+		t.Fatalf("appCatalogRemoteURL() = %q, want staging URL", got)
+	}
+
+	service.PreferencesStore = appCenterPreferencesStoreStub{err: errors.New("preferences unavailable")}
+	if got := service.appCatalogRemoteURL(ctx); got != builtinapps.ProductionRemoteCatalogURL {
+		t.Fatalf("appCatalogRemoteURL() with preference error = %q, want production URL", got)
 	}
 }
 

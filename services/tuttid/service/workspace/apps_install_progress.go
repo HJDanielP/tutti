@@ -94,12 +94,12 @@ func (s *AppCenterService) installNeedsPackageDownload(ctx context.Context, appI
 	appPackage, err := s.Store.GetAppPackage(ctx, appID)
 	if err != nil {
 		if errors.Is(err, workspacedata.ErrWorkspaceAppNotFound) {
-			_, ok, remoteErr := s.remoteBuiltinForAppID(appID)
+			_, ok, remoteErr := s.remoteBuiltinForAppID(ctx, appID)
 			return remoteErr == nil && ok
 		}
 		return false
 	}
-	remoteBuiltin, ok, remoteErr := s.remoteBuiltinForAppID(appID)
+	remoteBuiltin, ok, remoteErr := s.remoteBuiltinForAppID(ctx, appID)
 	if remoteErr != nil || !ok {
 		return false
 	}

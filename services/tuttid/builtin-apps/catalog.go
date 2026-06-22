@@ -45,7 +45,9 @@ const (
 	remoteCatalogSchemaVersionV1 = "tutti.app.catalog.v1"
 	remoteCatalogFileEnv         = "TUTTI_APP_CATALOG_FILE"
 	remoteCatalogURLEnv          = "TUTTI_APP_CATALOG_URL"
-	defaultRemoteCatalogURL      = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases/catalog.json"
+	ProductionRemoteCatalogURL   = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases/catalog.json"
+	StagingRemoteCatalogURL      = "https://d1x7gb6wqsqmnm.cloudfront.net/tutti-app-releases-staging/catalog.json"
+	defaultRemoteCatalogURL      = ProductionRemoteCatalogURL
 	remoteCatalogFetchTimeout    = 10 * time.Second
 	remoteCatalogFetchAttempts   = 3
 )
@@ -101,18 +103,42 @@ func Snapshot() (CatalogSnapshot, error) {
 	return snapshot(false)
 }
 
+func SnapshotForRemoteURL(catalogURL string) (CatalogSnapshot, error) {
+	return snapshotWithSource(remoteCatalogSourceForURL(catalogURL), false)
+}
+
 func RefreshRemoteCatalog() (CatalogSnapshot, error) {
 	return snapshot(true)
+}
+
+func RefreshRemoteCatalogForRemoteURL(catalogURL string) (CatalogSnapshot, error) {
+	return snapshotWithSource(remoteCatalogSourceForURL(catalogURL), true)
 }
 
 func RefreshRemoteCatalogAndWait(ctx context.Context) (CatalogSnapshot, error) {
 	return snapshotAndWait(ctx)
 }
 
+func RefreshRemoteCatalogAndWaitForRemoteURL(ctx context.Context, catalogURL string) (CatalogSnapshot, error) {
+	return snapshotAndWaitWithSource(ctx, remoteCatalogSourceForURL(catalogURL))
+}
+
+func RemoteCatalogEnvOverrideActive() bool {
+	filePath := strings.TrimSpace(os.Getenv(remoteCatalogFileEnv))
+	if filePath != "" {
+		return true
+	}
+	_, ok := os.LookupEnv(remoteCatalogURLEnv)
+	return ok
+}
+
 func snapshot(refreshRemote bool) (CatalogSnapshot, error) {
+	return snapshotWithSource(currentRemoteCatalogSource(), refreshRemote)
+}
+
+func snapshotWithSource(source remoteCatalogSource, refreshRemote bool) (CatalogSnapshot, error) {
 	apps := []App{}
 
-	source := currentRemoteCatalogSource()
 	remote, err := remoteCatalogSnapshot(source, refreshRemote)
 	if err != nil {
 		return CatalogSnapshot{}, err
@@ -133,9 +159,12 @@ func snapshot(refreshRemote bool) (CatalogSnapshot, error) {
 }
 
 func snapshotAndWait(ctx context.Context) (CatalogSnapshot, error) {
+	return snapshotAndWaitWithSource(ctx, currentRemoteCatalogSource())
+}
+
+func snapshotAndWaitWithSource(ctx context.Context, source remoteCatalogSource) (CatalogSnapshot, error) {
 	apps := []App{}
 
-	source := currentRemoteCatalogSource()
 	remote, err := remoteCatalogSnapshotAndWait(ctx, source)
 	if err != nil {
 		return CatalogSnapshot{}, err
@@ -296,6 +325,14 @@ func currentRemoteCatalogSource() remoteCatalogSource {
 	}
 
 	catalogURL := remoteCatalogURL()
+	if catalogURL == "" {
+		return remoteCatalogSource{kind: remoteCatalogSourceNone}
+	}
+	return remoteCatalogSource{kind: remoteCatalogSourceURL, value: catalogURL}
+}
+
+func remoteCatalogSourceForURL(catalogURL string) remoteCatalogSource {
+	catalogURL = strings.TrimSpace(catalogURL)
 	if catalogURL == "" {
 		return remoteCatalogSource{kind: remoteCatalogSourceNone}
 	}

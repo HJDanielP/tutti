@@ -260,6 +260,7 @@ type desktopPreferencesMutationPayload struct {
 	Preferences struct {
 		AgentComposerDefaultsByProvider             desktopAgentComposerDefaultsByProviderPayload             `json:"agentComposerDefaultsByProvider"`
 		AgentGUIConversationRailCollapsedByProvider desktopAgentGUIConversationRailCollapsedByProviderPayload `json:"agentGuiConversationRailCollapsedByProvider"`
+		AppCatalogChannel                           string                                                    `json:"appCatalogChannel"`
 		BrowserUseConnectionMode                    string                                                    `json:"browserUseConnectionMode,omitempty"`
 		DefaultAgentProvider                        string                                                    `json:"defaultAgentProvider"`
 		DockIconStyle                               string                                                    `json:"dockIconStyle"`
@@ -381,6 +382,7 @@ type workspaceIssueUpdatedPayload struct {
 type desktopPreferencesSettingsPayload struct {
 	AgentComposerDefaultsByProvider             desktopAgentComposerDefaultsByProviderPayload             `json:"agentComposerDefaultsByProvider"`
 	AgentGUIConversationRailCollapsedByProvider desktopAgentGUIConversationRailCollapsedByProviderPayload `json:"agentGuiConversationRailCollapsedByProvider"`
+	AppCatalogChannel                           string                                                    `json:"appCatalogChannel"`
 	BrowserUseConnectionMode                    string                                                    `json:"browserUseConnectionMode,omitempty"`
 	DefaultAgentProvider                        string                                                    `json:"defaultAgentProvider"`
 	DockIconStyle                               string                                                    `json:"dockIconStyle"`
@@ -440,6 +442,12 @@ func validateDesktopPreferencesUpdateRequestedPayload(payload []byte) error {
 	}
 	if !preferencesbiz.IsDesktopDockPlacement(decoded.DockPlacement) {
 		return fmt.Errorf("preferences.dockPlacement is unsupported")
+	}
+	if decoded.AppCatalogChannel == "" {
+		return fmt.Errorf("preferences.appCatalogChannel is required")
+	}
+	if !preferencesbiz.IsDesktopAppCatalogChannel(decoded.AppCatalogChannel) {
+		return fmt.Errorf("preferences.appCatalogChannel is unsupported")
 	}
 	if decoded.BrowserUseConnectionMode != "" &&
 		!preferencesbiz.IsDesktopBrowserUseConnectionMode(decoded.BrowserUseConnectionMode) {
@@ -508,6 +516,12 @@ func validateDesktopPreferencesUpdatedPayload(payload []byte) error {
 	}
 	if !preferencesbiz.IsDesktopDockPlacement(decoded.Preferences.DockPlacement) {
 		return fmt.Errorf("preferences.dockPlacement is unsupported")
+	}
+	if decoded.Preferences.AppCatalogChannel == "" {
+		return fmt.Errorf("preferences.appCatalogChannel is required")
+	}
+	if !preferencesbiz.IsDesktopAppCatalogChannel(decoded.Preferences.AppCatalogChannel) {
+		return fmt.Errorf("preferences.appCatalogChannel is unsupported")
 	}
 	if decoded.Preferences.BrowserUseConnectionMode != "" &&
 		!preferencesbiz.IsDesktopBrowserUseConnectionMode(decoded.Preferences.BrowserUseConnectionMode) {

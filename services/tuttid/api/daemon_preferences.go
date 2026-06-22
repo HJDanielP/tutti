@@ -117,6 +117,30 @@ func (api DaemonAPI) PutDesktopPreferences(ctx context.Context, request tuttigen
 		}, nil
 	}
 
+	appCatalogChannel := strings.TrimSpace(string(request.Body.Preferences.AppCatalogChannel))
+	if appCatalogChannel == "" {
+		return tuttigenerated.PutDesktopPreferences400JSONResponse{
+			InvalidRequestErrorJSONResponse: invalidRequestError(
+				apierrors.InvalidRequest(
+					apierrors.ReasonMissingDesktopAppCatalogChannel,
+					apierrors.WithDeveloperMessage("desktop app catalog channel is required"),
+					apierrors.WithParams(map[string]any{"field": "preferences.appCatalogChannel"}),
+				),
+			),
+		}, nil
+	}
+	if !preferencesbiz.IsDesktopAppCatalogChannel(appCatalogChannel) {
+		return tuttigenerated.PutDesktopPreferences400JSONResponse{
+			InvalidRequestErrorJSONResponse: invalidRequestError(
+				apierrors.InvalidRequest(
+					apierrors.ReasonUnsupportedDesktopAppCatalogChannel,
+					apierrors.WithDeveloperMessage("desktop app catalog channel is unsupported"),
+					apierrors.WithParams(map[string]any{"field": "preferences.appCatalogChannel"}),
+				),
+			),
+		}, nil
+	}
+
 	browserUseConnectionMode := preferencesbiz.DefaultDesktopBrowserUseConnectionMode
 	if request.Body.Preferences.BrowserUseConnectionMode != nil {
 		browserUseConnectionMode = strings.TrimSpace(string(*request.Body.Preferences.BrowserUseConnectionMode))
@@ -271,6 +295,7 @@ func (api DaemonAPI) PutDesktopPreferences(ctx context.Context, request tuttigen
 		AgentGUIConversationRailCollapsedByProvider: agentGUIConversationRailCollapsedByProviderFromGenerated(
 			request.Body.Preferences.AgentGuiConversationRailCollapsedByProvider,
 		),
+		AppCatalogChannel:        appCatalogChannel,
 		BrowserUseConnectionMode: browserUseConnectionMode,
 		DefaultAgentProvider:     defaultAgentProvider,
 		DockIconStyle:            dockIconStyle,

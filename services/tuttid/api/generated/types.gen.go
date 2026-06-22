@@ -445,6 +445,24 @@ func (e CliOutputMode) Valid() bool {
 	}
 }
 
+// Defines values for DesktopAppCatalogChannel.
+const (
+	Production DesktopAppCatalogChannel = "production"
+	Staging    DesktopAppCatalogChannel = "staging"
+)
+
+// Valid indicates whether the value is a known member of the DesktopAppCatalogChannel enum.
+func (e DesktopAppCatalogChannel) Valid() bool {
+	switch e {
+	case Production:
+		return true
+	case Staging:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DesktopBrowserUseConnectionMode.
 const (
 	AutoConnect DesktopBrowserUseConnectionMode = "autoConnect"
@@ -1970,6 +1988,9 @@ type DesktopAgentGuiConversationRailCollapsedByProvider struct {
 	Openclaw   *bool `json:"openclaw,omitempty"`
 }
 
+// DesktopAppCatalogChannel defines model for DesktopAppCatalogChannel.
+type DesktopAppCatalogChannel string
+
 // DesktopBrowserUseConnectionMode defines model for DesktopBrowserUseConnectionMode.
 type DesktopBrowserUseConnectionMode string
 
@@ -1992,6 +2013,7 @@ type DesktopLocale string
 type DesktopPreferences struct {
 	AgentComposerDefaultsByProvider             DesktopAgentComposerDefaultsByProvider             `json:"agentComposerDefaultsByProvider"`
 	AgentGuiConversationRailCollapsedByProvider DesktopAgentGuiConversationRailCollapsedByProvider `json:"agentGuiConversationRailCollapsedByProvider"`
+	AppCatalogChannel                           DesktopAppCatalogChannel                           `json:"appCatalogChannel"`
 	BrowserUseConnectionMode                    *DesktopBrowserUseConnectionMode                   `json:"browserUseConnectionMode,omitempty"`
 	DefaultAgentProvider                        WorkspaceAgentProvider                             `json:"defaultAgentProvider"`
 	DockIconStyle                               DesktopDockIconStyle                               `json:"dockIconStyle"`

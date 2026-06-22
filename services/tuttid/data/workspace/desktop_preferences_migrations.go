@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS desktop_preferences (
   theme_source TEXT NOT NULL,
   sleep_prevention_mode TEXT NOT NULL DEFAULT 'never',
   browser_use_connection_mode TEXT NOT NULL DEFAULT 'isolated',
+  app_catalog_channel TEXT NOT NULL DEFAULT 'production',
   update_channel TEXT NOT NULL DEFAULT 'stable',
   update_policy TEXT NOT NULL DEFAULT 'prompt',
   updated_at_unix_ms INTEGER NOT NULL
@@ -70,6 +71,38 @@ INSERT INTO tuttid_schema_migrations (id, applied_at_unix_ms)
 `, schemaMigrationDesktopPreferencesFileDefaultOpenersV1, now)
 	if err != nil {
 		return fmt.Errorf("migrate workspace database for desktop file default openers: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SQLiteStore) applyDesktopPreferencesAppCatalogChannelV1(ctx context.Context) error {
+	applied, err := s.hasMigration(ctx, schemaMigrationDesktopPreferencesAppCatalogChannelV1)
+	if err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
+
+	now := unixMs(time.Now().UTC())
+	hasAppCatalogChannel, err := s.hasColumn(ctx, "desktop_preferences", "app_catalog_channel")
+	if err != nil {
+		return err
+	}
+	if !hasAppCatalogChannel {
+		if _, err := s.db.ExecContext(ctx, `
+ALTER TABLE desktop_preferences
+  ADD COLUMN app_catalog_channel TEXT NOT NULL DEFAULT 'production';`); err != nil {
+			return fmt.Errorf("migrate workspace database for desktop app catalog channel: %w", err)
+		}
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO tuttid_schema_migrations (id, applied_at_unix_ms)
+  VALUES (?, ?);
+`, schemaMigrationDesktopPreferencesAppCatalogChannelV1, now)
+	if err != nil {
+		return fmt.Errorf("record desktop app catalog channel migration: %w", err)
 	}
 
 	return nil

@@ -80,6 +80,7 @@ export interface PreferencesDesktopPreferencesV1 {
     hermes?: boolean;
     openclaw?: boolean;
   };
+  appCatalogChannel: "production" | "staging";
   browserUseConnectionMode?: "isolated" | "autoConnect";
   defaultAgentProvider:
     | "claude-code"

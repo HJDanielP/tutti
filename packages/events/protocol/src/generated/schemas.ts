@@ -9,6 +9,7 @@ export const preferencesDesktopPreferencesSchema = {
   required: [
     "agentComposerDefaultsByProvider",
     "agentGuiConversationRailCollapsedByProvider",
+    "appCatalogChannel",
     "defaultAgentProvider",
     "dockIconStyle",
     "dockPlacement",
@@ -139,6 +140,10 @@ export const preferencesDesktopPreferencesSchema = {
           type: "boolean"
         }
       }
+    },
+    appCatalogChannel: {
+      type: "string",
+      enum: ["production", "staging"]
     },
     browserUseConnectionMode: {
       type: "string",
@@ -909,6 +914,7 @@ export const preferencesDesktopUpdateRequestedPayloadSchema = {
       required: [
         "agentComposerDefaultsByProvider",
         "agentGuiConversationRailCollapsedByProvider",
+        "appCatalogChannel",
         "defaultAgentProvider",
         "dockIconStyle",
         "dockPlacement",
@@ -1039,6 +1045,10 @@ export const preferencesDesktopUpdateRequestedPayloadSchema = {
               type: "boolean"
             }
           }
+        },
+        appCatalogChannel: {
+          type: "string",
+          enum: ["production", "staging"]
         },
         browserUseConnectionMode: {
           type: "string",
@@ -1129,6 +1139,7 @@ export const preferencesDesktopUpdatedPayloadSchema = {
       required: [
         "agentComposerDefaultsByProvider",
         "agentGuiConversationRailCollapsedByProvider",
+        "appCatalogChannel",
         "defaultAgentProvider",
         "dockIconStyle",
         "dockPlacement",
@@ -1259,6 +1270,10 @@ export const preferencesDesktopUpdatedPayloadSchema = {
               type: "boolean"
             }
           }
+        },
+        appCatalogChannel: {
+          type: "string",
+          enum: ["production", "staging"]
         },
         browserUseConnectionMode: {
           type: "string",

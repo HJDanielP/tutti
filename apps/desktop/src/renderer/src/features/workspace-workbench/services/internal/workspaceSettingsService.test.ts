@@ -742,6 +742,31 @@ test("WorkspaceSettingsService writes changed preferences", async () => {
   assert.deepEqual(writes, ["zh-CN", "left", "claude-code", "dark"]);
 });
 
+test("WorkspaceSettingsService refreshes App Center after changing catalog channel", async () => {
+  const refreshedWorkspaceIDs: string[] = [];
+  const service = new WorkspaceSettingsService(
+    {
+      client: createWorkspaceSettingsClient({})
+    },
+    createDesktopPreferencesService({
+      onSetAppCatalogChannel: async (channel) => channel,
+      state: createPreferencesState({})
+    }),
+    createNotificationRecorder().service,
+    null,
+    {
+      refreshCatalog: async (workspaceID) => {
+        refreshedWorkspaceIDs.push(workspaceID);
+      }
+    }
+  );
+
+  service.openPanel({ id: "workspace-1" });
+  await service.changeAppCatalogChannel("staging");
+
+  assert.deepEqual(refreshedWorkspaceIDs, ["workspace-1"]);
+});
+
 test("WorkspaceSettingsService reports preference save failures", async () => {
   const notifications = createNotificationRecorder();
   const service = new WorkspaceSettingsService(
@@ -790,6 +815,7 @@ test("WorkspaceSettingsService tracks settings panel open and section switches",
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -830,6 +856,7 @@ test("WorkspaceSettingsService tracks theme changes without developer log clear 
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -887,6 +914,7 @@ test("WorkspaceSettingsService tracks language changes", async () => {
     }),
     createNotificationRecorder().service,
     createReporterService(reporterCalls),
+    null,
     () => 1749124800000
   );
 
@@ -901,6 +929,42 @@ test("WorkspaceSettingsService tracks language changes", async () => {
           from_language: "en",
           to_language: "zh-CN"
         }
+      }
+    ]
+  ]);
+});
+
+test("WorkspaceSettingsService keeps reporter clock separate from App Center injection", () => {
+  const reporterCalls: ReporterEventInput[][] = [];
+  const refreshedWorkspaceIDs: string[] = [];
+  const service = new WorkspaceSettingsService(
+    {
+      client: createWorkspaceSettingsClient({})
+    },
+    createDesktopPreferencesService({
+      state: createPreferencesState({})
+    }),
+    createNotificationRecorder().service,
+    createReporterService(reporterCalls),
+    {
+      refreshCatalog: async (workspaceID) => {
+        refreshedWorkspaceIDs.push(workspaceID);
+      }
+    },
+    () => 1749124800000
+  );
+
+  assert.doesNotThrow(() => {
+    service.openPanel({ id: "workspace-1" });
+  });
+
+  assert.deepEqual(refreshedWorkspaceIDs, []);
+  assert.deepEqual(reporterCalls, [
+    [
+      {
+        clientTS: 1749124800000,
+        name: "settings.opened",
+        params: {}
       }
     ]
   ]);
@@ -957,6 +1021,7 @@ function createWorkspaceSettingsClient(
 
 function createDesktopPreferencesService(input: {
   onSetDefaultAgentProvider?: IDesktopPreferencesService["setDefaultAgentProvider"];
+  onSetAppCatalogChannel?: IDesktopPreferencesService["setAppCatalogChannel"];
   onSetBrowserUseConnectionMode?: IDesktopPreferencesService["setBrowserUseConnectionMode"];
   onSetDockIconStyle?: IDesktopPreferencesService["setDockIconStyle"];
   onSetDockPlacement?: IDesktopPreferencesService["setDockPlacement"];
@@ -973,6 +1038,8 @@ function createDesktopPreferencesService(input: {
     store: input.state,
     rememberAgentComposerDefaults: async () => {},
     rememberAgentGuiConversationRailCollapsed: async () => {},
+    setAppCatalogChannel:
+      input.onSetAppCatalogChannel ?? (async (channel) => channel),
     setBrowserUseConnectionMode:
       input.onSetBrowserUseConnectionMode ?? (async (mode) => mode),
     setDefaultAgentProvider:
@@ -999,7 +1066,9 @@ function createPreferencesState(
   return {
     agentComposerDefaultsByProvider: {},
     agentGuiConversationRailCollapsedByProvider: {},
+    appCatalogChannel: "production",
     browserUseConnectionMode: "isolated",
+    changingAppCatalogChannel: null,
     changingBrowserUseConnectionMode: null,
     changingDefaultAgentProvider: null,
     changingDockIconStyle: null,
