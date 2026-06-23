@@ -293,16 +293,16 @@ export function IssueManagerSubtaskSection({
   copy,
   diagnostics,
   onCreate,
+  onMoveTask,
   onSelectTask,
-  onSetTaskStatus,
   selectedTaskId,
   tasks
 }: {
   copy: IssueManagerI18nRuntime;
   diagnostics?: IssueManagerController["diagnostics"];
   onCreate: () => void;
+  onMoveTask: IssueManagerController["moveTask"];
   onSelectTask: (taskId: string | null) => void;
-  onSetTaskStatus: IssueManagerController["setTaskStatus"];
   selectedTaskId: string | null;
   tasks: readonly IssueManagerTaskSummary[];
 }): JSX.Element {
@@ -354,8 +354,8 @@ export function IssueManagerSubtaskSection({
         <IssueManagerSubtaskBoard
           copy={copy}
           tasks={tasks}
+          onMoveTask={onMoveTask}
           onSelectTask={handleSelectTask}
-          onSetTaskStatus={onSetTaskStatus}
         />
       ) : (
         <IssueManagerSubtaskList

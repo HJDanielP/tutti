@@ -6,7 +6,9 @@ import type {
   IssueManagerReferenceBundle,
   IssueManagerRun,
   IssueManagerNodeState,
+  IssueManagerStatus,
   IssueManagerTaskDetail,
+  IssueManagerTaskSummary,
   IssueManagerTaskStatusUpdate
 } from "../../contracts/index.ts";
 import {
@@ -122,7 +124,74 @@ interface IssueManagerDeleteOptions {
   skipConfirmation?: boolean;
 }
 
+interface IssueManagerMoveTaskInput {
+  targetIndex: number;
+  targetStatus: IssueManagerStatus;
+  taskId: string;
+  visibleTaskIds?: readonly string[];
+}
+
 export type { IssueManagerDeleteOptions };
+
+function resolveIssueManagerTaskStatusBucket(
+  status: IssueManagerStatus
+): string {
+  return status === "in_progress" ? "running" : status;
+}
+
+function resolveIssueManagerMovedTaskOrder(input: {
+  targetIndex: number;
+  targetStatus: IssueManagerStatus;
+  taskId: string;
+  tasks: readonly IssueManagerTaskSummary[];
+}): IssueManagerTaskSummary[] | null {
+  const normalizedTaskId = input.taskId.trim();
+  const targetStatus = resolveIssueManagerTaskStatusBucket(input.targetStatus);
+  const sourceTask = input.tasks.find(
+    (task) => task.taskId === normalizedTaskId
+  );
+  if (!sourceTask || !targetStatus) {
+    return null;
+  }
+
+  const tasksWithoutMoved = input.tasks.filter(
+    (task) => task.taskId !== normalizedTaskId
+  );
+  const targetTasks = tasksWithoutMoved.filter(
+    (task) => resolveIssueManagerTaskStatusBucket(task.status) === targetStatus
+  );
+  const targetIndex = Math.min(
+    Math.max(0, Math.trunc(input.targetIndex)),
+    targetTasks.length
+  );
+  const targetTaskAtIndex = targetTasks[targetIndex];
+  const previousTargetTask = targetTasks[targetIndex - 1];
+  const sourceStatus =
+    resolveIssueManagerTaskStatusBucket(sourceTask.status) === targetStatus
+      ? sourceTask.status
+      : input.targetStatus;
+  const nextTask = {
+    ...sourceTask,
+    status: sourceStatus
+  };
+  const insertIndex = targetTaskAtIndex
+    ? tasksWithoutMoved.findIndex(
+        (task) => task.taskId === targetTaskAtIndex.taskId
+      )
+    : previousTargetTask
+      ? tasksWithoutMoved.findIndex(
+          (task) => task.taskId === previousTargetTask.taskId
+        ) + 1
+      : tasksWithoutMoved.length;
+
+  const normalizedInsertIndex =
+    insertIndex < 0 ? tasksWithoutMoved.length : insertIndex;
+  return [
+    ...tasksWithoutMoved.slice(0, normalizedInsertIndex),
+    nextTask,
+    ...tasksWithoutMoved.slice(normalizedInsertIndex)
+  ];
+}
 
 export function createIssueManagerControllerActions(
   input: CreateIssueManagerControllerActionsInput
@@ -385,6 +454,101 @@ export function createIssueManagerControllerActions(
       applyOutcome(
         createIssueManagerOpenReferencePickerOutcome(insertPlan.target)
       );
+    },
+
+    async moveTask(move: IssueManagerMoveTaskInput) {
+      const selectedIssueId = nodeState.selectedIssueId;
+      const normalizedTaskId = move.taskId.trim();
+      const allTasks = issueDetail.value?.tasks ?? [];
+      const visibleTaskIds = new Set(
+        move.visibleTaskIds
+          ?.map((taskId) => taskId.trim())
+          .filter((taskId) => taskId.length > 0)
+      );
+      const currentTasks =
+        visibleTaskIds.size > 0
+          ? allTasks.filter((task) => visibleTaskIds.has(task.taskId))
+          : allTasks;
+      if (!selectedIssueId || !normalizedTaskId || currentTasks.length === 0) {
+        return;
+      }
+
+      const nextTasks = resolveIssueManagerMovedTaskOrder({
+        targetIndex: move.targetIndex,
+        targetStatus: move.targetStatus,
+        taskId: normalizedTaskId,
+        tasks: currentTasks
+      });
+      if (!nextTasks) {
+        return;
+      }
+      const nextVisibleTasks = [...nextTasks];
+      const orderedTasks =
+        visibleTaskIds.size > 0
+          ? allTasks.map((task) =>
+              visibleTaskIds.has(task.taskId)
+                ? (nextVisibleTasks.shift() ?? task)
+                : task
+            )
+          : nextTasks;
+
+      const previousById = new Map(
+        allTasks.map((task, index) => [
+          task.taskId,
+          {
+            sortIndex: task.sortIndex ?? index + 1,
+            status: task.status
+          }
+        ])
+      );
+      const updates = orderedTasks
+        .map((task, index) => {
+          const previous = previousById.get(task.taskId);
+          const sortIndex = index + 1;
+          if (
+            previous &&
+            previous.sortIndex === sortIndex &&
+            previous.status === task.status
+          ) {
+            return null;
+          }
+          return {
+            sortIndex,
+            status: task.status,
+            taskId: task.taskId
+          };
+        })
+        .filter(
+          (
+            update
+          ): update is {
+            sortIndex: number;
+            status: IssueManagerStatus;
+            taskId: string;
+          } => update !== null
+        );
+      if (updates.length === 0) {
+        return;
+      }
+
+      try {
+        await Promise.all(
+          updates.map((update) =>
+            feature.backend.updateTask({
+              issueId: selectedIssueId,
+              sortIndex: update.sortIndex,
+              status: update.status,
+              taskId: update.taskId,
+              workspaceId
+            })
+          )
+        );
+        applyOutcome({
+          refreshAll: true
+        });
+      } catch (error) {
+        notifyError(error, "messages.taskSaveFailed");
+      }
     },
 
     async uploadReferences(

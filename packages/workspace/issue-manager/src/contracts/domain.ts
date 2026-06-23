@@ -230,6 +230,7 @@ export interface IssueManagerUpdateTaskInput extends IssueManagerScope {
   dueAtUnix?: number;
   issueId: string;
   priority?: IssueManagerPriority;
+  sortIndex?: number;
   status?: IssueManagerStatus;
   taskId: string;
   title?: string;

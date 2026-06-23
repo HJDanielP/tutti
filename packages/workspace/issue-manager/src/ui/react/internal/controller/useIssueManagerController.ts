@@ -16,6 +16,7 @@ import type {
   IssueManagerPriority,
   IssueManagerReferenceBundle,
   IssueManagerRun,
+  IssueManagerStatus,
   IssueManagerTaskDetail,
   IssueManagerTaskStatusUpdate,
   IssueManagerTopic,
@@ -91,6 +92,12 @@ export interface IssueManagerController {
   openAgentSession: (run: IssueManagerRun) => Promise<void>;
   openMention: (mention: RichTextMentionAttrs) => Promise<void>;
   openReference: (reference: IssueManagerFileReference) => Promise<void>;
+  moveTask: (input: {
+    targetIndex: number;
+    targetStatus: IssueManagerStatus;
+    taskId: string;
+    visibleTaskIds?: readonly string[];
+  }) => Promise<void>;
   providerOptions: readonly IssueManagerAgentProviderOption[];
   executionDirectoryProjectService: WorkspaceUserProjectService | null;
   reportIssueSearchUsage: (query: string) => void;

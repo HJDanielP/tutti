@@ -10,7 +10,6 @@ import {
 import { cn } from "@tutti-os/ui-system";
 import type {
   IssueManagerStatus,
-  IssueManagerTaskStatusUpdate,
   IssueManagerTaskSummary
 } from "../../../contracts/index.ts";
 import {
@@ -29,19 +28,18 @@ type IssueManagerSubtaskBoardStatus =
   | "failed"
   | "canceled";
 
-type IssueManagerSubtaskDragStatus = "completed" | "pending_acceptance";
 type IssueManagerSubtaskDragState = {
   cardHeight: number;
-  sourceStatus: IssueManagerSubtaskDragStatus;
+  sourceStatus: IssueManagerSubtaskBoardStatus;
   taskId: string;
 };
 type IssueManagerSubtaskDropPreview = {
   index: number;
-  status: IssueManagerTaskStatusUpdate;
+  status: IssueManagerSubtaskBoardStatus;
 };
 type IssueManagerSubtaskOptimisticDrop = {
   index: number;
-  status: IssueManagerTaskStatusUpdate;
+  status: IssueManagerSubtaskBoardStatus;
   taskId: string;
 };
 
@@ -63,6 +61,10 @@ const issueManagerBoardLayoutAnimationEasing = "cubic-bezier(0.22,1,0.36,1)";
 const issueManagerSubtaskDragShadow = "var(--shadow-soft)";
 const issueManagerSubtaskDragShadowClassName = "shadow-[var(--shadow-soft)]";
 const issueManagerBoardLayoutAnimations = new WeakMap<HTMLElement, Animation>();
+const issueManagerBoardLayoutInitialScrollSnapshot = {
+  left: 0,
+  top: 0
+};
 
 const issueManagerBoardStatusSet: Record<IssueManagerSubtaskBoardStatus, true> =
   {
@@ -84,35 +86,38 @@ function resolveIssueManagerSubtaskBoardStatus(
       : "not_started";
 }
 
-function isIssueManagerTaskDropTargetStatus(
-  status: IssueManagerSubtaskBoardStatus
-): status is IssueManagerTaskStatusUpdate {
-  return (
-    status === "not_started" ||
-    status === "pending_acceptance" ||
-    status === "completed"
-  );
-}
-
-function isIssueManagerTaskDragStatus(
+function isIssueManagerTaskBoardStatus(
   status: IssueManagerStatus
-): status is IssueManagerSubtaskDragStatus {
-  return status === "pending_acceptance" || status === "completed";
+): status is IssueManagerSubtaskBoardStatus {
+  return status in issueManagerBoardStatusSet;
 }
 
-function canIssueManagerDropTaskStatus(input: {
-  sourceStatus: IssueManagerSubtaskDragStatus;
-  targetStatus: IssueManagerTaskStatusUpdate;
+function canIssueManagerCrossColumnDropTaskStatus(input: {
+  sourceStatus: IssueManagerSubtaskBoardStatus;
+  targetStatus: IssueManagerSubtaskBoardStatus;
 }): boolean {
   if (input.sourceStatus === "pending_acceptance") {
     return (
       input.targetStatus === "not_started" || input.targetStatus === "completed"
     );
   }
-  return (
-    input.targetStatus === "not_started" ||
-    input.targetStatus === "pending_acceptance"
-  );
+  if (input.sourceStatus === "completed") {
+    return (
+      input.targetStatus === "not_started" ||
+      input.targetStatus === "pending_acceptance"
+    );
+  }
+  return false;
+}
+
+function canIssueManagerDropTaskStatus(input: {
+  sourceStatus: IssueManagerSubtaskBoardStatus;
+  targetStatus: IssueManagerSubtaskBoardStatus;
+}): boolean {
+  if (input.sourceStatus === input.targetStatus) {
+    return true;
+  }
+  return canIssueManagerCrossColumnDropTaskStatus(input);
 }
 
 function groupIssueManagerSubtasksByStatus(
@@ -155,17 +160,43 @@ function groupIssueManagerSubtasksByStatus(
   return groups;
 }
 
-function hasIssueManagerTaskStatusDragData(
-  dataTransfer: DataTransfer
+function isIssueManagerOptimisticDropSettled(
+  tasks: readonly IssueManagerTaskSummary[],
+  optimisticDrop: IssueManagerSubtaskOptimisticDrop
 ): boolean {
-  return Array.from(dataTransfer.types).includes(
-    issueManagerTaskStatusDragDataType
+  const optimisticTask = tasks.find(
+    (task) => task.taskId === optimisticDrop.taskId
   );
+  if (!optimisticTask) {
+    return true;
+  }
+  if (
+    resolveIssueManagerSubtaskBoardStatus(optimisticTask.status) !==
+    optimisticDrop.status
+  ) {
+    return false;
+  }
+  const targetGroup = tasks.filter(
+    (task) =>
+      resolveIssueManagerSubtaskBoardStatus(task.status) ===
+      optimisticDrop.status
+  );
+  const taskIndex = targetGroup.findIndex(
+    (task) => task.taskId === optimisticDrop.taskId
+  );
+  if (taskIndex < 0) {
+    return false;
+  }
+  const targetIndex = Math.min(
+    Math.max(0, optimisticDrop.index),
+    Math.max(0, targetGroup.length - 1)
+  );
+  return taskIndex === targetIndex;
 }
 
 function readIssueManagerTaskStatusDragData(
   dataTransfer: DataTransfer
-): { sourceStatus: IssueManagerSubtaskDragStatus; taskId: string } | null {
+): { sourceStatus: IssueManagerSubtaskBoardStatus; taskId: string } | null {
   try {
     const raw = dataTransfer.getData(issueManagerTaskStatusDragDataType);
     const payload = JSON.parse(raw) as Partial<{
@@ -175,7 +206,7 @@ function readIssueManagerTaskStatusDragData(
     const taskId =
       typeof payload.taskId === "string" ? payload.taskId.trim() : "";
     const sourceStatus = payload.sourceStatus ?? "";
-    if (!taskId || !isIssueManagerTaskDragStatus(sourceStatus)) {
+    if (!taskId || !isIssueManagerTaskBoardStatus(sourceStatus)) {
       return null;
     }
     return {
@@ -190,7 +221,7 @@ function readIssueManagerTaskStatusDragData(
 function writeIssueManagerTaskStatusDragData(
   event: DragEvent<HTMLButtonElement>,
   task: IssueManagerTaskSummary,
-  sourceStatus: IssueManagerSubtaskDragStatus
+  sourceStatus: IssueManagerSubtaskBoardStatus
 ): void {
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData(
@@ -225,29 +256,77 @@ function setIssueManagerTaskDragImage(
   return rect.height;
 }
 
-function resolveIssueManagerDropPreviewIndex(
-  event: DragEvent<HTMLDivElement>
-): number {
+function resolveIssueManagerDropPreviewIndex(input: {
+  draggingTaskId: string | null;
+  event: DragEvent<HTMLDivElement>;
+}): number {
   const cards = Array.from(
-    event.currentTarget.querySelectorAll<HTMLElement>(
+    input.event.currentTarget.querySelectorAll<HTMLElement>(
       "[data-issue-manager-board-card]"
     )
+  ).filter(
+    (card) => card.dataset.issueManagerBoardCardTaskId !== input.draggingTaskId
   );
   for (const [index, card] of cards.entries()) {
     const rect = card.getBoundingClientRect();
-    if (event.clientY < rect.top + rect.height / 2) {
+    if (input.event.clientY < rect.top + rect.height / 2) {
       return index;
     }
   }
   return cards.length;
 }
 
+function orderIssueManagerTasksForSameColumnDropPreview(input: {
+  dragState: IssueManagerSubtaskDragState | null;
+  dropPreview: IssueManagerSubtaskDropPreview | null;
+  status: IssueManagerSubtaskBoardStatus;
+  tasks: readonly IssueManagerTaskSummary[];
+}): readonly IssueManagerTaskSummary[] {
+  if (
+    !input.dragState ||
+    input.dragState.sourceStatus !== input.status ||
+    input.dropPreview?.status !== input.status
+  ) {
+    return input.tasks;
+  }
+  const sourceTaskIndex = input.tasks.findIndex(
+    (task) => task.taskId === input.dragState?.taskId
+  );
+  if (sourceTaskIndex < 0) {
+    return input.tasks;
+  }
+  const movingTask = input.tasks[sourceTaskIndex];
+  if (!movingTask) {
+    return input.tasks;
+  }
+  const nextTasks = input.tasks.filter((_, index) => index !== sourceTaskIndex);
+  const targetIndex = Math.min(
+    Math.max(0, input.dropPreview.index),
+    nextTasks.length
+  );
+  if (targetIndex === sourceTaskIndex) {
+    return input.tasks;
+  }
+  nextTasks.splice(targetIndex, 0, movingTask);
+  return nextTasks;
+}
+
 function isLeavingIssueManagerBoardColumn(
   event: DragEvent<HTMLDivElement>
 ): boolean {
   const relatedTarget = event.relatedTarget;
+  if (
+    relatedTarget instanceof Node &&
+    event.currentTarget.contains(relatedTarget)
+  ) {
+    return false;
+  }
+  const rect = event.currentTarget.getBoundingClientRect();
   return !(
-    relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
   );
 }
 
@@ -259,9 +338,23 @@ function prefersReducedIssueManagerBoardMotion(): boolean {
   );
 }
 
+function readIssueManagerBoardScrollSnapshot(board: HTMLElement): {
+  left: number;
+  top: number;
+} {
+  const scrollContainer = board.parentElement;
+  return {
+    left: scrollContainer?.scrollLeft ?? 0,
+    top: scrollContainer?.scrollTop ?? 0
+  };
+}
+
 function useIssueManagerBoardLayoutAnimation() {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const previousRectsRef = useRef<Map<string, DOMRectReadOnly>>(new Map());
+  const previousScrollSnapshotRef = useRef(
+    issueManagerBoardLayoutInitialScrollSnapshot
+  );
 
   useLayoutEffect(() => {
     const board = boardRef.current;
@@ -274,7 +367,25 @@ function useIssueManagerBoardLayoutAnimation() {
       )
     );
     const nextRects = new Map<string, DOMRectReadOnly>();
-    const shouldAnimate = !prefersReducedIssueManagerBoardMotion();
+    const nextScrollSnapshot = readIssueManagerBoardScrollSnapshot(board);
+    const previousScrollSnapshot = previousScrollSnapshotRef.current;
+    const didScrollSinceLastLayout =
+      previousScrollSnapshot.left !== nextScrollSnapshot.left ||
+      previousScrollSnapshot.top !== nextScrollSnapshot.top;
+    const shouldAnimate =
+      !didScrollSinceLastLayout && !prefersReducedIssueManagerBoardMotion();
+    const activeVisualTopByKey = new Map<string, number>();
+
+    for (const element of elements) {
+      const key = element.getAttribute(issueManagerBoardLayoutItemAttribute);
+      const animation = issueManagerBoardLayoutAnimations.get(element);
+      if (!key || !animation) {
+        continue;
+      }
+      activeVisualTopByKey.set(key, element.getBoundingClientRect().top);
+      animation.cancel();
+      issueManagerBoardLayoutAnimations.delete(element);
+    }
 
     for (const element of elements) {
       const key = element.getAttribute(issueManagerBoardLayoutItemAttribute);
@@ -287,15 +398,14 @@ function useIssueManagerBoardLayoutAnimation() {
       if (!shouldAnimate || !previousRect) {
         continue;
       }
-      const deltaX = previousRect.left - rect.left;
-      const deltaY = previousRect.top - rect.top;
-      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) {
+      const deltaY =
+        (activeVisualTopByKey.get(key) ?? previousRect.top) - rect.top;
+      if (Math.abs(deltaY) < 0.5) {
         continue;
       }
-      issueManagerBoardLayoutAnimations.get(element)?.cancel();
       const animation = element.animate(
         [
-          { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
+          { transform: `translate3d(0, ${deltaY}px, 0)` },
           { transform: "translate3d(0, 0, 0)" }
         ],
         {
@@ -313,6 +423,7 @@ function useIssueManagerBoardLayoutAnimation() {
     }
 
     previousRectsRef.current = nextRects;
+    previousScrollSnapshotRef.current = nextScrollSnapshot;
   });
 
   return boardRef;
@@ -320,25 +431,28 @@ function useIssueManagerBoardLayoutAnimation() {
 
 export function IssueManagerSubtaskBoard({
   copy,
+  onMoveTask,
   onSelectTask,
-  onSetTaskStatus,
   tasks
 }: {
   copy: IssueManagerI18nRuntime;
+  onMoveTask: (input: {
+    targetIndex: number;
+    targetStatus: IssueManagerSubtaskBoardStatus;
+    taskId: string;
+    visibleTaskIds?: readonly string[];
+  }) => Promise<void>;
   onSelectTask: (
     event: MouseEvent<HTMLButtonElement>,
     task: IssueManagerTaskSummary,
     surface: "detail_subtasks_board"
   ) => void;
-  onSetTaskStatus: (
-    taskId: string,
-    status: IssueManagerTaskStatusUpdate
-  ) => Promise<void>;
   tasks: readonly IssueManagerTaskSummary[];
 }): JSX.Element {
   const [optimisticDrop, setOptimisticDrop] =
     useState<IssueManagerSubtaskOptimisticDrop | null>(null);
   const groups = groupIssueManagerSubtasksByStatus(tasks, optimisticDrop);
+  const visibleTaskIds = tasks.map((task) => task.taskId);
   const [dragState, setDragState] =
     useState<IssueManagerSubtaskDragState | null>(null);
   const [dropPreview, setDropPreview] =
@@ -349,14 +463,7 @@ export function IssueManagerSubtaskBoard({
     if (!optimisticDrop) {
       return;
     }
-    const droppedTask = tasks.find(
-      (task) => task.taskId === optimisticDrop.taskId
-    );
-    if (
-      !droppedTask ||
-      resolveIssueManagerSubtaskBoardStatus(droppedTask.status) ===
-        optimisticDrop.status
-    ) {
+    if (isIssueManagerOptimisticDropSettled(tasks, optimisticDrop)) {
       setOptimisticDrop(null);
     }
   }, [optimisticDrop, tasks]);
@@ -364,7 +471,7 @@ export function IssueManagerSubtaskBoard({
   const handleTaskDragStart = (
     event: DragEvent<HTMLButtonElement>,
     task: IssueManagerTaskSummary,
-    sourceStatus: IssueManagerSubtaskDragStatus
+    sourceStatus: IssueManagerSubtaskBoardStatus
   ) => {
     const cardHeight = setIssueManagerTaskDragImage(event);
     writeIssueManagerTaskStatusDragData(event, task, sourceStatus);
@@ -393,12 +500,13 @@ export function IssueManagerSubtaskBoard({
             key={status}
             status={status}
             tasks={groups[status]}
+            visibleTaskIds={visibleTaskIds}
             dragState={dragState}
             dropPreview={dropPreview}
             onDropPreviewChange={setDropPreview}
             onOptimisticDropChange={setOptimisticDrop}
+            onMoveTask={onMoveTask}
             onSelectTask={onSelectTask}
-            onSetTaskStatus={onSetTaskStatus}
             onTaskDragEnd={handleTaskDragEnd}
             onTaskDragStart={handleTaskDragStart}
           />
@@ -412,18 +520,25 @@ function IssueManagerSubtaskBoardColumn({
   copy,
   dragState,
   dropPreview,
+  onMoveTask,
   onDropPreviewChange,
   onOptimisticDropChange,
   onSelectTask,
-  onSetTaskStatus,
   onTaskDragEnd,
   onTaskDragStart,
   status,
-  tasks
+  tasks,
+  visibleTaskIds
 }: {
   copy: IssueManagerI18nRuntime;
   dragState: IssueManagerSubtaskDragState | null;
   dropPreview: IssueManagerSubtaskDropPreview | null;
+  onMoveTask: (input: {
+    targetIndex: number;
+    targetStatus: IssueManagerSubtaskBoardStatus;
+    taskId: string;
+    visibleTaskIds?: readonly string[];
+  }) => Promise<void>;
   onDropPreviewChange: (preview: IssueManagerSubtaskDropPreview | null) => void;
   onOptimisticDropChange: (
     optimisticDrop: IssueManagerSubtaskOptimisticDrop | null
@@ -433,41 +548,34 @@ function IssueManagerSubtaskBoardColumn({
     task: IssueManagerTaskSummary,
     surface: "detail_subtasks_board"
   ) => void;
-  onSetTaskStatus: (
-    taskId: string,
-    status: IssueManagerTaskStatusUpdate
-  ) => Promise<void>;
   onTaskDragEnd: () => void;
   onTaskDragStart: (
     event: DragEvent<HTMLButtonElement>,
     task: IssueManagerTaskSummary,
-    sourceStatus: IssueManagerSubtaskDragStatus
+    sourceStatus: IssueManagerSubtaskBoardStatus
   ) => void;
   status: IssueManagerSubtaskBoardStatus;
   tasks: readonly IssueManagerTaskSummary[];
+  visibleTaskIds: readonly string[];
 }): JSX.Element {
-  const dropTargetStatus = isIssueManagerTaskDropTargetStatus(status)
-    ? status
-    : null;
   const canAcceptTaskDrop =
-    Boolean(dropTargetStatus && dragState) &&
+    Boolean(dragState) &&
     canIssueManagerDropTaskStatus({
       sourceStatus: dragState?.sourceStatus ?? "completed",
-      targetStatus: dropTargetStatus ?? "not_started"
+      targetStatus: status
     });
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (
-      !dropTargetStatus ||
-      !canAcceptTaskDrop ||
-      !hasIssueManagerTaskStatusDragData(event.dataTransfer)
-    ) {
+    if (!canAcceptTaskDrop) {
       return;
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     const nextPreview = {
-      index: resolveIssueManagerDropPreviewIndex(event),
-      status: dropTargetStatus
+      index: resolveIssueManagerDropPreviewIndex({
+        draggingTaskId: dragState?.taskId ?? null,
+        event
+      }),
+      status
     };
     if (
       dropPreview?.index !== nextPreview.index ||
@@ -485,9 +593,6 @@ function IssueManagerSubtaskBoardColumn({
     }
   };
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (!dropTargetStatus) {
-      return;
-    }
     const payload = readIssueManagerTaskStatusDragData(event.dataTransfer);
     const taskId = payload?.taskId ?? dragState?.taskId;
     const sourceStatus = payload?.sourceStatus ?? dragState?.sourceStatus;
@@ -496,7 +601,7 @@ function IssueManagerSubtaskBoardColumn({
       !sourceStatus ||
       !canIssueManagerDropTaskStatus({
         sourceStatus,
-        targetStatus: dropTargetStatus
+        targetStatus: status
       })
     ) {
       return;
@@ -504,22 +609,44 @@ function IssueManagerSubtaskBoardColumn({
     event.preventDefault();
     event.stopPropagation();
     const targetIndex =
-      dropPreview?.status === dropTargetStatus
+      dropPreview?.status === status
         ? dropPreview.index
-        : resolveIssueManagerDropPreviewIndex(event);
+        : resolveIssueManagerDropPreviewIndex({
+            draggingTaskId: taskId,
+            event
+          });
     onOptimisticDropChange({
       index: targetIndex,
-      status: dropTargetStatus,
+      status,
       taskId
     });
     onDropPreviewChange(null);
-    void onSetTaskStatus(taskId, dropTargetStatus).catch(() => {
+    void onMoveTask({
+      targetIndex,
+      targetStatus: status,
+      taskId,
+      visibleTaskIds
+    }).catch(() => {
       onOptimisticDropChange(null);
     });
   };
-  const shouldShowDropPreview = dropPreview?.status === status && dragState;
-  const renderDropPreview = (index: number): JSX.Element | null => {
-    if (!shouldShowDropPreview || dropPreview.index !== index) {
+  const renderTasks = orderIssueManagerTasksForSameColumnDropPreview({
+    dragState,
+    dropPreview,
+    status,
+    tasks
+  });
+  const isSameColumnDropPreview =
+    Boolean(dragState) &&
+    dragState?.sourceStatus === status &&
+    dropPreview?.status === status &&
+    tasks.some((task) => task.taskId === dragState?.taskId);
+  const activeDropPreviewDragState =
+    dropPreview?.status === status && dragState && !isSameColumnDropPreview
+      ? dragState
+      : null;
+  const renderDropPreview = (renderIndex: number): JSX.Element | null => {
+    if (!activeDropPreviewDragState || dropPreview?.index !== renderIndex) {
       return null;
     }
     return (
@@ -532,7 +659,10 @@ function IssueManagerSubtaskBoardColumn({
         data-issue-manager-board-layout-item={`preview:${status}`}
         data-task-status-drop-preview
         style={{
-          height: `${Math.max(64, Math.min(dragState.cardHeight, 160))}px`
+          height: `${Math.max(
+            64,
+            Math.min(activeDropPreviewDragState.cardHeight, 160)
+          )}px`
         }}
       />
     );
@@ -570,25 +700,24 @@ function IssueManagerSubtaskBoardColumn({
       </div>
       <div className="grid gap-2">
         {renderDropPreview(0)}
-        {tasks.map((task, index) => {
-          const dragStatus = isIssueManagerTaskDragStatus(task.status)
-            ? task.status
-            : null;
+        {renderTasks.map((task, index) => {
+          const dragStatus = resolveIssueManagerSubtaskBoardStatus(task.status);
           const isDraggingTask = dragState?.taskId === task.taskId;
           return (
             <div
               className="grid gap-2"
-              data-issue-manager-board-layout-item={`task:${task.taskId}`}
+              data-issue-manager-board-layout-item={`task:${status}:${task.taskId}`}
               key={task.taskId}
             >
               <button
                 className={cn(
                   "rounded-[8px] bg-[var(--background-fronted)] px-3 py-2.5 text-left transition-shadow duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                  dragStatus && "cursor-grab active:cursor-grabbing",
+                  "cursor-grab active:cursor-grabbing",
                   isDraggingTask && issueManagerSubtaskDragShadowClassName
                 )}
                 data-issue-manager-board-card
-                draggable={Boolean(dragStatus)}
+                data-issue-manager-board-card-task-id={task.taskId}
+                draggable
                 type="button"
                 onClick={(event) =>
                   onSelectTask(event, task, "detail_subtasks_board")
@@ -633,7 +762,7 @@ function resolveIssueManagerBoardPlaceholderClassName(
 ): string {
   switch (status) {
     case "pending_acceptance":
-      return "border-[color-mix(in_srgb,var(--state-warning)_24%,transparent)] bg-[color-mix(in_srgb,var(--state-warning)_18%,transparent)]";
+      return "border-[color-mix(in_srgb,var(--tutti-purple)_24%,transparent)] bg-[color-mix(in_srgb,var(--tutti-purple)_18%,transparent)]";
     case "completed":
       return "border-[color-mix(in_srgb,var(--state-success)_24%,transparent)] bg-[color-mix(in_srgb,var(--state-success)_18%,transparent)]";
     case "not_started":
@@ -650,7 +779,7 @@ function resolveIssueManagerBoardColumnClassName(
     case "running":
       return "border-[color-mix(in_srgb,var(--status-running)_12%,transparent)] bg-[color-mix(in_srgb,var(--status-running)_8%,transparent)]";
     case "pending_acceptance":
-      return "border-[color-mix(in_srgb,var(--state-warning)_12%,transparent)] bg-[color-mix(in_srgb,var(--state-warning)_8%,transparent)]";
+      return "border-[color-mix(in_srgb,var(--tutti-purple)_12%,transparent)] bg-[color-mix(in_srgb,var(--tutti-purple)_8%,transparent)]";
     case "completed":
       return "border-[color-mix(in_srgb,var(--state-success)_12%,transparent)] bg-[color-mix(in_srgb,var(--state-success)_8%,transparent)]";
     case "failed":
@@ -669,7 +798,7 @@ function resolveIssueManagerBoardDotClassName(
     case "running":
       return "bg-[var(--status-running)]";
     case "pending_acceptance":
-      return "bg-[var(--state-warning)]";
+      return "bg-[var(--tutti-purple)]";
     case "completed":
       return "bg-[var(--state-success)]";
     case "failed":

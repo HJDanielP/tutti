@@ -274,8 +274,8 @@ export function IssueManagerIssuePane({
                 copy={copy}
                 diagnostics={controller.diagnostics}
                 onCreate={controller.createTaskDraft}
+                onMoveTask={controller.moveTask}
                 onSelectTask={controller.selectTask}
-                onSetTaskStatus={controller.setTaskStatus}
                 selectedTaskId={selectedTaskId}
                 tasks={visibleTasks}
               />
