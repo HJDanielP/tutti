@@ -124,7 +124,7 @@ interface IssueManagerDeleteOptions {
   skipConfirmation?: boolean;
 }
 
-interface IssueManagerMoveTaskInput {
+export interface IssueManagerMoveTaskInput {
   targetIndex: number;
   targetStatus: IssueManagerStatus;
   taskId: string;
