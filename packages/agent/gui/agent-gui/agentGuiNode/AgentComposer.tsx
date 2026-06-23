@@ -36,7 +36,7 @@ import type { AgentConversationPromptVM } from "../../shared/agentConversation/c
 import { AgentUsageMeter, agentUsageBarColor } from "./AgentUsageMeter";
 import { cn } from "../../app/renderer/lib/utils";
 import { AddIcon, Select, SelectTrigger } from "@tutti-os/ui-system";
-import { ListChecks, X } from "lucide-react";
+import { ListChecks, Target, X } from "lucide-react";
 import {
   createMentionPaletteStateAdapter,
   makeAtPanelKeyDown,
@@ -235,6 +235,7 @@ export interface AgentComposerProps {
     planModeOnLabel: string;
     planModeOffLabel: string;
     planUnavailable: string;
+    goalLabel: string;
     browserUseCapabilityLabel: string;
     browserUseCapabilityDescription: string;
     browserUseCapabilityDescriptionAutoConnect: string;
@@ -264,6 +265,15 @@ export interface AgentComposerProps {
     slashPalettePluginsGroup: string;
     slashPaletteConnectorsGroup: string;
     slashPaletteMcpGroup: string;
+    slashCommandCompactDescription: string;
+    slashCommandContextDescription: string;
+    slashCommandFastDescription: string;
+    slashCommandGoalDescription: string;
+    slashCommandInitDescription: string;
+    slashCommandPlanDescription: string;
+    slashCommandReviewDescription: string;
+    slashCommandStatusDescription: string;
+    slashCommandUsageDescription: string;
     slashStatusTitle: string;
     slashStatusSession: string;
     slashStatusBaseUrl: string;
@@ -664,6 +674,7 @@ const EMPTY_PROMPT_TIPS: readonly AgentComposerPromptTip[] = [];
 const EMPTY_PROVIDER_SKILLS: readonly AgentGUIProviderSkillOption[] = [];
 const EMPTY_WORKSPACE_APP_ICONS: readonly AgentMessageMarkdownWorkspaceAppIcon[] =
   [];
+const GOAL_MODE_SLASH_COMMAND = "/goal";
 const PROMPT_TIP_CYCLE_STEP_MS = 5_200;
 const MENTION_PALETTE_DISMISS_INTERACTION_SELECTOR = [
   "[data-node-drag-handle]",
@@ -777,6 +788,8 @@ export function AgentComposer({
 }: AgentComposerProps): React.JSX.Element {
   "use memo";
   const draftPrompt = draftContent.prompt;
+  const goalDraftObjective = goalDraftObjectiveFromPrompt(draftPrompt);
+  const isGoalModeActive = goalDraftObjective !== null;
   const draftImages = draftContent.images;
   const draftFiles = draftContent.files ?? [];
   const agentActivityRuntime = useOptionalAgentActivityRuntime();
@@ -792,7 +805,9 @@ export function AgentComposer({
     shouldResetMentionHighlightToFilter,
     setShouldResetMentionHighlightToFilter
   ] = useState(false);
-  const [paletteDraftPrompt, setPaletteDraftPrompt] = useState(draftPrompt);
+  const [paletteDraftPrompt, setPaletteDraftPrompt] = useState(
+    goalDraftObjective ?? draftPrompt
+  );
   const [fileMentionSuggestion, setFileMentionSuggestion] =
     useState<AgentFileMentionSuggestionState | null>(null);
   const [isSelectedProjectMissing, setIsSelectedProjectMissing] =
@@ -842,7 +857,9 @@ export function AgentComposer({
   const [dockComposerTextHeight, setDockComposerTextHeight] = useState(
     DOCK_COMPOSER_INPUT_MIN_HEIGHT
   );
-  const slashQuery = getPromptStartSlashCommandQuery(paletteDraftPrompt);
+  const slashQuery = isGoalModeActive
+    ? null
+    : getPromptStartSlashCommandQuery(paletteDraftPrompt);
   const promptBeforeSelection =
     editorHandleRef.current?.getPromptTextBeforeSelection() ?? "";
   const skillQueryDraft = promptBeforeSelection || paletteDraftPrompt;
@@ -962,11 +979,15 @@ export function AgentComposer({
           };
           return [capabilityEntry];
         }
+        const commandDescription = slashCommandDescriptionForDisplay(
+          command,
+          labels
+        );
         const commandEntry: AgentSlashPaletteEntry = {
           type: "command",
           key: `command:${command.name}`,
           label: labelForSlashCommand(command),
-          ...(command.description ? { description: command.description } : {}),
+          ...(commandDescription ? { description: commandDescription } : {}),
           command
         };
         return [commandEntry];
@@ -1004,6 +1025,15 @@ export function AgentComposer({
     labels.computerUseCapabilitySetupRequiredDescription,
     labels.computerUseCapabilityLabel,
     labels.computerUseCapabilitySettingsLabel,
+    labels.slashCommandCompactDescription,
+    labels.slashCommandContextDescription,
+    labels.slashCommandFastDescription,
+    labels.slashCommandGoalDescription,
+    labels.slashCommandInitDescription,
+    labels.slashCommandPlanDescription,
+    labels.slashCommandReviewDescription,
+    labels.slashCommandStatusDescription,
+    labels.slashCommandUsageDescription,
     skillQueryMatch?.prefix
   ]);
   const showFileMentionPalette =
@@ -1086,7 +1116,7 @@ export function AgentComposer({
   useEffect(() => {
     const isExternalDraftReplacement = draftPromptRef.current !== draftPrompt;
     draftPromptRef.current = draftPrompt;
-    setPaletteDraftPrompt(draftPrompt);
+    setPaletteDraftPrompt(goalDraftObjective ?? draftPrompt);
     if (isExternalDraftReplacement && draftPrompt) {
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
@@ -1094,7 +1124,7 @@ export function AgentComposer({
         });
       });
     }
-  }, [draftPrompt]);
+  }, [draftPrompt, goalDraftObjective]);
 
   useEffect(() => {
     draftImagesRef.current = draftImages;
@@ -1191,6 +1221,18 @@ export function AgentComposer({
         clearSlashCommandDraft();
         setIsSlashStatusPanelOpen(false);
         setIsReviewPickerOpen(true);
+        return;
+      }
+      if (effect.kind === "activateGoalMode") {
+        draftPromptRef.current = GOAL_MODE_SLASH_COMMAND;
+        setPaletteDraftPrompt("");
+        setIsSlashStatusPanelOpen(false);
+        setIsReviewPickerOpen(false);
+        setIsPaletteOpen(false);
+        onDraftContentChange({
+          ...draftContent,
+          prompt: GOAL_MODE_SLASH_COMMAND
+        });
         return;
       }
       if (effect.kind === "togglePlanMode") {
@@ -1779,12 +1821,44 @@ export function AgentComposer({
 
   const handleDraftChange = useStableEventCallback(
     (nextDraft: string): void => {
+      if (isGoalModeActive) {
+        const nextGoalPrompt = buildGoalModePrompt(nextDraft);
+        draftPromptRef.current = nextGoalPrompt;
+        setPaletteDraftPrompt(nextDraft);
+        setIsPaletteOpen(true);
+        onDraftContentChange({ ...draftContent, prompt: nextGoalPrompt });
+        return;
+      }
+      const nextGoalObjective = goalDraftObjectiveFromPrompt(nextDraft);
+      if (nextGoalObjective !== null) {
+        const nextGoalPrompt = buildGoalModePrompt(nextGoalObjective);
+        draftPromptRef.current = nextGoalPrompt;
+        setPaletteDraftPrompt(nextGoalObjective);
+        setIsPaletteOpen(true);
+        onDraftContentChange({ ...draftContent, prompt: nextGoalPrompt });
+        return;
+      }
       draftPromptRef.current = nextDraft;
       setPaletteDraftPrompt(nextDraft);
       setIsPaletteOpen(true);
       onDraftContentChange({ ...draftContent, prompt: nextDraft });
     }
   );
+
+  const clearGoalModeBadge = useCallback((): void => {
+    if (!isGoalModeActive) {
+      return;
+    }
+    const nextPrompt = goalDraftObjective ?? "";
+    draftPromptRef.current = nextPrompt;
+    setPaletteDraftPrompt(nextPrompt);
+    onDraftContentChange({ ...draftContent, prompt: nextPrompt });
+  }, [
+    draftContent,
+    goalDraftObjective,
+    isGoalModeActive,
+    onDraftContentChange
+  ]);
 
   const addDraftImages = useCallback(
     (images: AgentRichTextPastedImage[]): void => {
@@ -3015,6 +3089,26 @@ export function AgentComposer({
                   </span>
                 </button>
               ) : null}
+              {isGoalModeActive ? (
+                <button
+                  type="button"
+                  disabled={settingsControlsDisabled}
+                  aria-label={labels.goalLabel}
+                  title={labels.goalLabel}
+                  data-agent-goal-badge="true"
+                  className={cn(
+                    styles.composerMenuTrigger,
+                    "w-auto",
+                    "disabled:cursor-not-allowed disabled:opacity-60"
+                  )}
+                  onClick={clearGoalModeBadge}
+                >
+                  <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                    <Target aria-hidden className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{labels.goalLabel}</span>
+                  </span>
+                </button>
+              ) : null}
             </div>
             <div className={composerStyles.footerGroupRight}>
               {usage && usage.percentUsed !== null ? (
@@ -3225,6 +3319,59 @@ function AgentComposerDraftImagePreview({
       </button>
     </div>
   );
+}
+
+function slashCommandDescriptionForDisplay(
+  command: AgentSessionCommand,
+  labels: Pick<
+    AgentComposerProps["labels"],
+    | "slashCommandCompactDescription"
+    | "slashCommandContextDescription"
+    | "slashCommandFastDescription"
+    | "slashCommandGoalDescription"
+    | "slashCommandInitDescription"
+    | "slashCommandPlanDescription"
+    | "slashCommandReviewDescription"
+    | "slashCommandStatusDescription"
+    | "slashCommandUsageDescription"
+  >
+): string | undefined {
+  switch (command.name.trim().toLowerCase()) {
+    case "compact":
+      return labels.slashCommandCompactDescription;
+    case "context":
+      return labels.slashCommandContextDescription;
+    case "fast":
+      return labels.slashCommandFastDescription;
+    case "goal":
+      return labels.slashCommandGoalDescription;
+    case "init":
+      return labels.slashCommandInitDescription;
+    case "plan":
+      return labels.slashCommandPlanDescription;
+    case "review":
+      return labels.slashCommandReviewDescription;
+    case "status":
+      return labels.slashCommandStatusDescription;
+    case "usage":
+      return labels.slashCommandUsageDescription;
+    default:
+      return command.description;
+  }
+}
+
+function goalDraftObjectiveFromPrompt(prompt: string): string | null {
+  const match = /^\s*\/goal(?:\s+(.*))?\s*$/u.exec(prompt);
+  if (!match) {
+    return null;
+  }
+  return match[1] ?? "";
+}
+
+function buildGoalModePrompt(objective: string): string {
+  return objective.trim() === ""
+    ? GOAL_MODE_SLASH_COMMAND
+    : `${GOAL_MODE_SLASH_COMMAND} ${objective}`;
 }
 
 function isSlashCommandCapability(
