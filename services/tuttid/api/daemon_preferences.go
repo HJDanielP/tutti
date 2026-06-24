@@ -312,11 +312,9 @@ func (api DaemonAPI) PutDesktopPreferences(ctx context.Context, request tuttigen
 		}, nil
 	}
 
-	windowSnappingEnabled := preferencesbiz.DefaultDesktopWindowSnappingEnabled
-	windowSnappingShortcutPreset := preferencesbiz.DefaultDesktopWindowSnappingShortcut
+	var windowSnapping *preferencesservice.DesktopWindowSnappingInput
 	if request.Body.Preferences.WorkbenchWindowSnapping != nil {
-		windowSnappingEnabled = request.Body.Preferences.WorkbenchWindowSnapping.Enabled
-		windowSnappingShortcutPreset = strings.TrimSpace(
+		windowSnappingShortcutPreset := strings.TrimSpace(
 			string(request.Body.Preferences.WorkbenchWindowSnapping.ShortcutPreset),
 		)
 		if windowSnappingShortcutPreset == "" {
@@ -341,6 +339,10 @@ func (api DaemonAPI) PutDesktopPreferences(ctx context.Context, request tuttigen
 				),
 			}, nil
 		}
+		windowSnapping = &preferencesservice.DesktopWindowSnappingInput{
+			Enabled:        request.Body.Preferences.WorkbenchWindowSnapping.Enabled,
+			ShortcutPreset: windowSnappingShortcutPreset,
+		}
 	}
 
 	preferences, err := api.PreferencesService.Put(ctx, preferencesservice.PutInput{
@@ -358,14 +360,13 @@ func (api DaemonAPI) PutDesktopPreferences(ctx context.Context, request tuttigen
 		FileDefaultOpenersByExtension: fileDefaultOpenersByExtensionFromGenerated(
 			request.Body.Preferences.FileDefaultOpenersByExtension,
 		),
-		Locale:                       locale,
-		MinimizeAnimation:            minimizeAnimation,
-		SleepPreventionMode:          sleepPreventionMode,
-		ThemeSource:                  themeSource,
-		UpdateChannel:                updateChannel,
-		UpdatePolicy:                 updatePolicy,
-		WindowSnappingEnabled:        windowSnappingEnabled,
-		WindowSnappingShortcutPreset: windowSnappingShortcutPreset,
+		Locale:              locale,
+		MinimizeAnimation:   minimizeAnimation,
+		SleepPreventionMode: sleepPreventionMode,
+		ThemeSource:         themeSource,
+		UpdateChannel:       updateChannel,
+		UpdatePolicy:        updatePolicy,
+		WindowSnapping:      windowSnapping,
 	})
 	if err != nil {
 		return tuttigenerated.PutDesktopPreferences502JSONResponse{

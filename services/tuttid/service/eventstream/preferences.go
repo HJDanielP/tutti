@@ -83,8 +83,7 @@ func NewPreferencesDesktopUpdateRequestedHandler(mutator PreferencesMutator) Int
 			ThemeSource:                                 decoded.ThemeSource,
 			UpdateChannel:                               decoded.UpdateChannel,
 			UpdatePolicy:                                decoded.UpdatePolicy,
-			WindowSnappingEnabled:                       decoded.WindowSnappingEnabled,
-			WindowSnappingShortcutPreset:                decoded.WindowSnappingShortcutPreset,
+			WindowSnapping:                              decoded.WindowSnapping,
 		})
 		if err != nil {
 			return fmt.Errorf("put desktop preferences: %w", err)
@@ -108,8 +107,7 @@ type decodedDesktopPreferencesMutationPayload struct {
 	ThemeSource                                 string
 	UpdateChannel                               string
 	UpdatePolicy                                string
-	WindowSnappingEnabled                       bool
-	WindowSnappingShortcutPreset                string
+	WindowSnapping                              *preferencesservice.DesktopWindowSnappingInput
 }
 
 func decodeDesktopPreferencesMutationPayload(payload []byte) (decodedDesktopPreferencesMutationPayload, error) {
@@ -117,11 +115,12 @@ func decodeDesktopPreferencesMutationPayload(payload []byte) (decodedDesktopPref
 	if err := json.Unmarshal(payload, &decoded); err != nil {
 		return decodedDesktopPreferencesMutationPayload{}, fmt.Errorf("decode payload: %w", err)
 	}
-	windowSnappingEnabled := preferencesbiz.DefaultDesktopWindowSnappingEnabled
-	windowSnappingShortcutPreset := preferencesbiz.DefaultDesktopWindowSnappingShortcut
+	var windowSnapping *preferencesservice.DesktopWindowSnappingInput
 	if decoded.Preferences.WorkbenchWindowSnapping != nil {
-		windowSnappingEnabled = decoded.Preferences.WorkbenchWindowSnapping.Enabled
-		windowSnappingShortcutPreset = decoded.Preferences.WorkbenchWindowSnapping.ShortcutPreset
+		windowSnapping = &preferencesservice.DesktopWindowSnappingInput{
+			Enabled:        decoded.Preferences.WorkbenchWindowSnapping.Enabled,
+			ShortcutPreset: decoded.Preferences.WorkbenchWindowSnapping.ShortcutPreset,
+		}
 	}
 
 	return decodedDesktopPreferencesMutationPayload{
@@ -139,14 +138,13 @@ func decodeDesktopPreferencesMutationPayload(payload []byte) (decodedDesktopPref
 		FileDefaultOpenersByExtension: fileDefaultOpenersByExtensionFromPayload(
 			decoded.Preferences.FileDefaultOpenersByExtension,
 		),
-		Locale:                       decoded.Preferences.Locale,
-		MinimizeAnimation:            decoded.Preferences.MinimizeAnimation,
-		SleepPreventionMode:          decoded.Preferences.SleepPreventionMode,
-		ThemeSource:                  decoded.Preferences.ThemeSource,
-		UpdateChannel:                decoded.Preferences.UpdateChannel,
-		UpdatePolicy:                 decoded.Preferences.UpdatePolicy,
-		WindowSnappingEnabled:        windowSnappingEnabled,
-		WindowSnappingShortcutPreset: windowSnappingShortcutPreset,
+		Locale:              decoded.Preferences.Locale,
+		MinimizeAnimation:   decoded.Preferences.MinimizeAnimation,
+		SleepPreventionMode: decoded.Preferences.SleepPreventionMode,
+		ThemeSource:         decoded.Preferences.ThemeSource,
+		UpdateChannel:       decoded.Preferences.UpdateChannel,
+		UpdatePolicy:        decoded.Preferences.UpdatePolicy,
+		WindowSnapping:      windowSnapping,
 	}, nil
 }
 

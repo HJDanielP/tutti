@@ -676,6 +676,8 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
     updatePolicy: DesktopUpdatePolicy;
     workbenchWindowSnapping?: DesktopWorkbenchWindowSnapping;
   } {
+    const hasWorkbenchWindowSnappingOverride =
+      "workbenchWindowSnapping" in overrides;
     const workbenchWindowSnapping = normalizeDesktopWorkbenchWindowSnapping(
       overrides.workbenchWindowSnapping ?? this.store.workbenchWindowSnapping
     );
@@ -712,12 +714,13 @@ export class DesktopPreferencesService implements IDesktopPreferencesService {
       themeSource: overrides.themeSource ?? this.store.theme.source,
       updateChannel: overrides.updateChannel ?? this.store.updateChannel,
       updatePolicy: overrides.updatePolicy ?? this.store.updatePolicy,
-      ...(desktopWorkbenchWindowSnappingEqual(
+      ...(hasWorkbenchWindowSnappingOverride ||
+      !desktopWorkbenchWindowSnappingEqual(
         workbenchWindowSnapping,
         defaultDesktopWorkbenchWindowSnapping
       )
-        ? {}
-        : { workbenchWindowSnapping })
+        ? { workbenchWindowSnapping }
+        : {})
     };
   }
 }

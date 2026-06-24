@@ -640,6 +640,46 @@ test("DesktopPreferencesService publishes workbench window snapping preference w
   service.dispose();
 });
 
+test("DesktopPreferencesService includes default workbench window snapping when explicitly changed", async () => {
+  const client = createDesktopPreferencesClient({});
+
+  const service = new DesktopPreferencesService({
+    applyLocale() {},
+    applyTheme() {},
+    client,
+    initialLocale: "en",
+    initialTheme: {
+      appearance: "light",
+      source: "system"
+    },
+    resolveTheme
+  });
+
+  await settle();
+  const savedPreferencePromise = service.setWorkbenchWindowSnapping({
+    enabled: false,
+    shortcutPreset: "commandArrows"
+  });
+
+  assert.deepEqual(client.updatedRequests.at(-1)?.workbenchWindowSnapping, {
+    enabled: false,
+    shortcutPreset: "commandArrows"
+  });
+
+  client.emitDesktopPreferencesUpdated(client.updatedRequests.at(-1)!);
+
+  assert.deepEqual(await savedPreferencePromise, {
+    enabled: false,
+    shortcutPreset: "commandArrows"
+  });
+  assert.deepEqual(service.store.workbenchWindowSnapping, {
+    enabled: false,
+    shortcutPreset: "commandArrows"
+  });
+
+  service.dispose();
+});
+
 test("DesktopPreferencesService applies HTTP-confirmed authoritative preferences to store", async () => {
   const tuttidClient = createSequentialTuttidClient([
     {
