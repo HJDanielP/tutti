@@ -281,6 +281,15 @@ export const zhCN = {
           scale: "缩放"
         },
         minimizeAnimationSaveFailed: "暂时无法更新最小化动画。",
+        workbenchWindowSnappingDescription:
+          "开启边缘、四角吸附以及键盘窗口整理",
+        workbenchWindowSnappingLabel: "窗口吸附",
+        workbenchWindowSnappingSaveFailed: "暂时无法更新窗口吸附设置。",
+        workbenchWindowSnappingShortcutLabel: "窗口吸附快捷键",
+        workbenchWindowSnappingShortcutOptions: {
+          commandArrows: "Command + 方向键",
+          commandShiftArrows: "Command + Shift + 方向键"
+        },
         themeDescription: "控制窗口外观以及信息的颜色模式",
         themeLabel: "外观",
         themeOptions: {
