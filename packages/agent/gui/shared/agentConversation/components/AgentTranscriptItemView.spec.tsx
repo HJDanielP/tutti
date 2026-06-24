@@ -369,14 +369,18 @@ describe("AgentTranscriptItemView render stability", () => {
   });
 
   it("shows a loading spinner while a user prompt image is being read", async () => {
-    let resolveRead:
-      | ((value: {
-          attachmentId: string;
-          data: string;
-          mimeType: "image/png";
-          name: string;
-        }) => void)
-      | null = null;
+    const readController: {
+      resolve: (value: {
+        attachmentId: string;
+        data: string;
+        mimeType: "image/png";
+        name: string;
+      }) => void;
+    } = {
+      resolve: () => {
+        throw new Error("readSessionAttachment was not called");
+      }
+    };
     const readSessionAttachment = vi.fn(
       () =>
         new Promise<{
@@ -385,7 +389,7 @@ describe("AgentTranscriptItemView render stability", () => {
           mimeType: "image/png";
           name: string;
         }>((resolvePromise) => {
-          resolveRead = resolvePromise;
+          readController.resolve = resolvePromise;
         })
     );
     Object.defineProperty(window, "agentActivityRuntime", {
@@ -426,7 +430,7 @@ describe("AgentTranscriptItemView render stability", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("img", { name: "screen.png" })).toBeNull();
 
-    resolveRead?.({
+    readController.resolve({
       attachmentId: "attachment-loading",
       data: "aW1hZ2U=",
       mimeType: "image/png",
