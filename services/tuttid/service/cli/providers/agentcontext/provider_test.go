@@ -134,6 +134,20 @@ func (f *fakeAgentSessions) GetComposerOptions(_ context.Context, input agentser
 				Value: input.Settings.ReasoningEffort,
 			}},
 		},
+		SpeedConfig: agentservice.ComposerConfigOption{
+			Configurable: true,
+			CurrentValue: "standard",
+			DefaultValue: "standard",
+			Options: []agentservice.ComposerConfigOptionValue{{
+				ID:    "standard",
+				Label: "标准",
+				Value: "standard",
+			}, {
+				ID:    "fast",
+				Label: "快速",
+				Value: "fast",
+			}},
+		},
 		RuntimeContext: map[string]any{
 			"configOptions": []map[string]any{{
 				"currentValue": input.Settings.Model,
@@ -506,6 +520,14 @@ func TestComposerOptionsCommandReturnsProviderOptions(t *testing.T) {
 	modes := permissionConfig["modes"].([]any)
 	if modes[0].(map[string]any)["label"] != "替我审批" {
 		t.Fatalf("permission modes = %#v", modes)
+	}
+	speedConfig := output.Value["speedConfig"].(map[string]any)
+	if speedConfig["currentValue"] != "standard" || speedConfig["defaultValue"] != "standard" {
+		t.Fatalf("speedConfig = %#v", speedConfig)
+	}
+	speedOptions := speedConfig["options"].([]any)
+	if len(speedOptions) != 2 || speedOptions[0].(map[string]any)["value"] != "standard" || speedOptions[1].(map[string]any)["value"] != "fast" {
+		t.Fatalf("speed options = %#v", speedOptions)
 	}
 }
 
