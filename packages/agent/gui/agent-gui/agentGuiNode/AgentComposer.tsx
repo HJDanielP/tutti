@@ -1259,10 +1259,16 @@ export function AgentComposer({
 
   const submitCurrentPrompt = useStableEventCallback((): void => {
     const canSubmitWhileSending = canQueueWhileBusy && isSendingTurn;
-    const hasUploadingImages = draftImages.some((image) => image.uploading);
-    const hasFailedImages = draftImages.some((image) => image.uploadError);
-    const hasUploadingFiles = draftFiles.some((file) => file.uploading);
-    const hasFailedFiles = draftFiles.some((file) => file.uploadError);
+    const currentDraftImages = draftImagesRef.current;
+    const currentDraftFiles = draftFilesRef.current;
+    const hasUploadingImages = currentDraftImages.some(
+      (image) => image.uploading
+    );
+    const hasFailedImages = currentDraftImages.some(
+      (image) => image.uploadError
+    );
+    const hasUploadingFiles = currentDraftFiles.some((file) => file.uploading);
+    const hasFailedFiles = currentDraftFiles.some((file) => file.uploadError);
     if (
       isSelectedProjectMissing ||
       submitDisabled ||
@@ -1276,11 +1282,16 @@ export function AgentComposer({
       return;
     }
     const nextPrompt = draftPromptRef.current;
-    const nextDraftContent = { ...draftContent, prompt: nextPrompt };
+    const nextDraftContent = {
+      ...draftContent,
+      prompt: nextPrompt,
+      images: currentDraftImages,
+      files: currentDraftFiles
+    };
     if (!agentComposerDraftHasContent(nextDraftContent)) {
       return;
     }
-    if (draftImages.length > 0 && !promptImagesSupported) {
+    if (currentDraftImages.length > 0 && !promptImagesSupported) {
       onPromptImagesUnsupported?.();
       return;
     }
@@ -1312,6 +1323,8 @@ export function AgentComposer({
     });
     onSubmit(submitContent);
     draftPromptRef.current = "";
+    draftImagesRef.current = [];
+    draftFilesRef.current = [];
     setPaletteDraftPrompt("");
     onDraftContentChange(emptyAgentComposerDraft());
   });
@@ -1866,7 +1879,6 @@ export function AgentComposer({
                     name: uploadedFile?.name ?? file.name,
                     mimeType: uploadedFile?.mimeType ?? file.mimeType,
                     path: uploadedPath,
-                    hostPath: uploadedFile?.hostPath ?? file.hostPath,
                     assetId: uploadedFile?.assetId,
                     sizeBytes: uploadedFile?.sizeBytes,
                     uploading: false

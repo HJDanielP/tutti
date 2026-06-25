@@ -65,6 +65,7 @@ export interface ReferenceSourcePickerProps {
   copy: WorkspaceFileReferenceCopy;
   /** 可选:打开时直达某事项/应用分组(展开并聚焦)。 */
   initialTarget?: ReferenceLocateTarget | null;
+  isNodeSelectable?: (node: ReferenceNode) => boolean;
   onClose: () => void;
   onConfirm: (refs: WorkspaceFileReference[]) => void;
   /**
@@ -129,6 +130,7 @@ export function ReferenceSourcePicker({
   aggregator,
   copy,
   initialTarget,
+  isNodeSelectable,
   onClose,
   onConfirm,
   onConfirmBundles,
@@ -142,6 +144,7 @@ export function ReferenceSourcePicker({
     open,
     workspaceRootGroupLabel: copy.t("referencePicker.workspaceRootGroup"),
     initialTarget,
+    isNodeSelectable,
     onClose,
     onConfirm,
     onConfirmBundles
@@ -327,6 +330,7 @@ export function ReferenceSourcePicker({
                               node={node}
                               selected={view.isSelected(node)}
                               onFocus={view.setFocusedNode}
+                              selectable={view.isSelectable(node)}
                               onSingleSelect={
                                 view.toggleSingleSelectionAndExpand
                               }
@@ -588,6 +592,7 @@ function SearchResultRow({
   node,
   focused,
   selected,
+  selectable,
   onFocus,
   onSingleSelect,
   onToggle
@@ -595,17 +600,19 @@ function SearchResultRow({
   node: ReferenceNode;
   focused: boolean;
   selected: boolean;
+  selectable: boolean;
   onFocus: (node: ReferenceNode) => void;
   onSingleSelect: (node: ReferenceNode) => void;
   onToggle: (node: ReferenceNode) => void;
 }): JSX.Element {
   const isFolder = node.kind === "folder";
   const contextLabel = node.contextLabel ?? node.ref.nodeId;
+  const active = selected || (focused && selectable);
   return (
     <div
       className={cn(
         "grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[6px] border py-2.5 pr-1 pl-3 transition-colors",
-        focused || selected
+        active
           ? "border-border bg-transparency-block"
           : "border-transparent bg-transparent hover:border-border/70 hover:bg-transparency-block"
       )}
@@ -635,24 +642,26 @@ function SearchResultRow({
           </FullTextTooltip>
         </span>
       </div>
-      <Button
-        aria-label={node.displayName}
-        aria-pressed={selected}
-        size="icon-sm"
-        type="button"
-        variant="ghost"
-        onClick={(event) => {
-          event.stopPropagation();
-          onFocus(node);
-          onToggle(node);
-        }}
-      >
-        {selected ? (
-          <CheckIcon size={14} />
-        ) : (
-          <AddLinedIcon className="text-[var(--text-secondary)]" size={16} />
-        )}
-      </Button>
+      {selectable ? (
+        <Button
+          aria-label={node.displayName}
+          aria-pressed={selected}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+          onClick={(event) => {
+            event.stopPropagation();
+            onFocus(node);
+            onToggle(node);
+          }}
+        >
+          {selected ? (
+            <CheckIcon size={14} />
+          ) : (
+            <AddLinedIcon className="text-[var(--text-secondary)]" size={16} />
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -1183,8 +1192,8 @@ function isFocused(
 
 /**
  * 递归文件树节点,交互复刻 main 分支 `WorkspaceFileReferencePickerTreeEntry`:
- * 24px 缩进、folder 箭头旋转、点名称展开/收起、grid-rows 展开动画、add/check 勾选
- * (文件夹与文件都可作为引用选中)。
+ * 24px 缩进、folder 箭头旋转、点名称展开/收起、grid-rows 展开动画、add/check 勾选。
+ * 可选性由业务侧按 source/kind 注入,例如 host 本地目录可浏览但不可引用。
  */
 function TreeNodeRow({
   node,
@@ -1203,7 +1212,9 @@ function TreeNodeRow({
   const childState = view.childrenByKey[key];
   const childEntries = view.sortNodes(childState?.entries ?? []);
   const selected = view.isSelected(node);
+  const selectable = view.isSelectable(node);
   const focused = isFocused(view.focusedNode, node);
+  const active = selected || (focused && selectable);
 
   const [shouldRenderChildContent, setShouldRenderChildContent] =
     useState(expanded);
@@ -1258,9 +1269,7 @@ function TreeNodeRow({
       <div
         className={cn(
           "flex cursor-pointer items-center gap-2 rounded-[6px] py-1.5 pr-1 transition-colors",
-          focused || selected
-            ? "bg-transparency-block"
-            : "hover:bg-transparency-block"
+          active ? "bg-transparency-block" : "hover:bg-transparency-block"
         )}
         style={{ paddingLeft: `${depth * TREE_INDENT + 8}px` }}
         onClick={() => {
@@ -1300,25 +1309,30 @@ function TreeNodeRow({
             {node.displayName}
           </span>
         </FullTextTooltip>
-        <Button
-          aria-label={node.displayName}
-          aria-pressed={selected}
-          className="shrink-0"
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-          onClick={(event) => {
-            event.stopPropagation();
-            view.setFocusedNode(node);
-            view.toggleSelection(node);
-          }}
-        >
-          {selected ? (
-            <CheckIcon size={14} />
-          ) : (
-            <AddLinedIcon className="text-[var(--text-secondary)]" size={16} />
-          )}
-        </Button>
+        {selectable ? (
+          <Button
+            aria-label={node.displayName}
+            aria-pressed={selected}
+            className="shrink-0"
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+            onClick={(event) => {
+              event.stopPropagation();
+              view.setFocusedNode(node);
+              view.toggleSelection(node);
+            }}
+          >
+            {selected ? (
+              <CheckIcon size={14} />
+            ) : (
+              <AddLinedIcon
+                className="text-[var(--text-secondary)]"
+                size={16}
+              />
+            )}
+          </Button>
+        ) : null}
       </div>
       {isFolder ? (
         <div

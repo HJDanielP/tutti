@@ -835,12 +835,13 @@ export function AgentGUINodeView({
     uiLanguage === "zh-CN" ? "本地文件(宿主机)" : "Local files (Host)";
   const hostLocalFileSelectLabel =
     uiLanguage === "zh-CN" ? "从电脑选择…" : "Choose from computer…";
+  const hostLocalFileSourceId = "host-local-file";
   const hostLocalFileActionPath = "host-local-file://select";
   const referenceSourceAggregatorWithHostLocalFile = useMemo(() => {
     if (!referenceSourceAggregator) {
       return null;
     }
-    const sourceId = "host-local-file";
+    const sourceId = hostLocalFileSourceId;
     const actionNode: ReferenceNode = {
       ref: { sourceId, nodeId: "select-files" },
       kind: "file",
@@ -941,7 +942,17 @@ export function AgentGUINodeView({
         return referenceSourceAggregator.getLoadedSource(currentSourceId);
       }
     } satisfies ReferenceSourceAggregator;
-  }, [hostLocalFileLabel, hostLocalFileSelectLabel, referenceSourceAggregator]);
+  }, [
+    hostLocalFileLabel,
+    hostLocalFileSelectLabel,
+    hostLocalFileSourceId,
+    referenceSourceAggregator
+  ]);
+  const isWorkspaceReferencePickerNodeSelectable = useCallback(
+    (node: ReferenceNode) =>
+      node.ref.sourceId !== hostLocalFileSourceId || node.kind === "file",
+    [hostLocalFileSourceId]
+  );
   const requestWorkspaceReferences = useCallback(
     async (
       entity?: AgentContextMentionItem | null
@@ -1013,7 +1024,15 @@ export function AgentGUINodeView({
       const wantsHostFiles = refs.some(
         (ref) => ref.path === hostLocalFileActionPath
       );
-      if (!wantsHostFiles) {
+      const hostSourceRefs = refs.filter(
+        (ref) =>
+          ref.sourceId === hostLocalFileSourceId &&
+          ref.path !== hostLocalFileActionPath
+      );
+      const hostSourceFileRefs = hostSourceRefs.filter(
+        (ref) => ref.kind === "file"
+      );
+      if (!wantsHostFiles && hostSourceRefs.length === 0) {
         settleReferencePicker(
           { files: refs, mentionItems: [], hostAttachments: [] },
           refs
@@ -1021,28 +1040,60 @@ export function AgentGUINodeView({
         return;
       }
       const workspaceRefs = refs.filter(
-        (ref) => ref.path !== hostLocalFileActionPath
+        (ref) =>
+          ref.path !== hostLocalFileActionPath &&
+          ref.sourceId !== hostLocalFileSourceId
       );
-      const selected = await agentHostApi.workspace.selectFiles({
-        allowDirectories: false
-      });
-      const hostAttachments = selected.map((file) => ({
+      const selected = wantsHostFiles
+        ? await agentHostApi.workspace.selectFiles({
+            allowDirectories: false
+          })
+        : [];
+      const selectedHostAttachments = selected.map((file) => ({
         hostPath: file.path,
         name: file.name || file.path.split("/").pop() || file.path,
         mimeType: null
       }));
+      const browsedHostAttachments = hostSourceFileRefs.map((file) => ({
+        hostPath: file.path,
+        name: file.displayName || file.path.split("/").pop() || file.path,
+        mimeType: null
+      }));
       settleReferencePicker(
-        { files: workspaceRefs, mentionItems: [], hostAttachments },
+        {
+          files: workspaceRefs,
+          mentionItems: [],
+          hostAttachments: [
+            ...selectedHostAttachments,
+            ...browsedHostAttachments
+          ]
+        },
         workspaceRefs
       );
     },
-    [agentHostApi.workspace, settleReferencePicker]
+    [
+      agentHostApi.workspace,
+      hostLocalFileActionPath,
+      hostLocalFileSourceId,
+      settleReferencePicker
+    ]
   );
   // 「文件夹=一个 reference 节点」确认:navigable 源文件夹折叠成 workspace-reference
   // mention item(只携带可解析句柄 source+id+groupId,不展开文件);松散文件仍按 file
   // mention 插入。agent 收到 `mention://workspace-reference/...` 后经 skill+CLI 按需解析。
   const confirmWorkspaceReferenceBundles = useCallback(
     (result: ReferenceGroupedSelection) => {
+      const hostSourceRefs = result.files.filter(
+        (ref) => ref.sourceId === hostLocalFileSourceId && ref.kind === "file"
+      );
+      const workspaceRefs = result.files.filter(
+        (ref) => ref.sourceId !== hostLocalFileSourceId
+      );
+      const hostAttachments = hostSourceRefs.map((file) => ({
+        hostPath: file.path,
+        name: file.displayName || file.path.split("/").pop() || file.path,
+        mimeType: null
+      }));
       const mentionItems: AgentMentionWorkspaceReferenceItem[] = result.bundles
         .filter((bundle) => bundle.handle != null)
         .map((bundle) => {
@@ -1077,11 +1128,11 @@ export function AgentGUINodeView({
         });
       // bundle 不再展开文件,仅松散文件计入「最近引用」跟踪。
       settleReferencePicker(
-        { files: result.files, mentionItems, hostAttachments: [] },
-        result.files
+        { files: workspaceRefs, mentionItems, hostAttachments },
+        workspaceRefs
       );
     },
-    [settleReferencePicker, viewModel.workspaceId]
+    [hostLocalFileSourceId, settleReferencePicker]
   );
   const openclawGateway = useMemo(
     () =>
@@ -1474,6 +1525,7 @@ export function AgentGUINodeView({
             workspaceFileReferenceCopy ?? fallbackWorkspaceFileReferenceCopy
           }
           initialTarget={workspaceReferencePickerTarget}
+          isNodeSelectable={isWorkspaceReferencePickerNodeSelectable}
           open={workspaceReferencePickerOpen}
           workspaceId={viewModel.workspaceId}
           onClose={closeWorkspaceReferencePicker}
