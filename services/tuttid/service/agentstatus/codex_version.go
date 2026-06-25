@@ -7,12 +7,11 @@ import (
 
 // MinSupportedCodexVersion is the lowest Codex CLI version Tutti supports.
 //
-// NOTE: this is a single tunable hard gate. The value below is a placeholder
-// and must be confirmed against the actual minimum Codex CLI release that the
-// backend models in use require (e.g. the version that supports the currently
-// served models). Bump this constant when raising the floor; nothing else
-// needs to change.
-const MinSupportedCodexVersion = "0.5.0"
+// Single tunable hard gate: a detected codex below this floor is flagged as
+// too old (surfaced as CODEX_VERSION_TOO_OLD) and the server-side 400 is the
+// backstop. Bump this constant when raising the floor; nothing else needs to
+// change.
+const MinSupportedCodexVersion = "0.142.1"
 
 // compareCodexVersions compares two semver-ish version strings.
 //
