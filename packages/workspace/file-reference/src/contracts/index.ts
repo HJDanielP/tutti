@@ -4,6 +4,7 @@ export interface WorkspaceFileReference {
   mtimeMs?: number | null;
   path: string;
   sizeBytes?: number | null;
+  sourceId?: string;
 }
 
 export interface WorkspaceFileReferenceDirectoryListing {

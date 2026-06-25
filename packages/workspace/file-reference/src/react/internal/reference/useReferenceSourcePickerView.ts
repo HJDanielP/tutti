@@ -88,6 +88,7 @@ export interface UseReferenceSourcePickerViewInput {
   initialTarget?: ReferenceLocateTarget | null;
   onClose: () => void;
   onConfirm: (refs: WorkspaceFileReference[]) => void;
+  isNodeSelectable?: (node: ReferenceNode) => boolean;
   /**
    * 可选:启用「文件夹=一个 bundle」确认形态。提供时,confirm 改用 confirmGrouped,
    * navigable 源的选中文件夹折叠成一个 bundle,其余仍作为单条文件。
@@ -107,6 +108,7 @@ export function useReferenceSourcePickerView({
   initialTarget = null,
   onClose,
   onConfirm,
+  isNodeSelectable,
   onConfirmBundles
 }: UseReferenceSourcePickerViewInput) {
   const readSnapshot = useSnapshot as <T extends object>(store: T) => T;
@@ -482,16 +484,30 @@ export function useReferenceSourcePickerView({
 
   const isSelected = useCallback(
     (node: ReferenceNode) =>
+      (isNodeSelectable?.(node) ?? true) &&
       snapshot.selection.some(
         (item) => nodeRefKey(item.ref) === nodeRefKey(node.ref)
       ),
-    [snapshot.selection]
+    [isNodeSelectable, snapshot.selection]
+  );
+
+  const isSelectable = useCallback(
+    (node: ReferenceNode) => isNodeSelectable?.(node) ?? true,
+    [isNodeSelectable]
+  );
+  const selectableSelection = useMemo(
+    () => snapshot.selection.filter(isSelectable),
+    [isSelectable, snapshot.selection]
   );
 
   // app/issue 源的文件夹引用需异步递归枚举展开,故 confirm 异步;期间置 isConfirming 防重复提交。
   const [isConfirming, setIsConfirming] = useState(false);
   const confirm = useCallback(async () => {
     if (isConfirming) {
+      return;
+    }
+    if (selectableSelection.length === 0) {
+      controller.clearSelection();
       return;
     }
     setIsConfirming(true);
@@ -518,7 +534,14 @@ export function useReferenceSourcePickerView({
     } finally {
       setIsConfirming(false);
     }
-  }, [controller, isConfirming, onClose, onConfirm, onConfirmBundles]);
+  }, [
+    controller,
+    isConfirming,
+    onClose,
+    onConfirm,
+    onConfirmBundles,
+    selectableSelection.length
+  ]);
 
   // 焦点节点预览:文件夹→directory;文件→走源 readPreview,字节经 file-preview 分类
   // 成 image/text/readonly。image 用 object URL,切换/卸载时回收避免泄漏。
@@ -685,8 +708,8 @@ export function useReferenceSourcePickerView({
       ? (activeTabState?.isSearchLoadingMore ?? false)
       : (currentChildren?.loading ?? false),
     focusedNode,
-    selection: snapshot.selection,
-    selectionCount: snapshot.selection.length,
+    selection: selectableSelection,
+    selectionCount: selectableSelection.length,
     setActiveSource,
     enterFolder,
     selectGroup,
@@ -697,11 +720,24 @@ export function useReferenceSourcePickerView({
       controller.setSearchQuery(query, searchScopeNodeId),
     setFilters: (filters: string[]) =>
       controller.setSearchFilters(filters, searchScopeNodeId),
-    toggleSelection: (node: ReferenceNode) => controller.toggleSelection(node),
-    toggleSingleSelectionAndExpand: (node: ReferenceNode) =>
-      controller.toggleSingleSelectionAndExpand(node),
+    toggleSelection: (node: ReferenceNode) => {
+      if (isSelectable(node)) {
+        controller.toggleSelection(node);
+      }
+    },
+    toggleSingleSelectionAndExpand: (node: ReferenceNode) => {
+      if (isSelectable(node)) {
+        controller.toggleSingleSelectionAndExpand(node);
+        return;
+      }
+      controller.clearSelection();
+      if (node.kind === "folder") {
+        controller.toggleNode(node);
+      }
+    },
     loadMore: () =>
       isQuery ? controller.loadMoreSearch() : controller.loadMore(currentNode),
+    isSelectable,
     isSelected,
     confirm,
     isConfirming
