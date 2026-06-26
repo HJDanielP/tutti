@@ -72,6 +72,8 @@ export type CliCapabilitySource = {
   documentationPath?: string | null;
 };
 
+export type CliCapabilityVisibility = "public" | "integration";
+
 /**
  * Stable command metadata exposed by the local CLI capability protocol.
  */
@@ -92,6 +94,7 @@ export type CliCapability = {
    * Optional longer human-readable command description.
    */
   description?: string | null;
+  visibility?: CliCapabilityVisibility;
   /**
    * Optional JSON Schema fragment describing accepted command input.
    */
@@ -1986,9 +1989,13 @@ export type ListCliCapabilitiesData = {
      */
     workspaceID?: string;
     /**
-     * Include capabilities hidden from CLI command discovery by provider availability filters. Intended for metadata consumers, not command routing.
+     * Include capabilities hidden from ordinary CLI command discovery by provider availability filters and command visibility. Intended for metadata consumers, not ordinary user command routing.
      */
     includeHidden?: boolean;
+    /**
+     * Include integration-only commands while preserving provider availability filters. Intended for app-runtime integrations.
+     */
+    includeIntegration?: boolean;
   };
   url: "/v1/cli/capabilities";
 };

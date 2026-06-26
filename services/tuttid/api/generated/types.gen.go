@@ -421,6 +421,24 @@ func (e CliCapabilitySourceKind) Valid() bool {
 	}
 }
 
+// Defines values for CliCapabilityVisibility.
+const (
+	Integration CliCapabilityVisibility = "integration"
+	Public      CliCapabilityVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the CliCapabilityVisibility enum.
+func (e CliCapabilityVisibility) Valid() bool {
+	switch e {
+	case Integration:
+		return true
+	case Public:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CliOutputMode.
 const (
 	Json     CliOutputMode = "json"
@@ -1822,7 +1840,8 @@ type CliCapability struct {
 	Source CliCapabilitySource `json:"source"`
 
 	// Summary Short human-readable summary for help surfaces.
-	Summary string `json:"summary"`
+	Summary    string                   `json:"summary"`
+	Visibility *CliCapabilityVisibility `json:"visibility,omitempty"`
 }
 
 // CliCapabilityOutput defines model for CliCapabilityOutput.
@@ -1855,6 +1874,9 @@ type CliCapabilitySource struct {
 
 // CliCapabilitySourceKind defines model for CliCapabilitySourceKind.
 type CliCapabilitySourceKind string
+
+// CliCapabilityVisibility defines model for CliCapabilityVisibility.
+type CliCapabilityVisibility string
 
 // CliCommandOutput defines model for CliCommandOutput.
 type CliCommandOutput struct {
@@ -3487,8 +3509,11 @@ type ListCliCapabilitiesParams struct {
 	// WorkspaceID Optional workspace context. When omitted, the daemon uses the startup workspace.
 	WorkspaceID *string `form:"workspaceID,omitempty" json:"workspaceID,omitempty"`
 
-	// IncludeHidden Include capabilities hidden from CLI command discovery by provider availability filters. Intended for metadata consumers, not command routing.
+	// IncludeHidden Include capabilities hidden from ordinary CLI command discovery by provider availability filters and command visibility. Intended for metadata consumers, not ordinary user command routing.
 	IncludeHidden *bool `form:"includeHidden,omitempty" json:"includeHidden,omitempty"`
+
+	// IncludeIntegration Include integration-only commands while preserving provider availability filters. Intended for app-runtime integrations.
+	IncludeIntegration *bool `form:"includeIntegration,omitempty" json:"includeIntegration,omitempty"`
 }
 
 // ListWorkspaceAgentGeneratedFilesParams defines parameters for ListWorkspaceAgentGeneratedFiles.

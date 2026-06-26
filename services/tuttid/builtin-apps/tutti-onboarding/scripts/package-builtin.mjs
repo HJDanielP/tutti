@@ -435,6 +435,15 @@ function validateCliInputSchema(schema, label) {
   }
 }
 
+function validateCliVisibility(visibility, label) {
+  if (visibility === undefined) {
+    return;
+  }
+  if (!["public", "integration"].includes(visibility)) {
+    throw new Error(`tutti.cli.json ${label} must be public or integration.`);
+  }
+}
+
 function validateCliOutput(output, label) {
   if (!output || !["json", "table"].includes(output.defaultMode)) {
     throw new Error(
@@ -522,6 +531,7 @@ function validateCliManifest(cliManifest) {
       throw new Error(`tutti.cli.json command path ${pathKey} is duplicated.`);
     }
     seenPaths.add(pathKey);
+    validateCliVisibility(command.visibility, `${label}.visibility`);
     validateCliInputSchema(command.inputSchema, `${label}.inputSchema`);
     validateCliOutput(command.output, `${label}.output`);
     validateCliHandler(command.handler, `${label}.handler`);

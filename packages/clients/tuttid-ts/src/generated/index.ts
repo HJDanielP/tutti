@@ -221,6 +221,7 @@ export type {
   CliCapabilityOutput,
   CliCapabilitySource,
   CliCapabilitySourceKind,
+  CliCapabilityVisibility,
   CliCommandId,
   CliCommandOutput,
   ClientOptions,

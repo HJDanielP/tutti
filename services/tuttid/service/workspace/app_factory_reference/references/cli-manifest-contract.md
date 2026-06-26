@@ -25,6 +25,7 @@ Shape:
       "path": ["run"],
       "summary": "Run an automation",
       "description": "Run one named automation.",
+      "visibility": "public",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -55,6 +56,10 @@ Rules:
 - `scope` and every command path segment must use lowercase letters, numbers, and hyphen only.
 - `description` is optional. When present, it describes the CLI scope as a whole for app-level discovery surfaces such as `tutti --help` and `@app` mentions.
 - Command `path` must not repeat `scope`.
+- Command `visibility` is optional. It may be `public` or `integration`; when omitted, it defaults to `public`.
+- `public` commands appear in ordinary Tutti CLI help, Agent command guides, and command discovery.
+- `integration` commands are hidden from ordinary user and Agent discovery, but are still available to app-runtime integrations that call local capabilities through `$TUTTI_CLI`.
+- `visibility` is not an authorization boundary. Do not use `integration` for secrets, privileged operations, or commands that must be blocked from a user who already knows the command.
 - `documentation` is optional. When present, `documentation.file` must be a relative package path to app-owned command documentation, usually `COMMANDS.md`. CLI capabilities expose the resolved absolute documentation path for help output.
 - Handler `kind` must be `http`, `method` must be `POST`, and `path` must start with `/tutti/cli/`.
 - Do not declare host, port, or full URLs; Tutti routes to the app runtime port.

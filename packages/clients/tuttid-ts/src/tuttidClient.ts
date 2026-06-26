@@ -119,7 +119,8 @@ export function createTuttidClient(
         client,
         query: {
           ...(workspaceID ? { workspaceID } : {}),
-          ...(options?.includeHidden ? { includeHidden: true } : {})
+          ...(options?.includeHidden ? { includeHidden: true } : {}),
+          ...(options?.includeIntegration ? { includeIntegration: true } : {})
         }
       });
       return unwrapData(response, "CLI capabilities request failed.");
