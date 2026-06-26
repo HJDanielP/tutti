@@ -1,7 +1,9 @@
 import {
+  normalizeAgentActivityDisplayStatus,
   selectNeedsAttentionCount,
   selectNeedsAttentionItems,
   type AgentActivityMessage,
+  type AgentActivityDisplayStatus,
   type AgentActivityNeedsAttentionItem,
   type AgentActivityPresence,
   type AgentActivitySession,
@@ -103,22 +105,23 @@ function agentHostSessionFromCore(
   id: number,
   presenceId: number
 ): AgentHostWorkspaceAgentSession {
+  const displayStatus = agentActivityDisplayStatusFromSession(session);
   return {
     agentSessionId: session.agentSessionId,
     endedAtUnixMs: session.endedAtUnixMs,
     startedAtUnixMs: session.startedAtUnixMs,
     createdAtUnixMs: session.createdAtUnixMs,
     cwd: session.cwd,
-    effectiveStatus: agentHostEffectiveStatusFromCore(session.status),
+    effectiveStatus: agentHostEffectiveStatusFromDisplay(displayStatus),
     id,
-    lifecycleStatus: agentHostLifecycleStatusFromCore(session.status),
+    lifecycleStatus: agentHostLifecycleStatusFromDisplay(displayStatus),
     presenceId,
     pinnedAtUnixMs: session.pinnedAtUnixMs,
     provider: session.provider,
     providerSessionId: session.providerSessionId ?? session.agentSessionId,
     resumable: session.resumable ?? false,
     sessionOrigin: "WORKSPACE_AGENT_SESSION_ORIGIN_RUNTIME",
-    status: agentHostSessionStatusFromCore(session.status),
+    status: agentHostSessionStatusFromDisplay(displayStatus),
     syncState: session.lastError
       ? {
           agentSessionId: session.agentSessionId,
@@ -129,7 +132,7 @@ function agentHostSessionFromCore(
         }
       : undefined,
     title: session.title || undefined,
-    turnPhase: agentHostTurnPhaseFromCore(session.status),
+    turnPhase: agentHostTurnPhaseFromDisplay(displayStatus),
     updatedAtUnixMs: session.updatedAtUnixMs ?? session.lastEventUnixMs,
     userId: session.userId?.trim() || "local",
     workspaceId: session.workspaceId
@@ -167,6 +170,7 @@ export function projectCoreSessionStatus(status: string): string {
 
 function agentHostSessionStatusFromCore(status: string): string {
   switch (status) {
+    case "active":
     case "created":
     case "queued":
       return "ready";
@@ -179,22 +183,30 @@ function agentHostSessionStatusFromCore(status: string): string {
   }
 }
 
-function agentHostEffectiveStatusFromCore(status: string): string {
-  switch (status) {
-    case "created":
-    case "queued":
-      return "ready";
-    case "running":
-      return "working";
-    case "waiting":
-    case "failed":
-      return status;
-    default:
-      return "idle";
-  }
+function agentActivityDisplayStatusFromSession(
+  session: AgentActivitySession
+): AgentActivityDisplayStatus {
+  return normalizeAgentActivityDisplayStatus(session.status, {
+    currentPhase: session.currentPhase,
+    turnLifecyclePhase: session.turnLifecycle?.phase
+  });
 }
 
-function agentHostLifecycleStatusFromCore(status: string): string {
+function agentHostSessionStatusFromDisplay(
+  status: AgentActivityDisplayStatus
+): string {
+  return status === "idle" ? "ready" : status;
+}
+
+function agentHostEffectiveStatusFromDisplay(
+  status: AgentActivityDisplayStatus
+): string {
+  return status === "idle" ? "ready" : status;
+}
+
+function agentHostLifecycleStatusFromDisplay(
+  status: AgentActivityDisplayStatus
+): string {
   switch (status) {
     case "failed":
       return "failed";
@@ -206,15 +218,14 @@ function agentHostLifecycleStatusFromCore(status: string): string {
   }
 }
 
-function agentHostTurnPhaseFromCore(status: string): string {
+function agentHostTurnPhaseFromDisplay(
+  status: AgentActivityDisplayStatus
+): string {
   switch (status) {
-    case "running":
     case "working":
-      return "working";
     case "waiting":
-      return "waiting";
     case "failed":
-      return "failed";
+      return status;
     default:
       return "idle";
   }

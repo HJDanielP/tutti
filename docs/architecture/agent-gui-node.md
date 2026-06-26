@@ -344,6 +344,14 @@ require a fetch so the controller snapshot remains authoritative. UI code
 should debug both the event payload and the reconcile fetch before treating a
 missing transcript row as a rendering-only bug.
 
+When a session status bug mentions "still processing", "queued", or a disabled
+composer after a turn finishes, inspect the full runtime tuple:
+`status`, `currentPhase`, and `turnLifecycle.phase`. The Agent Activity snapshot
+may carry lifecycle status such as `active` while the visible state is derived
+from `currentPhase` or turn lifecycle. Projection layers that bridge into legacy
+Host DTOs must normalize the tuple together, or `active/idle` and
+`active/working` sessions will render as the wrong conversation state.
+
 ### Message Parsing And Rendering
 
 ```text

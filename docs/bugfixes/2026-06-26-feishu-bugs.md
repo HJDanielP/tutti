@@ -31,3 +31,34 @@
 - Status: fixed locally
 - Commit: pending; final hash recorded in batch summary.
 - Feishu status update: confirmed `已修复待打包`.
+
+## C9Ywrblb9epPvHctNLicN4Z6nJd - completed session still processing
+
+- Link: https://ccn53rwonxso.feishu.cn/record/C9Ywrblb9epPvHctNLicN4Z6nJd
+- Base record id: `recvnkVFkJKczo`
+- Bug: 会话已完成但一直显示“正在规划下一步”，再发消息显示排队中。
+- Evidence: Feishu attachment shows completed tool calls while the transcript still has the processing row and the composer send button remains busy/queued.
+- Cause: Agent Activity snapshot projection mapped legacy Host DTO status from `session.status` alone. Runtime state can report lifecycle `active` with `currentPhase: idle` or `turnLifecycle.phase: settled`; ignoring those fields leaves Agent GUI with stale working/queued state.
+- Fix: Normalize `status`, `currentPhase`, and `turnLifecycle.phase` together when projecting activity-core sessions into Agent GUI Host DTOs.
+- Verification:
+  - `corepack pnpm@10.11.0 --filter @tutti-os/agent-gui test -- shared/agentActivitySnapshotProjection.spec.ts`
+  - `corepack pnpm@10.11.0 check:agent-activity-runtime-boundaries`
+- Status: fixed locally
+- Commit: pending; final hash recorded after commit.
+- Feishu status update: pending.
+
+## CQs9rF6GhekdMAcbDhsc1Q9PnWA - Create App session stops early / command detail empty
+
+- Link: https://ccn53rwonxso.feishu.cn/record/CQs9rF6GhekdMAcbDhsc1Q9PnWA
+- Base record id: `recvnD5oHgq1ot`
+- Bug: 创建应用任务跑到一半自动停止显示完成，点击最后输出的“执行命令”无任何显示。
+- Evidence: Feishu log bundle `tutti-logs-20260626-143851.zip` shows ACP event flow around the issue with `call.failed`, later `session.updated`, and no app crash; app-center snapshot shows the `系统监控` factory job failed validation because no `tutti.app.json` was produced.
+- Cause: Same Agent GUI projection gap as above made runtime lifecycle/phase transitions unreliable in the transcript and composer state. The app factory itself marked the job failed after validation; the user-visible "completed/empty command" symptom came from the conversation state projection.
+- Fix: Same shared status tuple normalization used for the completed-session issue.
+- Verification:
+  - `node /Users/wwcome/.codex/skills/feishu-bug-runner/scripts/feishu_bug_fetcher.mjs analyze /private/tmp/feishu-bug-runner/recvnD5oHgq1ot/tutti-logs-20260626-143851.zip --issue '创建应用 任务 跑到一半 自动停止 显示完成 最后输出 执行命令 无任何显示' --anchor '2026-06-26 14:38:42'`
+  - `corepack pnpm@10.11.0 --filter @tutti-os/agent-gui test -- shared/agentActivitySnapshotProjection.spec.ts`
+  - `corepack pnpm@10.11.0 check:agent-activity-runtime-boundaries`
+- Status: fixed locally
+- Commit: pending; final hash recorded after commit.
+- Feishu status update: pending.
