@@ -7262,6 +7262,8 @@ function createViewModel(
     draftContent,
     isLoadingConversations: false,
     isLoadingMessages: false,
+    isLoadingOlderMessages: false,
+    hasOlderMessages: false,
     isCreatingConversation: false,
     isSubmitting: false,
     isInterrupting: false,
