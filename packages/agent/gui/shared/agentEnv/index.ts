@@ -9,7 +9,10 @@ export type {
   AgentEnvPanelRequest,
   OpenAgentEnvPanelInput
 } from "./agentEnvPanelStore.ts";
-export { resolveAgentErrorPresentation } from "./agentErrorPresentation.ts";
+export {
+  classifyFailedAgentMessage,
+  resolveAgentErrorPresentation
+} from "./agentErrorPresentation.ts";
 export type {
   AgentErrorPresentation,
   AgentRunErrorCode

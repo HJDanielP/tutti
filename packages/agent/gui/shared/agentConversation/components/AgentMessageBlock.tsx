@@ -24,7 +24,10 @@ import { AgentRichTextReadonly } from "../../AgentRichTextReadonly";
 import { resolveAgentConversationLinkAction } from "../actions/agentConversationLinkActions";
 import { workspaceAgentProviderLabel } from "../../workspaceAgentProviderLabel";
 import { openAgentEnvPanel } from "../../agentEnv/agentEnvPanelStore";
-import { resolveAgentErrorPresentation } from "../../agentEnv/agentErrorPresentation";
+import {
+  classifyFailedAgentMessage,
+  resolveAgentErrorPresentation
+} from "../../agentEnv/agentErrorPresentation";
 import type { AgentGUIProviderSkillOption } from "../../../agent-gui/agentGuiNode/model/agentGuiNodeTypes";
 import type {
   AgentMessageContentVM,
@@ -47,6 +50,9 @@ interface AgentMessageBlockProps {
   onLinkAction?: (action: WorkspaceLinkAction) => void;
   thinkingLabel: string;
   onAuthLogin?: (provider?: string | null) => void;
+  // The conversation's provider, so a failed message recovered as an env error
+  // routes its wizard CTA to the right provider.
+  provider?: string | null;
   availableSkills?: readonly AgentGUIProviderSkillOption[];
   workspaceAppIcons?: readonly AgentMessageMarkdownWorkspaceAppIcon[];
   previewMode?: boolean;
@@ -61,6 +67,7 @@ export function AgentMessageBlock({
   onLinkAction,
   thinkingLabel,
   onAuthLogin,
+  provider,
   availableSkills,
   workspaceAppIcons,
   previewMode = false,
@@ -139,6 +146,13 @@ export function AgentMessageBlock({
               label={rawTimelineJsonLabel}
             />
           ) : null;
+        // Recover a structured error card from a failed message that the provider
+        // reported as plain text (e.g. a dropped-login 401), so it still gets the
+        // wizard call-to-action instead of a dead red message.
+        const recoveredError =
+          !isUser && !message.visibleError && message.statusKind === "failed"
+            ? recoverVisibleErrorFromFailedMessage(message, provider)
+            : null;
         const content =
           isUser && message.contentKind === "image-grid" ? (
             <AgentUserImageGrid message={message} />
@@ -154,6 +168,11 @@ export function AgentMessageBlock({
           ) : message.visibleError ? (
             <AgentVisibleErrorMessage
               message={message}
+              onAuthLogin={onAuthLogin}
+            />
+          ) : recoveredError ? (
+            <AgentVisibleErrorMessage
+              message={recoveredError}
               onAuthLogin={onAuthLogin}
             />
           ) : message.systemNotice ? (
@@ -553,6 +572,28 @@ function systemNoticeTitle(message: AgentMessageContentVM): string {
         translate("agentHost.agentGui.systemNoticeDefault")
       );
   }
+}
+
+// Builds a synthetic visibleError from a plain failed message whose text is a
+// recognizable env failure, so it renders as the structured remediation card.
+function recoverVisibleErrorFromFailedMessage(
+  message: AgentMessageContentVM,
+  provider: string | null | undefined
+): AgentMessageContentVM | null {
+  const code = classifyFailedAgentMessage(message.body);
+  if (!code) {
+    return null;
+  }
+  return {
+    ...message,
+    visibleError: {
+      code,
+      phase: null,
+      provider: provider ?? null,
+      detail: message.body,
+      retryable: null
+    }
+  };
 }
 
 function AgentVisibleErrorMessage({

@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { resolveAgentErrorPresentation } from "./agentErrorPresentation";
+import {
+  classifyFailedAgentMessage,
+  resolveAgentErrorPresentation
+} from "./agentErrorPresentation";
+
+describe("classifyFailedAgentMessage", () => {
+  it("recovers auth from a plain Claude 401 message", () => {
+    expect(
+      classifyFailedAgentMessage(
+        "Failed to authenticate. API Error: 401 Invalid authentication credentials"
+      )
+    ).toBe("auth_required");
+  });
+
+  it("recovers cli/version/network codes from text", () => {
+    expect(classifyFailedAgentMessage("spawn codex ENOENT")).toBe(
+      "cli_not_found"
+    );
+    expect(
+      classifyFailedAgentMessage("codex-acp requires a newer version of codex")
+    ).toBe("cli_version_unsupported");
+    expect(
+      classifyFailedAgentMessage("getaddrinfo ENOTFOUND api.anthropic.com")
+    ).toBe("network_error");
+  });
+
+  it("returns null for transient / non-env failures so they stay plain", () => {
+    expect(classifyFailedAgentMessage("rate limit exceeded")).toBeNull();
+    expect(classifyFailedAgentMessage("request timed out")).toBeNull();
+    expect(classifyFailedAgentMessage("here is your answer")).toBeNull();
+    expect(classifyFailedAgentMessage(null)).toBeNull();
+  });
+});
 
 describe("resolveAgentErrorPresentation", () => {
   it("routes env-fixable failures to the matching wizard step", () => {

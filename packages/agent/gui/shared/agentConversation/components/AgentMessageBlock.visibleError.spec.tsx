@@ -34,15 +34,38 @@ function buildRow(
   };
 }
 
-function renderBlock(row: AgentMessageRowVM) {
+function renderBlock(row: AgentMessageRowVM, provider?: string) {
   return render(
     <AgentMessageBlock
       workspaceRoot={null}
       basePath="/"
       row={row}
+      provider={provider}
       thinkingLabel="thinking"
     />
   );
+}
+
+function buildFailedTextRow(body: string): AgentMessageRowVM {
+  return {
+    kind: "message",
+    id: "row-1",
+    turnId: "turn-1",
+    speaker: "assistant",
+    occurredAtUnixMs: 0,
+    thinking: [],
+    messages: [
+      {
+        kind: "message-content",
+        id: "msg-1",
+        turnId: "turn-1",
+        body,
+        statusKind: "failed",
+        occurredAtUnixMs: 0,
+        visibleError: null
+      }
+    ]
+  };
 }
 
 afterEach(() => {
@@ -136,6 +159,36 @@ describe("AgentVisibleErrorMessage", () => {
     // No env-panel call-to-action — the wizard cannot fix a transient timeout.
     expect(queryByText("Set up")).toBeNull();
     expect(queryByText("Open setup")).toBeNull();
+    expect(queryByText("Sign in")).toBeNull();
+  });
+
+  it("recovers a failed plain auth message into the wizard card (Claude 401)", () => {
+    const { getByText, getAllByRole } = renderBlock(
+      buildFailedTextRow(
+        "Failed to authenticate. API Error: 401 Invalid authentication credentials"
+      ),
+      "claude-code"
+    );
+    // Rendered as the structured card (not dead red text), routing to the wizard.
+    expect(
+      getByText("Claude Code needs authentication or configuration")
+    ).toBeTruthy();
+    const action = getAllByRole("button").find(
+      (button) => button.textContent === "Sign in"
+    );
+    expect(action).toBeTruthy();
+    fireEvent.click(action as HTMLButtonElement);
+    const store = getAgentEnvPanelStore();
+    expect(store.open).toBe(true);
+    expect(store.provider).toBe("claude-code");
+    expect(store.focus).toBe("auth");
+  });
+
+  it("leaves a non-env failed message as plain text (no card)", () => {
+    const { queryByText } = renderBlock(
+      buildFailedTextRow("rate limit exceeded, try again later"),
+      "codex"
+    );
     expect(queryByText("Sign in")).toBeNull();
   });
 });

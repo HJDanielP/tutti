@@ -118,3 +118,60 @@ export function resolveAgentErrorPresentation(
   }
   return PRESENTATIONS[code as AgentRunErrorCode] ?? null;
 }
+
+const FAILED_MESSAGE_CODE_MARKERS: ReadonlyArray<
+  readonly [AgentRunErrorCode, readonly string[]]
+> = [
+  [
+    "auth_required",
+    [
+      "authentication_failed",
+      "invalid authentication credentials",
+      "401 invalid authentication",
+      "unauthorized",
+      "not logged in",
+      "please run /login",
+      "invalid api key"
+    ]
+  ],
+  [
+    "cli_version_unsupported",
+    ["requires a newer version", "version is too old", "unsupported version"]
+  ],
+  [
+    "cli_not_found",
+    [
+      "no such file or directory",
+      "command not found",
+      "enoent",
+      "executable file not found"
+    ]
+  ],
+  [
+    "network_error",
+    ["enotfound", "econnrefused", "econnreset", "getaddrinfo", "socket hang up"]
+  ]
+];
+
+/**
+ * Some providers (notably Claude Code) report an environment failure — e.g. a
+ * dropped login (401) — as a plain failed assistant message rather than a
+ * structured visibleError, so it never gets the remediation card. This recovers
+ * the env-fixable code from that message's text so the caller can still route the
+ * user to the wizard. Returns null when the text isn't a recognized env failure
+ * (so transient/unknown failures stay plain).
+ */
+export function classifyFailedAgentMessage(
+  body: string | null | undefined
+): AgentRunErrorCode | null {
+  if (!body) {
+    return null;
+  }
+  const lower = body.toLowerCase();
+  for (const [code, markers] of FAILED_MESSAGE_CODE_MARKERS) {
+    if (markers.some((marker) => lower.includes(marker))) {
+      return code;
+    }
+  }
+  return null;
+}

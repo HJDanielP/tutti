@@ -256,12 +256,12 @@ export function AgentEnvPanel({
   const open = request.open;
   const providerLabel = resolveProviderLabel(provider);
 
-  // Opening the panel neither re-probes nor replays the step animation: it
-  // reuses the already-loaded snapshot (`ensureLoaded`, the dock loads it) and
-  // parks the reveal cursor past the end so every known step shows at once. A
-  // real re-detect — which DOES animate from step 1 — happens only when the user
-  // asks: the "重新检测" footer button (handleRedetect) or opening via the dock's
-  // re-detect action (focus "detect").
+  // What an open does depends on how it was opened:
+  // - "detect" (re-detect): re-probe AND replay the step animation from step 1.
+  // - any other focus (auth/install/repair/upgrade/network — i.e. opened FROM an
+  //   error or remediation CTA): re-probe so the wizard reflects the real problem
+  //   (and can auto-remediate), but show steps at once without the walk-through.
+  // - no focus (casual "智能体环境" open): reuse the cached snapshot, don't re-probe.
   useEffect(() => {
     if (!open) {
       return;
@@ -269,11 +269,10 @@ export function AgentEnvPanel({
     setCopied(false);
     setLogExpanded(false);
     setReportState("idle");
-    if (request.focus === "detect") {
-      setRevealIndex(0);
+    setRevealIndex(request.focus === "detect" ? 0 : REVEAL_ALL);
+    if (request.focus) {
       void agentProviderStatusService.refresh([provider]);
     } else {
-      setRevealIndex(REVEAL_ALL);
       void agentProviderStatusService.ensureLoaded({ providers: [provider] });
     }
   }, [
