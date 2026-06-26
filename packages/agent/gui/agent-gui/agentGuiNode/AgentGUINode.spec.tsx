@@ -7265,6 +7265,7 @@ function createViewModel(
     isCreatingConversation: false,
     isSubmitting: false,
     isInterrupting: false,
+    isCancelPending: false,
     isRespondingApproval: false,
     promptImagesSupported: true,
     compactSupported: null,

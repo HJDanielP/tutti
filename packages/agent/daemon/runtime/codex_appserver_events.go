@@ -63,14 +63,14 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 		// Record the provider turn id (needed for turn/interrupt and
 		// turn/steer) only while a turn context is registered, so stray
 		// turns (for example compaction) cannot block future prompts.
-		if a.sessionActiveTurn(session.AgentSessionID) != nil {
+		if activeTurn := a.sessionActiveTurn(session.AgentSessionID); activeTurn != nil {
 			if turn := payloadObject(params["turn"]); turn != nil {
 				providerTurnID := asString(turn["id"])
 				if a.setSessionActiveTurnID(session.AgentSessionID, providerTurnID) {
 					a.interruptActiveTurnAsync(&codexAppServerSession{
 						client:   client,
 						threadID: firstNonEmpty(asString(params["threadId"]), session.ProviderSessionID),
-					}, session, providerTurnID, "queued cancel")
+					}, session, activeTurn, providerTurnID, "queued cancel")
 				}
 			}
 		}

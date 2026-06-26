@@ -143,6 +143,7 @@ import {
 } from "../../../contexts/workspace/presentation/renderer/agentGuiConversationList/agentGuiConversationListStore";
 import { useAgentGuiConversationList } from "../../../contexts/workspace/presentation/renderer/agentGuiConversationList/useAgentGuiConversationList";
 import { useAgentGUIActivation } from "./useAgentGUIActivation";
+import { pendingInterruptActionForDisplayStatus } from "./pendingInterrupt";
 import {
   formatAgentMentionMarkdown,
   normalizeAgentSessionMentionTitle
@@ -679,6 +680,26 @@ function isSessionNotFoundErrorCode(
   code: AppErrorCode | null | undefined
 ): boolean {
   return code === AGENT_SESSION_NOT_FOUND_ERROR;
+}
+
+const WORKSPACE_AGENT_SESSION_NOT_READY_REASON =
+  "workspace_agent_session_not_found";
+
+// True when a cancel raced session startup: the workspace agent session is not
+// registered in the runtime yet (its thread/start is still in flight), so the
+// daemon reports "workspace agent session not found". This is transient — the
+// session is connecting — so it must not surface as a hard error.
+function isAgentSessionNotReadyError(error: unknown): boolean {
+  if (error && typeof error === "object") {
+    const reason = (error as { reason?: unknown }).reason;
+    if (reason === WORKSPACE_AGENT_SESSION_NOT_READY_REASON) {
+      return true;
+    }
+  }
+  return (
+    getAgentGUIRawErrorMessage(error)?.trim() ===
+    "workspace agent session not found"
+  );
 }
 
 function isSettingsRequireNewSessionErrorCode(
@@ -2678,6 +2699,11 @@ export function useAgentGUINodeController({
     setQueuedPromptRetryBlockBySessionId
   ] = useState<Record<string, QueuedPromptRetryBlock | null>>({});
   const [interruptingSessionIds, setInterruptingSessionIds] = useState<
+    Record<string, boolean>
+  >({});
+  // Sessions whose cancel raced startup; the interrupt is retried once the
+  // session connects and its turn goes live.
+  const [pendingInterruptSessionIds, setPendingInterruptSessionIds] = useState<
     Record<string, boolean>
   >({});
   const [
@@ -6446,25 +6472,37 @@ export function useAgentGUINodeController({
           void syncConversationListProjection(agentSessionId);
         })
         .catch((error) => {
-          if (isCurrentConversation(agentSessionId)) {
-            reportAgentGUIRuntimeError({
-              agentSessionId,
-              error,
-              phase: "interrupt_current_turn",
-              provider: dataRef.current.provider,
-              runtime: agentActivityRuntime,
-              workspaceId
-            });
-            setSuppressedPromptRequestIdsBySessionId((current) => {
-              if (current[agentSessionId] !== activePendingPrompt?.requestId) {
-                return current;
-              }
-              const next = { ...current };
-              delete next[agentSessionId];
-              return next;
-            });
-            setDetailError(getAgentGUIErrorMessage(error));
+          if (!isCurrentConversation(agentSessionId)) {
+            return;
           }
+          if (isAgentSessionNotReadyError(error)) {
+            // The session is still connecting (its thread/start is in flight),
+            // so there is no live turn to interrupt yet. Arm a retry for when
+            // the turn goes live and suppress the transient "session not found"
+            // banner instead of surfacing it as a hard error.
+            setPendingInterruptSessionIds((current) => ({
+              ...current,
+              [agentSessionId]: true
+            }));
+            return;
+          }
+          reportAgentGUIRuntimeError({
+            agentSessionId,
+            error,
+            phase: "interrupt_current_turn",
+            provider: dataRef.current.provider,
+            runtime: agentActivityRuntime,
+            workspaceId
+          });
+          setSuppressedPromptRequestIdsBySessionId((current) => {
+            if (current[agentSessionId] !== activePendingPrompt?.requestId) {
+              return current;
+            }
+            const next = { ...current };
+            delete next[agentSessionId];
+            return next;
+          });
+          setDetailError(getAgentGUIErrorMessage(error));
         })
         .finally(() => {
           setInterruptingSessionIds((current) => {
@@ -6490,6 +6528,51 @@ export function useAgentGUINodeController({
       agentActivityRuntime
     ]
   );
+
+  // A deferred cancel (armed when a cancel raced session startup) applies only
+  // to that startup turn. Fire it once the turn goes live; drop it once the
+  // session settles without a live turn, so it can never interrupt a later,
+  // unrelated turn in the same session.
+  useEffect(() => {
+    const agentSessionId = activeConversationId;
+    if (!agentSessionId || !pendingInterruptSessionIds[agentSessionId]) {
+      return;
+    }
+    const status = agentActivityDisplayStatuses.get(agentSessionId) ?? null;
+    const action = pendingInterruptActionForDisplayStatus(status);
+    if (action === "wait") {
+      return;
+    }
+    setPendingInterruptSessionIds((current) => {
+      if (!current[agentSessionId]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[agentSessionId];
+      return next;
+    });
+    if (action === "fire") {
+      interruptCurrentTurn("");
+    }
+  }, [
+    activeConversationId,
+    agentActivityDisplayStatuses,
+    pendingInterruptSessionIds,
+    interruptCurrentTurn
+  ]);
+
+  // Abandon a deferred cancel when the user switches away from its session, so
+  // it cannot fire against a different conversation later.
+  useEffect(() => {
+    const activeId = activeConversationId;
+    setPendingInterruptSessionIds((current) => {
+      const ids = Object.keys(current);
+      if (ids.length === 0 || (ids.length === 1 && ids[0] === activeId)) {
+        return current;
+      }
+      return activeId && current[activeId] ? { [activeId]: true } : {};
+    });
+  }, [activeConversationId]);
 
   const updateDraftContent = useCallback((draftContent: AgentComposerDraft) => {
     const agentSessionId = activeConversationIdRef.current;
@@ -8050,6 +8133,11 @@ export function useAgentGUINodeController({
   const isInterrupting =
     activeConversationId !== null &&
     Boolean(interruptingSessionIds[activeConversationId]);
+  // A cancel was requested but raced session startup; it will fire once the
+  // session connects. Surfaced so the connecting indicator can read "cancelling".
+  const isCancelPending =
+    activeConversationId !== null &&
+    Boolean(pendingInterruptSessionIds[activeConversationId]);
   const queuedPrompts = useMemo(
     () =>
       activeConversationId !== null
@@ -8546,6 +8634,7 @@ export function useAgentGUINodeController({
         isCreatingConversation,
         isSubmitting,
         isInterrupting,
+        isCancelPending,
         isRespondingApproval,
         promptImagesSupported,
         compactSupported,
@@ -8608,6 +8697,7 @@ export function useAgentGUINodeController({
       usageAlert,
       dismissUsageAlert,
       isInterrupting,
+      isCancelPending,
       isLoadingConversations,
       isLoadingMessages,
       isRespondingApproval,
