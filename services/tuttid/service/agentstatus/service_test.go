@@ -891,6 +891,34 @@ func TestServiceRunCodexCLILatestInstallerDownloadsLatestAssets(t *testing.T) {
 	}
 }
 
+func TestServiceDownloadFileRetriesRetryableStatus(t *testing.T) {
+	var attempts atomic.Int32
+	installerServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		if attempts.Add(1) < 3 {
+			http.Error(writer, "try again", http.StatusInternalServerError)
+			return
+		}
+		_, _ = writer.Write([]byte("downloaded"))
+	}))
+	defer installerServer.Close()
+
+	service := Service{HTTPClient: installerServer.Client()}
+	destinationPath := filepath.Join(t.TempDir(), "asset.txt")
+	if err := service.downloadFile(context.Background(), installerServer.URL+"/asset.txt", destinationPath); err != nil {
+		t.Fatalf("downloadFile() error = %v", err)
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("attempts = %d, want 3", attempts.Load())
+	}
+	content, err := os.ReadFile(destinationPath)
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+	if string(content) != "downloaded" {
+		t.Fatalf("downloaded content = %q, want downloaded", string(content))
+	}
+}
+
 func TestServiceRunActionReportsInstallCommandFailures(t *testing.T) {
 	home := t.TempDir()
 	service := probeTestService(home)
