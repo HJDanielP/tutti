@@ -162,9 +162,9 @@
 [data-testid="workspace-agent-message-center"] {
   --agent-gui-package-accent: var(--accent-codex);
   --agent-gui-package-accent-strong: var(--accent-codex);
-  --agent-gui-package-success: rgb(34 197 94);
-  --agent-gui-package-warning: rgb(234 121 8);
-  --agent-gui-package-danger: rgb(220 38 38);
+  --agent-gui-package-success: var(--state-success);
+  --agent-gui-package-warning: var(--state-warning);
+  --agent-gui-package-danger: var(--state-danger);
   --agent-gui-accent: var(--agent-gui-package-accent);
   --agent-gui-accent-strong: var(--agent-gui-package-accent-strong);
   --agent-gui-success: var(--agent-gui-package-success);
@@ -3808,9 +3808,9 @@ aside.workspace-agents-status-panel
     var(--agent-gui-package-accent) 12%
   );
   --agent-gui-package-border-focus: var(--accent-codex-border);
-  --agent-gui-package-success: rgb(34 197 94);
-  --agent-gui-package-warning: rgb(234 121 8);
-  --agent-gui-package-danger: rgb(220 38 38);
+  --agent-gui-package-success: var(--state-success);
+  --agent-gui-package-warning: var(--state-warning);
+  --agent-gui-package-danger: var(--state-danger);
   --agent-gui-accent: var(--agent-gui-package-accent);
   --agent-gui-accent-strong: var(--agent-gui-package-accent-strong);
   --agent-gui-accent-bg: var(--agent-gui-package-accent-bg);
@@ -5486,46 +5486,18 @@ button.agent-gui-node__conversation-section-toggle:hover
 
 .agent-gui-node__provider-setup-notice {
   position: absolute;
-  top: 16px;
-  right: var(--agent-gui-detail-padding-x);
+  top: 8px;
   left: var(--agent-gui-detail-padding-x);
   z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   box-sizing: border-box;
+  width: max-content;
+  max-width: min(calc(100% - (var(--agent-gui-detail-padding-x) * 2)), 420px);
   margin: 0;
-  border: 1px solid
-    color-mix(
-      in srgb,
-      var(--agent-gui-warning, var(--state-warning)) 26%,
-      transparent
-    );
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: var(--agent-gui-warning, var(--state-warning));
-  background: color-mix(
-    in srgb,
-    var(--agent-gui-warning, var(--state-warning)) 9%,
-    transparent
-  );
-  font-size: 13px;
-  line-height: 18px;
   pointer-events: auto;
 }
 
 .agent-gui-node__detail-header + .agent-gui-node__provider-setup-notice {
-  top: calc(64px + 8px);
-}
-
-.agent-gui-node__provider-setup-notice-icon {
-  flex: 0 0 auto;
-  color: currentColor;
-}
-
-.agent-gui-node__provider-setup-notice-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  top: calc(64px + 4px);
 }
 
 .agent-gui-node__layout [data-slot="status-dot"],
@@ -5573,25 +5545,25 @@ button.agent-gui-node__conversation-section-toggle:hover
 .agent-gui-node__layout [data-slot="status-dot"][data-tone="green"],
 [data-testid="workspace-agent-message-center"]
   [data-slot="status-dot"][data-tone="green"] {
-  --agent-gui-status-dot-color: var(--agent-gui-success, var(--state-success));
+  --agent-gui-status-dot-color: var(--state-success);
 }
 
 .agent-gui-node__layout [data-slot="status-dot"][data-tone="blue"],
 [data-testid="workspace-agent-message-center"]
   [data-slot="status-dot"][data-tone="blue"] {
-  --agent-gui-status-dot-color: var(--agent-gui-accent);
+  --agent-gui-status-dot-color: var(--status-running);
 }
 
 .agent-gui-node__layout [data-slot="status-dot"][data-tone="amber"],
 [data-testid="workspace-agent-message-center"]
   [data-slot="status-dot"][data-tone="amber"] {
-  --agent-gui-status-dot-color: var(--agent-gui-warning, var(--state-warning));
+  --agent-gui-status-dot-color: var(--state-warning);
 }
 
 .agent-gui-node__layout [data-slot="status-dot"][data-tone="red"],
 [data-testid="workspace-agent-message-center"]
   [data-slot="status-dot"][data-tone="red"] {
-  --agent-gui-status-dot-color: var(--agent-gui-danger, var(--state-danger));
+  --agent-gui-status-dot-color: var(--state-danger);
 }
 
 .agent-gui-node__layout [data-slot="status-dot"][data-pulse="true"],
@@ -6821,9 +6793,9 @@ html[data-theme="light"] [data-message-center-item-id].agent-gui-edge-glow {
   --agent-gui-border-subtle: var(--line-2);
   --agent-gui-package-accent: var(--tutti-purple);
   --agent-gui-package-accent-strong: var(--tutti-purple);
-  --agent-gui-package-success: rgb(34 197 94);
-  --agent-gui-package-warning: rgb(234 121 8);
-  --agent-gui-package-danger: rgb(220 38 38);
+  --agent-gui-package-success: var(--state-success);
+  --agent-gui-package-warning: var(--state-warning);
+  --agent-gui-package-danger: var(--state-danger);
   --agent-gui-accent: var(--agent-gui-package-accent);
   --agent-gui-accent-strong: var(--agent-gui-package-accent-strong);
   --agent-gui-success: var(--agent-gui-package-success);

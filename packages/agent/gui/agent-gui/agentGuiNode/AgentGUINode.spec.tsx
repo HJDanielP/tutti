@@ -2543,6 +2543,29 @@ describe("AgentGUINode", () => {
     expect(screen.queryByTestId("agent-gui-composer-send-spinner")).toBeNull();
   });
 
+  it("keeps the composer ready while managed agent install state is still loading", () => {
+    mockViewModel = createViewModel({
+      data: {
+        provider: "codex",
+        lastActiveAgentSessionId: null,
+        conversationRailWidthPx: null
+      },
+      activeConversationId: "session-1",
+      draftPrompt: "@请处理这个任务引用。",
+      canQueueWhileBusy: true
+    });
+
+    renderAgentGUINode({
+      managedAgentsState: null
+    });
+
+    expect(getComposerEditor()).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByTestId("agent-gui-provider-setup-notice")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "agentHost.agentGui.send" })
+    ).not.toBeDisabled();
+  });
+
   it("shows a provider setup notice while keeping the disabled composer reason on the input placeholder", () => {
     mockViewModel = createViewModel({
       data: {

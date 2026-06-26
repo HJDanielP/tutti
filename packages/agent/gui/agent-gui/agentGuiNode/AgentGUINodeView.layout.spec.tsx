@@ -1364,6 +1364,7 @@ describe("AgentGUINodeView provider setup notice", () => {
     const notice = screen.getByTestId("agent-gui-provider-setup-notice");
     expect(notice).toHaveTextContent("installRequiredPlaceholder");
     expect(notice).toHaveAttribute("role", "status");
+    expect(notice).toHaveAttribute("data-slot", "toast");
   });
 
   it("floats the setup notice above the detail content without affecting layout", () => {
@@ -1373,12 +1374,21 @@ describe("AgentGUINodeView provider setup notice", () => {
     )?.[0];
 
     expect(setupNoticeRule).toContain("position: absolute;");
-    expect(setupNoticeRule).toContain("top: 16px;");
+    expect(setupNoticeRule).toContain("top: 8px;");
+    expect(setupNoticeRule).toContain(
+      "left: var(--agent-gui-detail-padding-x);"
+    );
     expect(setupNoticeRule).toContain("z-index: 2;");
+    expect(setupNoticeRule).toContain("width: max-content;");
+    expect(setupNoticeRule).toMatch(
+      /max-width:\s*min\(\s*calc\(100% - \(var\(--agent-gui-detail-padding-x\) \* 2\)\),\s*420px\s*\);/s
+    );
     expect(setupNoticeRule).toContain("margin: 0;");
+    expect(setupNoticeRule).not.toContain("background:");
     expect(css).toContain(
       ".agent-gui-node__detail-header + .agent-gui-node__provider-setup-notice"
     );
+    expect(css).toContain("top: calc(64px + 4px);");
   });
 
   it("hides the setup notice when the provider is ready", () => {

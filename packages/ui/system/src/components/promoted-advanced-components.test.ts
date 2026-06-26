@@ -74,6 +74,14 @@ test("promoted advanced primitive sources preserve their core interaction contra
   const statusDotSource = readComponentSource("status-dot.tsx");
   assert.match(statusDotSource, /data-tone=/);
   assert.match(statusDotSource, /data-size=/);
+  assert.match(statusDotSource, /bg-\[var\(--status-running\)\]/);
+  assert.match(statusDotSource, /bg-\[var\(--state-warning\)\]/);
+  assert.match(statusDotSource, /bg-\[var\(--state-danger\)\]/);
+  assert.match(statusDotSource, /bg-\[var\(--state-success\)\]/);
+  assert.doesNotMatch(statusDotSource, /bg-blue-/);
+  assert.doesNotMatch(statusDotSource, /bg-amber-/);
+  assert.doesNotMatch(statusDotSource, /bg-destructive/);
+  assert.doesNotMatch(statusDotSource, /bg-emerald-500/);
 
   const viewportMenuSurfaceSource = readComponentSource(
     "viewport-menu-surface.tsx"
