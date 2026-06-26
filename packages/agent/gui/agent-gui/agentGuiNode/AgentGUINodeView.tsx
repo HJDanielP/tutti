@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
   NewWorkspaceLinedIcon,
   ConfirmationDialog,
+  toastVariants,
   cn
 } from "@tutti-os/ui-system";
 import { WorkspaceUserProjectSelect } from "@tutti-os/workspace-user-project/ui";
@@ -2323,18 +2324,18 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       />
       {showProviderSetupNotice ? (
         <div
-          className={styles.providerSetupNotice}
+          className={cn(
+            toastVariants({ variant: "default" }),
+            styles.providerSetupNotice
+          )}
+          data-slot="toast"
           data-testid="agent-gui-provider-setup-notice"
           role="status"
         >
-          <Info
-            aria-hidden="true"
-            className={styles.providerSetupNoticeIcon}
-            size={15}
-            strokeWidth={2}
-          />
-          <span className={styles.providerSetupNoticeText}>
-            {labels.installRequiredPlaceholder}
+          <span className="inline-flex max-w-full items-center justify-center gap-[6px] text-center text-[13px] font-normal leading-normal">
+            <span className="min-w-0 break-words">
+              {labels.installRequiredPlaceholder}
+            </span>
           </span>
         </div>
       ) : null}

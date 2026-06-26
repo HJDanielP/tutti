@@ -94,8 +94,6 @@ const styles = {
   usageAlertActions: "agent-gui-node__usage-alert-actions",
   usageAlertDismiss: "agent-gui-node__usage-alert-dismiss",
   providerSetupNotice: "agent-gui-node__provider-setup-notice",
-  providerSetupNoticeIcon: "agent-gui-node__provider-setup-notice-icon",
-  providerSetupNoticeText: "agent-gui-node__provider-setup-notice-text",
   detailHeaderTitle: "agent-gui-node__detail-header-title",
   detailHeaderTitleGroup: "agent-gui-node__detail-header-title-group",
   detail: "agent-gui-node__detail",

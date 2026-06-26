@@ -223,7 +223,9 @@ test("Chinese language contexts use the CJK font stack and medium weights", () =
   );
   assert.match(themeSource, /--state-warning:\s*rgb\(234 121 8\)/);
   assert.match(themeSource, /--state-warning:\s*rgb\(251 146 60\)/);
+  assert.match(themeSource, /--state-danger:\s*rgb\(244 91 91\)/);
   assert.match(themeSource, /--on-danger:\s*rgb\(220 38 38 \/ 8%\)/);
+  assert.match(themeSource, /--on-danger:\s*rgb\(248 113 113 \/ 10%\)/);
   assert.match(baseSource, /:lang\(zh\)/);
   assert.match(baseSource, /--font-sans-system:\s*var\(--font-sans-cjk\)/);
   assert.match(baseSource, /--font-sans:\s*var\(--font-sans-cjk\)/);
