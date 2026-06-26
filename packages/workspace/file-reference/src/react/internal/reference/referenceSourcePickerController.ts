@@ -668,6 +668,11 @@ export function createReferenceSourcePickerController(
       };
       for (const ref of refs) {
         const targetKey = nodeRefKey(ref);
+        const parentKey =
+          parent.nodeId === SOURCE_ROOT_NODE_ID
+            ? ROOT_CHILDREN_KEY
+            : nodeRefKey(parent);
+        let locatedEntries: ReferenceNode[] = [];
         let cursor: string | null = null;
         let node: ReferenceNode | undefined;
         do {
@@ -676,9 +681,22 @@ export function createReferenceSourcePickerController(
             parent,
             { cursor }
           );
+          locatedEntries = appendReferencePage(locatedEntries, entries);
           node = entries.find((entry) => nodeRefKey(entry.ref) === targetKey);
           cursor = nextCursor ?? null;
         } while (!node && cursor);
+        if (locatedEntries.length > 0) {
+          const current =
+            snapshot.bySource[parent.sourceId]?.childrenByKey[parentKey]
+              ?.entries ?? [];
+          setChildrenState(parent.sourceId, parentKey, {
+            entries: appendReferencePage(current, locatedEntries),
+            nextCursor: cursor,
+            loaded: true,
+            loading: false,
+            error: null
+          });
+        }
         if (!node) {
           break;
         }

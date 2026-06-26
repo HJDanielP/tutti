@@ -923,6 +923,76 @@ test("locatePath follows pagination while resolving the target path", async () =
   );
 });
 
+test("locatePath keeps paged parent children so the located target can render", async () => {
+  const controller = createReferenceSourcePickerController({
+    aggregator: {
+      ...fakeAggregator({
+        tabs: tabsTwo,
+        children: {
+          [`app-artifact:${SOURCE_ROOT_NODE_ID}`]: {
+            entries: [folder("app-artifact", "topic-1", "主题一")],
+            nextCursor: null
+          },
+          "app-artifact:topic-1": {
+            entries: [folder("app-artifact", "issue-old", "旧事项")],
+            nextCursor: "page-2"
+          }
+        },
+        locate: {
+          "app-artifact": [
+            { sourceId: "app-artifact", nodeId: "topic-1" },
+            { sourceId: "app-artifact", nodeId: "issue-target" }
+          ]
+        }
+      }),
+      async listChildren(_scope, ref, input): Promise<ListChildrenResult> {
+        if (ref.sourceId === "app-artifact" && ref.nodeId === "topic-1") {
+          return input?.cursor === "page-2"
+            ? {
+                entries: [folder("app-artifact", "issue-target", "目标事项")],
+                nextCursor: null
+              }
+            : {
+                entries: [folder("app-artifact", "issue-old", "旧事项")],
+                nextCursor: "page-2"
+              };
+        }
+        return fakeAggregator({
+          tabs: tabsTwo,
+          children: {
+            [`app-artifact:${SOURCE_ROOT_NODE_ID}`]: {
+              entries: [folder("app-artifact", "topic-1", "主题一")],
+              nextCursor: null
+            }
+          }
+        }).listChildren(_scope, ref, input);
+      }
+    },
+    scope,
+    searchDebounceMs: 0
+  });
+  controller.open();
+  await flush();
+
+  await controller.locatePath({
+    sourceId: "app-artifact",
+    params: { issueId: "issue-target", topicId: "topic-1" }
+  });
+
+  const topicKey = nodeRefKey({
+    sourceId: "app-artifact",
+    nodeId: "topic-1"
+  });
+  assert.deepEqual(
+    controller
+      .getSnapshot()
+      .bySource["app-artifact"]?.childrenByKey[topicKey]?.entries.map(
+        (node) => node.ref.nodeId
+      ),
+    ["issue-old", "issue-target"]
+  );
+});
+
 test("locatePath 源不支持定位 / 未找到时返回空路径", async () => {
   const controller = createReferenceSourcePickerController({
     aggregator: fakeAggregator({ tabs: tabsTwo, children: {} }),
