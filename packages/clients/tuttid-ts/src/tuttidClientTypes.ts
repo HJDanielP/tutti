@@ -126,7 +126,7 @@ export type TuttidTrackEventsRequest = TrackEventsRequest;
 export interface TuttidClient {
   listCliCapabilities(
     workspaceID?: string,
-    options?: { includeHidden?: boolean }
+    options?: { includeHidden?: boolean; includeIntegration?: boolean }
   ): Promise<CliCapabilitiesResponse>;
   listWorkspaceAppMentionCandidates(
     workspaceID: string
