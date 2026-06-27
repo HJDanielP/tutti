@@ -310,6 +310,31 @@ func TestProjectMessageUpdatePreservesExistingTurnWhenUpdateOmitsIt(t *testing.T
 	}
 }
 
+func TestProjectMessageUpdateRejectsExistingMessageTurnChange(t *testing.T) {
+	existing := MessageSnapshot{
+		ID:               7,
+		AgentSessionID:   "session-1",
+		MessageID:        "message-1",
+		Version:          1,
+		TurnID:           "turn-1",
+		Role:             "assistant",
+		Kind:             "text",
+		Payload:          map[string]any{"text": "hello"},
+		OccurredAtUnixMS: 120,
+		CreatedAtUnixMS:  100,
+		UpdatedAtUnixMS:  100,
+	}
+	message, ok := ProjectMessageUpdate(existing, true, MessageUpdate{
+		MessageID: "message-1",
+		TurnID:    "turn-2",
+		Status:    "completed",
+	}, 2, 160)
+
+	if ok {
+		t.Fatalf("ok = true with message %#v, want false", message)
+	}
+}
+
 func TestCanonicalSessionStatus(t *testing.T) {
 	tests := []struct {
 		name      string

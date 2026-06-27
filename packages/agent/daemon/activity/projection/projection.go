@@ -211,6 +211,8 @@ func ProjectMessageUpdate(
 		message.CreatedAtUnixMS = existing.CreatedAtUnixMS
 		if message.TurnID == "" {
 			message.TurnID = existing.TurnID
+		} else if existingTurnID := strings.TrimSpace(existing.TurnID); existingTurnID != "" && message.TurnID != existingTurnID {
+			return MessageSnapshot{}, false
 		}
 		if message.Role == "" {
 			message.Role = existing.Role
