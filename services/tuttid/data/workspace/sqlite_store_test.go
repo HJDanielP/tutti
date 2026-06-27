@@ -429,6 +429,7 @@ func TestSQLiteStoreListsWorkspaceGeneratedFiles(t *testing.T) {
 				Kind:      "tool_call",
 				Status:    "completed",
 				Payload: map[string]any{
+					"toolName": "Write",
 					"fileChanges": map[string]any{
 						"files": []any{
 							map[string]any{"path": "report.md"},
@@ -596,8 +597,14 @@ func TestSQLiteStoreListWorkspaceGeneratedFilesIgnoresFailedAndReadTools(t *test
 				Status:    "completed",
 				Payload: map[string]any{
 					"toolName": "Bash",
+					"fileChanges": map[string]any{
+						"files": []any{
+							map[string]any{"path": "read-filechanges.md"},
+						},
+					},
 					"input": map[string]any{
 						"command":   "nl -ba readme.md",
+						"changes":   map[string]any{"read-input-changes.md": "read"},
 						"file_path": "readme.md",
 					},
 					"output": map[string]any{

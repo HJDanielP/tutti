@@ -1837,9 +1837,17 @@ describe("buildWorkspaceAgentActivityListViewModel", () => {
             messageId: "message-1",
             payload: {
               callType: "tool",
+              fileChanges: {
+                files: [
+                  { path: "/Users/demo/project/apps/read-filechanges.md" }
+                ]
+              },
               input: {
                 command: "nl -ba 11.md",
                 cwd: "/Users/demo/project/apps",
+                changes: {
+                  "/Users/demo/project/apps/read-input-changes.md": "read"
+                },
                 file_path: "/Users/demo/project/apps/11.md"
               },
               locations: [{ path: "/Users/demo/project/apps/11.md" }],

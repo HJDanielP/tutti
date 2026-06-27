@@ -174,7 +174,7 @@ func generatedFileStatusAllows(status string) bool {
 
 func hasGeneratedFileChangeSignal(payload map[string]any) bool {
 	for _, record := range generatedFileSignalRecords(payload) {
-		if recordHasGeneratedFileChangeSignal(record) {
+		if recordHasGeneratedFileToolSignal(record) {
 			return true
 		}
 	}
@@ -200,20 +200,9 @@ func generatedFileSignalRecords(payload map[string]any) []map[string]any {
 	return records
 }
 
-func recordHasGeneratedFileChangeSignal(record map[string]any) bool {
+func recordHasGeneratedFileToolSignal(record map[string]any) bool {
 	if record == nil {
 		return false
-	}
-	if fileChanges, ok := objectField(record, "fileChanges"); ok {
-		if files, ok := fileChanges["files"].([]any); ok && len(files) > 0 {
-			return true
-		}
-	}
-	if changes, ok := objectField(record, "changes"); ok && len(changes) > 0 {
-		return true
-	}
-	if changes, ok := record["changes"].([]any); ok && len(changes) > 0 {
-		return true
 	}
 	if activityKind, ok := stringField(record, "activityKind"); ok &&
 		isGeneratedFileChangeToolName(normalizeGeneratedFileToolName(activityKind)) {
