@@ -295,6 +295,77 @@ function reportAgentGUIRuntimeError(input: {
   }
 }
 
+function reportAgentGUIMessagePageDiagnostic(input: {
+  agentSessionId: string;
+  details?: Record<string, unknown>;
+  event: string;
+  level?: "debug" | "info" | "warn";
+  messages?: readonly WorkspaceAgentActivityMessage[];
+  runtime: AgentActivityRuntime;
+  workspaceId: string;
+}): void {
+  const reportDiagnostic = input.runtime.reportDiagnostic;
+  if (!reportDiagnostic) {
+    return;
+  }
+  const versions = (input.messages ?? [])
+    .map((message) => message.version)
+    .filter((version) => Number.isFinite(version));
+  try {
+    void Promise.resolve(
+      reportDiagnostic.call(input.runtime, {
+        details: {
+          agentSessionId: input.agentSessionId,
+          ...(input.messages
+            ? {
+                firstVersion: versions.length ? Math.min(...versions) : null,
+                lastVersion: versions.length ? Math.max(...versions) : null,
+                messageCount: input.messages.length
+              }
+            : {}),
+          ...(input.details ?? {})
+        },
+        event: input.event,
+        level: input.level ?? "info",
+        source: "agent-gui",
+        workspaceId: input.workspaceId
+      })
+    ).catch(() => {});
+  } catch {
+    // Diagnostic logging must never affect message loading.
+  }
+}
+
+function reportAgentGUIActiveConversationCleared(input: {
+  details?: Record<string, unknown>;
+  previousAgentSessionId: string | null;
+  reason: string;
+  runtime: AgentActivityRuntime;
+  workspaceId: string;
+}): void {
+  const reportDiagnostic = input.runtime.reportDiagnostic;
+  if (!reportDiagnostic) {
+    return;
+  }
+  try {
+    void Promise.resolve(
+      reportDiagnostic.call(input.runtime, {
+        details: {
+          previousAgentSessionId: input.previousAgentSessionId,
+          reason: input.reason,
+          ...(input.details ?? {})
+        },
+        event: "agent.gui.active_conversation.cleared",
+        level: "info",
+        source: "agent-gui",
+        workspaceId: input.workspaceId
+      })
+    ).catch(() => {});
+  } catch {
+    // Diagnostic logging must never affect active conversation routing.
+  }
+}
+
 function reportAgentGUICancelDiagnostic(input: {
   agentSessionId: string;
   busySource?: string | null;
@@ -3282,6 +3353,9 @@ export function useAgentGUINodeController({
   });
   const selectedConversationMessageLoadSeqRef = useRef(0);
   const selectedConversationOlderMessageLoadSeqRef = useRef(0);
+  const lastConversationProjectionDiagnosticKeyRef = useRef<string | null>(
+    null
+  );
   const selectedConversationPendingMessageLoadIdsRef = useRef(
     new Set<string>()
   );
@@ -3519,6 +3593,17 @@ export function useAgentGUINodeController({
     if (externalId === (activeConversationIdRef.current ?? "")) return;
     if (!externalId) {
       const previous = activeConversationIdRef.current;
+      reportAgentGUIActiveConversationCleared({
+        details: {
+          dataLastActiveAgentSessionId: data.lastActiveAgentSessionId ?? null,
+          intent: intent.tag,
+          isComposerHome: isComposerHomeRef.current
+        },
+        previousAgentSessionId: previous,
+        reason: "external_last_active_empty",
+        runtime: agentActivityRuntime,
+        workspaceId
+      });
       if (previous) {
         void activation.unactivate(previous);
       }
@@ -4589,6 +4674,17 @@ export function useAgentGUINodeController({
         resetAgentSessionViewDetailMessages(
           sessionViewRef(normalizedAgentSessionId)
         );
+        reportAgentGUIMessagePageDiagnostic({
+          agentSessionId: normalizedAgentSessionId,
+          details: {
+            limit: AGENT_GUI_DETAIL_MESSAGES_PAGE_SIZE,
+            order: "desc",
+            requestId
+          },
+          event: "agent.gui.messages.initial.requested",
+          runtime: agentActivityRuntime,
+          workspaceId
+        });
         const page = await agentActivityRuntime.listSessionMessages({
           workspaceId,
           agentSessionId: normalizedAgentSessionId,
@@ -4606,6 +4702,18 @@ export function useAgentGUINodeController({
         selectedConversationInitialMessagesLoadedIdsRef.current.add(
           normalizedAgentSessionId
         );
+        reportAgentGUIMessagePageDiagnostic({
+          agentSessionId: normalizedAgentSessionId,
+          details: {
+            hasMore: page.hasMore,
+            latestVersion: page.latestVersion,
+            requestId
+          },
+          event: "agent.gui.messages.initial.resolved",
+          messages: page.messages,
+          runtime: agentActivityRuntime,
+          workspaceId
+        });
         clearSelectedConversationNotFoundRetryWhenInitialLoadsSettled(
           normalizedAgentSessionId
         );
@@ -4706,6 +4814,19 @@ export function useAgentGUINodeController({
         currentView.oldestLoadedVersion === null ||
         activeConversationIdRef.current !== normalizedAgentSessionId
       ) {
+        reportAgentGUIMessagePageDiagnostic({
+          agentSessionId: normalizedAgentSessionId,
+          details: {
+            activeConversationId: activeConversationIdRef.current,
+            hasOlderMessages: currentView?.hasOlderMessages ?? null,
+            isLoadingOlderMessages: currentView?.isLoadingOlderMessages ?? null,
+            oldestLoadedVersion: currentView?.oldestLoadedVersion ?? null
+          },
+          event: "agent.gui.messages.older.skipped",
+          level: "debug",
+          runtime: agentActivityRuntime,
+          workspaceId
+        });
         return;
       }
       const requestId = ++selectedConversationOlderMessageLoadSeqRef.current;
@@ -4714,6 +4835,18 @@ export function useAgentGUINodeController({
         true
       );
       try {
+        reportAgentGUIMessagePageDiagnostic({
+          agentSessionId: normalizedAgentSessionId,
+          details: {
+            beforeVersion: currentView.oldestLoadedVersion,
+            limit: AGENT_GUI_DETAIL_MESSAGES_PAGE_SIZE,
+            order: "desc",
+            requestId
+          },
+          event: "agent.gui.messages.older.requested",
+          runtime: agentActivityRuntime,
+          workspaceId
+        });
         const page = await agentActivityRuntime.listSessionMessages({
           workspaceId,
           agentSessionId: normalizedAgentSessionId,
@@ -4733,6 +4866,19 @@ export function useAgentGUINodeController({
           );
           return;
         }
+        reportAgentGUIMessagePageDiagnostic({
+          agentSessionId: normalizedAgentSessionId,
+          details: {
+            beforeVersion: currentView.oldestLoadedVersion,
+            hasMore: page.hasMore,
+            latestVersion: page.latestVersion,
+            requestId
+          },
+          event: "agent.gui.messages.older.resolved",
+          messages: page.messages,
+          runtime: agentActivityRuntime,
+          workspaceId
+        });
         const nextDetailMessages = mergeWorkspaceAgentMessages(
           currentView.detailMessages,
           page.messages
@@ -5705,7 +5851,15 @@ export function useAgentGUINodeController({
           event: "submit.begin",
           runtime: agentActivityRuntime,
           trace: submitTrace,
-          workspaceId
+          workspaceId,
+          fields: {
+            activeConversationId: currentActiveConversationId,
+            activeConversationKnown: currentActiveConversation !== null,
+            activeConversationStatus: currentActiveConversation?.status ?? null,
+            draftAgentSessionId,
+            isComposerHome: isComposerHomeRef.current,
+            targetMode: "new"
+          }
         });
         const optimisticConversation: AgentGUIConversationSummary = {
           id: agentSessionId,
@@ -6045,6 +6199,16 @@ export function useAgentGUINodeController({
         setSelectedProjectPath(projectPath);
       }
       const previous = activeConversationIdRef.current;
+      reportAgentGUIActiveConversationCleared({
+        details: {
+          hasProjectPathOption: Boolean(options && "projectPath" in options),
+          isComposerHome: isComposerHomeRef.current
+        },
+        previousAgentSessionId: previous,
+        reason: "create_conversation",
+        runtime: agentActivityRuntime,
+        workspaceId
+      });
       if (previous) {
         void activation.unactivate(previous);
       }
@@ -6058,7 +6222,13 @@ export function useAgentGUINodeController({
       persistActiveConversation(null);
       loadDraftComposerOptions();
     },
-    [activation, loadDraftComposerOptions, persistActiveConversation]
+    [
+      activation,
+      agentActivityRuntime,
+      loadDraftComposerOptions,
+      persistActiveConversation,
+      workspaceId
+    ]
   );
 
   useEffect(() => {
@@ -6084,6 +6254,16 @@ export function useAgentGUINodeController({
     setSelectedProjectPath(projectPath);
 
     const previous = activeConversationIdRef.current;
+    reportAgentGUIActiveConversationCleared({
+      details: {
+        autoSubmit: prefillPromptRequest.autoSubmit === true,
+        sequence: prefillPromptRequest.sequence
+      },
+      previousAgentSessionId: previous,
+      reason: "prefill_prompt",
+      runtime: agentActivityRuntime,
+      workspaceId
+    });
     if (previous) {
       void activation.unactivate(previous);
     }
@@ -6108,10 +6288,12 @@ export function useAgentGUINodeController({
     loadDraftComposerOptions();
   }, [
     activation,
+    agentActivityRuntime,
     loadDraftComposerOptions,
     persistActiveConversation,
     prefillPromptRequest,
-    previewMode
+    previewMode,
+    workspaceId
   ]);
 
   const continueInNewConversation = useCallback(() => {
@@ -6139,6 +6321,15 @@ export function useAgentGUINodeController({
       existingDraftPrompt: draftBySessionId[currentConversationId]?.prompt ?? ""
     });
     const previous = activeConversationIdRef.current;
+    reportAgentGUIActiveConversationCleared({
+      details: {
+        sourceConversationId: activeConversation.id
+      },
+      previousAgentSessionId: previous,
+      reason: "continue_in_new_conversation",
+      runtime: agentActivityRuntime,
+      workspaceId
+    });
     if (previous) {
       void activation.unactivate(previous);
     }
@@ -6161,6 +6352,7 @@ export function useAgentGUINodeController({
   }, [
     accountProfilesByUserId,
     activation,
+    agentActivityRuntime,
     conversations,
     createConversation,
     currentUserId,
@@ -6261,6 +6453,12 @@ export function useAgentGUINodeController({
         queued: queuedPromptId !== undefined,
         startedAtUnixMs: submittedAtUnixMs
       });
+      const targetConversation = resolveConversationSummaryById(
+        conversationsRef.current,
+        agentSessionId,
+        transientConversationRef.current
+      );
+      const previousConversationStatus = targetConversation?.status ?? null;
       submitTraceBySessionIdRef.current = {
         ...submitTraceBySessionIdRef.current,
         [agentSessionId]: submitTrace
@@ -6269,14 +6467,17 @@ export function useAgentGUINodeController({
         event: "submit.begin",
         runtime: agentActivityRuntime,
         trace: submitTrace,
-        workspaceId
+        workspaceId,
+        fields: {
+          activeConversationId: activeConversationIdRef.current,
+          conversationKnown: targetConversation !== null,
+          conversationStatus: previousConversationStatus,
+          isComposerHome: isComposerHomeRef.current,
+          targetIsActiveConversation:
+            activeConversationIdRef.current === agentSessionId,
+          targetMode: "existing"
+        }
       });
-      const previousConversationStatus =
-        resolveConversationSummaryById(
-          conversationsRef.current,
-          agentSessionId,
-          transientConversationRef.current
-        )?.status ?? null;
       if (conversationListQuery) {
         markAgentGUIConversationSubmitPending({
           query: conversationListQuery,
@@ -8472,6 +8673,60 @@ export function useAgentGUINodeController({
     }
     return conversationModels.conversation;
   }, [conversationDetail, conversationModels.conversation]);
+  useEffect(() => {
+    if (!activeConversationId || !conversation) {
+      lastConversationProjectionDiagnosticKeyRef.current = null;
+      return;
+    }
+    const firstVersion = minFiniteMessageVersion(activeMessages);
+    const lastVersion = maxFiniteMessageVersion(activeMessages);
+    const diagnosticKey = [
+      activeConversationId,
+      activeMessages.length,
+      activeTimelineItems.length,
+      conversation.sourceDetail.turns.length,
+      conversation.rows.length,
+      firstVersion ?? "",
+      lastVersion ?? "",
+      activeSessionView?.hasOlderMessages === true ? "1" : "0",
+      activeSessionView?.isLoadingOlderMessages === true ? "1" : "0"
+    ].join(":");
+    if (lastConversationProjectionDiagnosticKeyRef.current === diagnosticKey) {
+      return;
+    }
+    lastConversationProjectionDiagnosticKeyRef.current = diagnosticKey;
+    reportAgentGUIMessagePageDiagnostic({
+      agentSessionId: activeConversationId,
+      details: {
+        detailMessageCount: activeSessionView?.detailMessages.length ?? 0,
+        hasOlderMessages: activeSessionView?.hasOlderMessages ?? false,
+        isLoadingOlderMessages:
+          activeSessionView?.isLoadingOlderMessages ?? false,
+        oldestLoadedVersion: activeSessionView?.oldestLoadedVersion ?? null,
+        overlayMessageCount: activeSessionView?.overlayMessages.length ?? 0,
+        rowCount: conversation.rows.length,
+        timelineItemCount: activeTimelineItems.length,
+        turnCount: conversation.sourceDetail.turns.length
+      },
+      event: "agent.gui.conversation.projection.resolved",
+      level: "debug",
+      messages: activeMessages,
+      runtime: agentActivityRuntime,
+      workspaceId
+    });
+  }, [
+    activeConversationId,
+    activeMessages,
+    activeSessionView?.detailMessages.length,
+    activeSessionView?.hasOlderMessages,
+    activeSessionView?.isLoadingOlderMessages,
+    activeSessionView?.oldestLoadedVersion,
+    activeSessionView?.overlayMessages.length,
+    activeTimelineItems,
+    agentActivityRuntime,
+    conversation,
+    workspaceId
+  ]);
   const activeLiveState = activeConversationLiveState;
   const activationError = activation.errorFor(activeConversationId);
   const activationErrorCode = activation.codeFor(activeConversationId);
