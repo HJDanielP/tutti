@@ -1869,6 +1869,90 @@ describe("buildWorkspaceAgentActivityListViewModel", () => {
     ).toEqual([]);
   });
 
+  it("does not collect failed file change tool payloads as agent-generated files", () => {
+    const snapshot: AgentActivitySnapshot = {
+      workspaceId: "workspace-1",
+      presences: [],
+      sessions: [
+        {
+          agentSessionId: "session-25",
+          cwd: "/Users/demo/project",
+          provider: "codex",
+          status: "completed",
+          title: "Failed writes",
+          workspaceId: "workspace-1"
+        }
+      ],
+      sessionMessagesById: {
+        "session-25": [
+          {
+            agentSessionId: "session-25",
+            kind: "tool_call",
+            messageId: "message-failed-status",
+            payload: {
+              toolName: "Write",
+              fileChanges: {
+                files: [{ path: "failed-status.md" }]
+              }
+            },
+            role: "assistant",
+            status: "failed",
+            turnId: "turn-message-1",
+            occurredAtUnixMs: 1,
+            version: 1
+          },
+          {
+            agentSessionId: "session-25",
+            kind: "tool_call",
+            messageId: "message-failed-output",
+            payload: {
+              toolName: "Write",
+              output: {
+                filePath: "failed-output.md",
+                status: "failed",
+                success: false
+              }
+            },
+            role: "assistant",
+            status: "completed",
+            turnId: "turn-message-1",
+            occurredAtUnixMs: 2,
+            version: 2
+          },
+          {
+            agentSessionId: "session-25",
+            kind: "tool_call",
+            messageId: "message-success",
+            payload: {
+              toolName: "Write",
+              output: {
+                filePath: "ok.md",
+                status: "completed",
+                success: true
+              }
+            },
+            role: "assistant",
+            status: "completed",
+            turnId: "turn-message-1",
+            occurredAtUnixMs: 3,
+            version: 3
+          }
+        ]
+      }
+    };
+
+    expect(
+      collectWorkspaceAgentGeneratedFiles(snapshot, {
+        workspaceRoot: "/Users/demo/project"
+      })
+    ).toEqual([
+      {
+        path: "/Users/demo/project/ok.md",
+        label: "ok.md"
+      }
+    ]);
+  });
+
   it("resolves relative agent-generated file paths against the session cwd", () => {
     const snapshot: AgentActivitySnapshot = {
       workspaceId: "workspace-1",
