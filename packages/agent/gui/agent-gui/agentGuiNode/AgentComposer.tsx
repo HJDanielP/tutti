@@ -144,6 +144,8 @@ import { useOptionalAgentActivityRuntime } from "../../agentActivityRuntime";
 
 export { formatSlashStatusTokenCount };
 
+const USAGE_POPOVER_HOVER_DELAY_MS = 120;
+
 /**
  * 引用 picker 的确认结果:松散文件按 file mention 插入;mentionItems(如文件夹 bundle)
  * 作为整体节点插入。两者各走各的插入路径,composer 不需要理解 bundle 内部结构。
@@ -470,18 +472,68 @@ function AgentUsageChip({
 }): React.JSX.Element {
   "use memo";
 
+  const [usagePopoverOpen, setUsagePopoverOpen] = useState(false);
+  const usagePopoverHoverTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const clampedPercent = Math.max(0, Math.min(100, percentUsed));
   const chipLabel = labels.usageChipLabel({ percent: clampedPercent });
   const showTokens = usedTokens !== null && totalTokens !== null;
   const usageLevel = agentUsageChipLevel(clampedPercent);
   const ringColor = agentUsageRingColor(usageLevel);
+  const clearUsagePopoverHoverTimer = useCallback(() => {
+    if (usagePopoverHoverTimerRef.current) {
+      clearTimeout(usagePopoverHoverTimerRef.current);
+      usagePopoverHoverTimerRef.current = null;
+    }
+  }, []);
+  const openUsagePopoverAfterHoverDelay = useCallback(() => {
+    clearUsagePopoverHoverTimer();
+    usagePopoverHoverTimerRef.current = setTimeout(() => {
+      usagePopoverHoverTimerRef.current = null;
+      setUsagePopoverOpen(true);
+    }, USAGE_POPOVER_HOVER_DELAY_MS);
+  }, [clearUsagePopoverHoverTimer]);
+  const closeUsagePopover = useCallback(() => {
+    clearUsagePopoverHoverTimer();
+    setUsagePopoverOpen(false);
+  }, [clearUsagePopoverHoverTimer]);
+  const handleUsagePopoverOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setUsagePopoverOpen(true);
+        return;
+      }
+      closeUsagePopover();
+    },
+    [closeUsagePopover]
+  );
+
+  useEffect(
+    () => () => {
+      clearUsagePopoverHoverTimer();
+    },
+    [clearUsagePopoverHoverTimer]
+  );
+
   const trigger = (
     <button
       type="button"
       aria-label={chipLabel}
-      className="nodrag relative mr-2 inline-flex size-4 shrink-0 cursor-default items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--text-primary)_34%,transparent)] [-webkit-app-region:no-drag]"
+      className={cn(
+        "nodrag relative mr-2 inline-flex size-4 shrink-0 items-center justify-center rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--text-primary)_34%,transparent)] [-webkit-app-region:no-drag]",
+        tooltipsEnabled ? "cursor-pointer" : "cursor-default"
+      )}
       data-testid="agent-gui-usage-chip"
       data-usage-level={usageLevel}
+      onBlur={tooltipsEnabled ? closeUsagePopover : undefined}
+      onFocus={tooltipsEnabled ? openUsagePopoverAfterHoverDelay : undefined}
+      onPointerEnter={(event) => {
+        if (tooltipsEnabled && event.pointerType !== "touch") {
+          openUsagePopoverAfterHoverDelay();
+        }
+      }}
+      onPointerLeave={tooltipsEnabled ? closeUsagePopover : undefined}
       title={chipLabel}
       style={{
         background: `conic-gradient(${ringColor} ${clampedPercent}%, color-mix(in srgb, ${ringColor} 16%, transparent) 0)`
@@ -499,53 +551,51 @@ function AgentUsageChip({
   }
 
   return (
-    <Popover>
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <PopoverTrigger asChild>
-            <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          </PopoverTrigger>
-          <TooltipContent side="top">{labels.usageTooltipLabel}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <PopoverContent
-        side="bottom"
-        align="end"
-        className="w-[320px] max-w-[calc(100vw-32px)] gap-3 text-xs"
-        data-testid="agent-gui-usage-popover"
-      >
-        <div className="flex min-w-0 flex-col gap-3">
-          <span className="text-[13px] font-semibold leading-4">
-            {labels.usagePopoverTitle}
-          </span>
-          {showTokens ? (
-            <AgentUsageMeter
-              label={labels.usageContextWindowLabel}
-              value={`${formatSlashStatusTokenCount(usedTokens)} / ${formatSlashStatusTokenCount(totalTokens)} (${clampedPercent}%)`}
-              percent={clampedPercent}
-              testId="agent-gui-usage-context-meter"
-            />
-          ) : null}
-          {limits.length > 0 ? (
-            <div className="flex min-w-0 flex-col gap-2">
-              <span className="font-semibold">{labels.usageLimitsLabel}</span>
-              {limits.map((limit) => (
-                <AgentUsageMeter
-                  key={limit.id}
-                  label={limit.label}
-                  value={`${limit.value}${limit.reset ? ` (${limit.reset})` : ""}`}
-                  percent={
-                    typeof limit.percentRemaining === "number" &&
-                    Number.isFinite(limit.percentRemaining)
-                      ? limit.percentRemaining
-                      : null
-                  }
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </PopoverContent>
+    <Popover
+      open={usagePopoverOpen}
+      onOpenChange={handleUsagePopoverOpenChange}
+    >
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      {usagePopoverOpen ? (
+        <PopoverContent
+          side="bottom"
+          align="end"
+          className="w-[320px] max-w-[calc(100vw-32px)] gap-3 text-xs"
+          data-testid="agent-gui-usage-popover"
+        >
+          <div className="flex min-w-0 flex-col gap-3">
+            <span className="text-[13px] font-semibold leading-4">
+              {labels.usagePopoverTitle}
+            </span>
+            {showTokens ? (
+              <AgentUsageMeter
+                label={labels.usageContextWindowLabel}
+                value={`${formatSlashStatusTokenCount(usedTokens)} / ${formatSlashStatusTokenCount(totalTokens)} (${clampedPercent}%)`}
+                percent={clampedPercent}
+                testId="agent-gui-usage-context-meter"
+              />
+            ) : null}
+            {limits.length > 0 ? (
+              <div className="flex min-w-0 flex-col gap-2">
+                <span className="font-semibold">{labels.usageLimitsLabel}</span>
+                {limits.map((limit) => (
+                  <AgentUsageMeter
+                    key={limit.id}
+                    label={limit.label}
+                    value={`${limit.value}${limit.reset ? ` (${limit.reset})` : ""}`}
+                    percent={
+                      typeof limit.percentRemaining === "number" &&
+                      Number.isFinite(limit.percentRemaining)
+                        ? limit.percentRemaining
+                        : null
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </PopoverContent>
+      ) : null}
     </Popover>
   );
 }

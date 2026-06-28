@@ -216,6 +216,15 @@ export function ReferenceSourcePicker({
     }
 
     let cancelled = false;
+    const cachedApplications = view.getCachedOpenWithApplications(
+      contextMenu.node
+    );
+    if (cachedApplications) {
+      setOpenWithApplications(cachedApplications);
+      setOpenWithLoading(false);
+      return;
+    }
+
     setOpenWithApplications([]);
     setOpenWithLoading(true);
     void view
@@ -279,17 +288,13 @@ export function ReferenceSourcePicker({
     if (!fileManagerCopy || node.kind !== "file") {
       return;
     }
-    const bounds = menuBoundaryRef.current?.getBoundingClientRect();
-    if (!bounds) {
-      return;
-    }
     event.preventDefault();
     event.stopPropagation();
     view.setFocusedNode(node);
     setContextMenu({
       node,
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top
+      x: event.clientX,
+      y: event.clientY
     });
   };
 
@@ -461,6 +466,7 @@ export function ReferenceSourcePicker({
                               selected={view.isSelected(node)}
                               onFocus={view.setFocusedNode}
                               onContextMenu={openReferenceContextMenu}
+                              onOpen={view.openNode}
                               selectable={view.isSelectable(node)}
                               onSingleSelect={
                                 view.toggleSingleSelectionAndExpand
@@ -525,6 +531,7 @@ export function ReferenceSourcePicker({
                       copy={fileManagerCopy}
                       openWithApplications={openWithApplications}
                       openWithLoading={openWithLoading}
+                      positionMode="viewport"
                       revealInFolderLabel={resolveRevealInFolderLabel(
                         fileManagerCopy,
                         hostOs
@@ -807,6 +814,7 @@ function SearchResultRow({
   onFocus,
   onContextMenu,
   onSingleSelect,
+  onOpen,
   onToggle
 }: {
   node: ReferenceNode;
@@ -815,6 +823,7 @@ function SearchResultRow({
   selectable: boolean;
   onFocus: (node: ReferenceNode) => void;
   onContextMenu: (event: MouseEvent<HTMLElement>, node: ReferenceNode) => void;
+  onOpen: (node: ReferenceNode) => Promise<void>;
   onSingleSelect: (node: ReferenceNode) => void;
   onToggle: (node: ReferenceNode) => void;
 }): JSX.Element {
@@ -834,6 +843,14 @@ function SearchResultRow({
         onSingleSelect(node);
       }}
       onContextMenu={(event) => onContextMenu(event, node)}
+      onDoubleClick={(event) => {
+        if (node.kind !== "file") {
+          return;
+        }
+        event.stopPropagation();
+        onFocus(node);
+        void onOpen(node);
+      }}
     >
       <div className="flex min-w-0 items-center gap-3 text-left">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--transparency-block)] text-[var(--text-tertiary)]">
@@ -868,6 +885,7 @@ function SearchResultRow({
             onFocus(node);
             onToggle(node);
           }}
+          onDoubleClick={(event) => event.stopPropagation()}
         >
           {selected ? (
             <CheckIcon size={14} />
@@ -1494,6 +1512,14 @@ function TreeNodeRow({
           view.toggleSingleSelectionAndExpand(node);
         }}
         onContextMenu={(event) => onContextMenu(event, node)}
+        onDoubleClick={(event) => {
+          if (node.kind !== "file") {
+            return;
+          }
+          event.stopPropagation();
+          view.setFocusedNode(node);
+          void view.openNode(node);
+        }}
       >
         {isFolder ? (
           <button
@@ -1540,6 +1566,7 @@ function TreeNodeRow({
               view.setFocusedNode(node);
               view.toggleSelection(node);
             }}
+            onDoubleClick={(event) => event.stopPropagation()}
           >
             {selected ? (
               <CheckIcon size={14} />

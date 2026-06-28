@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -36,6 +37,7 @@ const { mockProjectMissingState } = vi.hoisted(() => ({
 afterEach(() => {
   mockProjectMissingState.current = false;
   resetAgentActivityRuntimeForTests();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -1660,7 +1662,9 @@ describe("AgentComposer", () => {
     );
   });
 
-  it("renders context usage immediately before the permission menu", async () => {
+  it("opens context usage details after hovering the usage chip", async () => {
+    vi.useFakeTimers();
+
     const { container } = render(
       <AgentComposer
         workspaceId="workspace-1"
@@ -1723,15 +1727,20 @@ describe("AgentComposer", () => {
     expect(usageChip.tagName).toBe("BUTTON");
     expect(usageChip).toHaveClass("size-4");
     expect(usageChip).toHaveClass("mr-2");
+    expect(usageChip).toHaveClass("cursor-pointer");
     expect(usageChip).not.toHaveAttribute("data-slot", "badge");
+    expect(screen.queryByTestId("agent-gui-usage-popover")).toBeNull();
 
-    fireEvent.pointerMove(usageChip, { pointerType: "mouse" });
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("上下文用量");
+    fireEvent.pointerOver(usageChip, { pointerType: "mouse" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(119);
+    });
+    expect(screen.queryByTestId("agent-gui-usage-popover")).toBeNull();
 
-    fireEvent.click(usageChip);
-    await waitFor(() =>
-      expect(screen.getByTestId("agent-gui-usage-popover")).toBeVisible()
-    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByTestId("agent-gui-usage-popover")).toBeVisible();
     expect(
       screen.getByTestId("agent-gui-usage-context-meter")
     ).toHaveTextContent("上下文窗口");
@@ -1740,6 +1749,9 @@ describe("AgentComposer", () => {
     ).toHaveTextContent("50,000 / 200,000 (25%)");
     expect(screen.getByText("7d limit")).toBeInTheDocument();
     expect(screen.getByText("96% left")).toBeInTheDocument();
+
+    fireEvent.pointerOut(usageChip, { pointerType: "mouse" });
+    expect(screen.queryByTestId("agent-gui-usage-popover")).toBeNull();
   });
 
   it.each([

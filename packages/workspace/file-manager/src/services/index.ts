@@ -29,6 +29,10 @@ export type {
   WorkspaceFileManagerMutationErrorMessage
 } from "./workspaceFileManagerHost.interface.ts";
 export {
+  resolveWorkspaceFileOpenWithCacheKey,
+  WorkspaceFileOpenWithApplicationsCache
+} from "./internal/model/openWithApplicationsCache.ts";
+export {
   isWorkspaceApplicationBundle,
   resolveWorkspaceFileDefaultApplicationIconExtension,
   resolveWorkspaceFileEntryIconCacheKey,

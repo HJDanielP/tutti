@@ -119,6 +119,14 @@ test("tree row click single-selects while plus button toggles multi-selection", 
   );
 });
 
+test("plus buttons stop double-click events from opening file previews", () => {
+  const stopDoubleClickCount =
+    source.match(/onDoubleClick=\{\(event\) => event\.stopPropagation\(\)\}/g)
+      ?.length ?? 0;
+
+  assert.ok(stopDoubleClickCount >= 2);
+});
+
 test("root-level references are not hidden behind the select-group hint", () => {
   assert.match(
     source,

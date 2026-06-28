@@ -16,7 +16,9 @@ import {
 } from "../../../core/index.ts";
 import type { ReferenceSourceAggregator } from "../../../core/referenceSourceAggregator.ts";
 import {
+  resolveWorkspaceFileOpenWithCacheKey,
   sortWorkspaceFileEntriesForArrangeMode,
+  WorkspaceFileOpenWithApplicationsCache,
   type WorkspaceFileEntry,
   type WorkspaceFileManagerArrangeMode
 } from "@tutti-os/workspace-file-manager/services";
@@ -32,6 +34,16 @@ import {
 export type { WorkspaceFileManagerArrangeMode };
 
 export { WORKSPACE_ROOT_GROUP_NODE_ID } from "../../../core/index.ts";
+
+function referenceNodeToOpenWithCacheEntry(
+  node: ReferenceNode
+): Pick<WorkspaceFileEntry, "kind" | "name" | "path"> {
+  return {
+    kind: node.kind === "folder" ? "directory" : "file",
+    name: node.displayName,
+    path: node.displayName
+  };
+}
 
 /**
  * 焦点节点的预览态(node-keyed)。复用 file-manager / file-preview 的分类逻辑
@@ -148,6 +160,9 @@ export function useReferenceSourcePickerView({
   const [focusedNode, setFocusedNode] = useState<ReferenceNode | null>(null);
   const [arrangeMode, setArrangeMode] =
     useState<WorkspaceFileManagerArrangeMode>("none");
+  const openWithApplicationsCache = useRef(
+    new WorkspaceFileOpenWithApplicationsCache()
+  );
 
   // 复用 file-manager 的排序能力:把 ReferenceNode 映射成 WorkspaceFileEntry 排序后映射回。
   const sortNodes = useCallback(
@@ -838,8 +853,19 @@ export function useReferenceSourcePickerView({
     isSelectable,
     isSelected,
     isOpeningReference,
+    getCachedOpenWithApplications: (node: ReferenceNode) =>
+      openWithApplicationsCache.current.get(
+        resolveWorkspaceFileOpenWithCacheKey(
+          referenceNodeToOpenWithCacheEntry(node)
+        )
+      ),
     listOpenWithApplications: (node: ReferenceNode) =>
-      aggregator.listOpenWithApplications(scope, node),
+      openWithApplicationsCache.current.resolve(
+        resolveWorkspaceFileOpenWithCacheKey(
+          referenceNodeToOpenWithCacheEntry(node)
+        ),
+        () => aggregator.listOpenWithApplications(scope, node)
+      ),
     openNode: (node: ReferenceNode) =>
       runReferenceAction(() => aggregator.open(scope, node)),
     openWithApplication: (node: ReferenceNode, applicationPath: string) =>
