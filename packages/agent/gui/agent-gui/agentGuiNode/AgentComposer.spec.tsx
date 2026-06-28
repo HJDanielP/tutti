@@ -2009,6 +2009,50 @@ describe("AgentComposer", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("shows the compact context button disabled when the composer is blocked (read-only)", () => {
+    const onSubmit = vi.fn();
+    render(
+      <AgentComposer
+        workspaceId="workspace-1"
+        currentUserId="user-1"
+        provider="codex"
+        usage={{ usedTokens: 50_000, totalTokens: 200_000, percentUsed: 25 }}
+        draftContent={createDraft("")}
+        availableCommands={[] satisfies readonly AgentHostAgentSessionCommand[]}
+        disabled={true}
+        submitDisabled={false}
+        placeholder="placeholder"
+        composerSettings={createComposerSettings()}
+        queuedPrompts={[]}
+        drainingQueuedPromptId={null}
+        canQueueWhileBusy={false}
+        showStopButton={false}
+        activePrompt={null}
+        isInterrupting={false}
+        isSendingTurn={false}
+        isSubmittingPrompt={false}
+        compactSupported={true}
+        hasCompactableContext={true}
+        labels={createLabels()}
+        workspaceUserProjectI18n={workspaceUserProjectI18n}
+        onDraftContentChange={vi.fn()}
+        onSettingsChange={vi.fn()}
+        onSubmit={onSubmit}
+        onSendQueuedPromptNext={vi.fn()}
+        onRemoveQueuedPrompt={vi.fn()}
+        onEditQueuedPrompt={vi.fn()}
+        onInterruptCurrentTurn={vi.fn()}
+        onSubmitInteractivePrompt={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("agent-gui-usage-chip"));
+    const compactButton = screen.getByTestId("agent-gui-compact-button");
+    expect(compactButton).toBeDisabled();
+    fireEvent.click(compactButton);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("does not render the project dropdown below the dock input shell", () => {
     const { container } = render(
       <AgentComposer

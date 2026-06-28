@@ -317,6 +317,7 @@ function analyzeMessageCenterSessionMessages(
 ): MessageCenterSessionMessageAnalysis {
   let firstUserMessageSummary = "";
   let latestUserMessageSummary = "";
+  let latestUserMessageAtUnixMs = Number.NEGATIVE_INFINITY;
   let latestAgentMessage: WorkspaceAgentMessageCenterDigestAgentSummary | null =
     null;
   let latestDigestAgentMessage: WorkspaceAgentMessageCenterDigestAgentSummary | null =
@@ -331,7 +332,11 @@ function analyzeMessageCenterSessionMessages(
         firstUserMessageSummary = summary;
       }
       if (summary) {
-        latestUserMessageSummary = summary;
+        const occurredAtUnixMs = messageTimeUnixMs(message);
+        if (occurredAtUnixMs >= latestUserMessageAtUnixMs) {
+          latestUserMessageSummary = summary;
+          latestUserMessageAtUnixMs = occurredAtUnixMs;
+        }
       }
     }
 

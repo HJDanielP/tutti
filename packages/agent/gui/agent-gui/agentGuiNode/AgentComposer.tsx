@@ -2737,7 +2737,9 @@ export function AgentComposer({
                   tooltipsEnabled={!previewMode}
                   compactSupported={compactSupported ?? false}
                   compactDisabled={
-                    !hasCompactableContext || settingsControlsDisabled
+                    !hasCompactableContext ||
+                    settingsControlsDisabled ||
+                    inputDisabled
                   }
                   onCompact={() => onSubmit(textPromptContent("/compact"))}
                   labels={{
