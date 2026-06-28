@@ -33,6 +33,8 @@ import {
 } from "../../app/renderer/components/ui/tooltip";
 import { ZoomableImage } from "../../app/renderer/components/ZoomableImage";
 import type { AgentConversationPromptVM } from "../../shared/agentConversation/contracts/agentConversationVM";
+import { ConversationImageContextMenu } from "../../shared/agentConversation/components/ConversationImageContextMenu";
+import { AgentUsageMeter, agentUsageBarColor } from "./AgentUsageMeter";
 import { cn } from "../../app/renderer/lib/utils";
 import { AddIcon, Select, SelectTrigger } from "@tutti-os/ui-system";
 import { ListChecks, X } from "lucide-react";
@@ -276,6 +278,7 @@ export interface AgentComposerProps {
     usageContextWindowLabel: string;
     usageTokensLabel: string;
     usageLimitsLabel: string;
+    usageCompactAction: string;
     approvalLead: string;
     planLead: string;
     planModes: Array<{ id: string; label: string; description: string }>;
@@ -452,22 +455,26 @@ function AgentUsageChip({
   percentUsed,
   usedTokens,
   totalTokens,
-  limits,
   labels,
-  tooltipsEnabled = true
+  tooltipsEnabled = true,
+  onCompact,
+  compactSupported,
+  compactDisabled
 }: {
   percentUsed: number;
   usedTokens: number | null;
   totalTokens: number | null;
-  limits: readonly AgentComposerSlashStatusLimit[];
   tooltipsEnabled?: boolean;
+  onCompact?: () => void;
+  compactSupported?: boolean;
+  compactDisabled?: boolean;
   labels: Pick<
     AgentComposerProps["labels"],
     | "usageChipLabel"
     | "usageTooltipLabel"
     | "usagePopoverTitle"
     | "usageContextWindowLabel"
-    | "usageLimitsLabel"
+    | "usageCompactAction"
   >;
 }): React.JSX.Element {
   "use memo";
@@ -481,41 +488,65 @@ function AgentUsageChip({
   const showTokens = usedTokens !== null && totalTokens !== null;
   const usageLevel = agentUsageChipLevel(clampedPercent);
   const ringColor = agentUsageRingColor(usageLevel);
+  const usagePopoverCloseTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const clearUsagePopoverHoverTimer = useCallback(() => {
     if (usagePopoverHoverTimerRef.current) {
       clearTimeout(usagePopoverHoverTimerRef.current);
       usagePopoverHoverTimerRef.current = null;
     }
   }, []);
+  const clearUsagePopoverCloseTimer = useCallback(() => {
+    if (usagePopoverCloseTimerRef.current) {
+      clearTimeout(usagePopoverCloseTimerRef.current);
+      usagePopoverCloseTimerRef.current = null;
+    }
+  }, []);
+  const openUsagePopover = useCallback(() => {
+    clearUsagePopoverHoverTimer();
+    clearUsagePopoverCloseTimer();
+    setUsagePopoverOpen(true);
+  }, [clearUsagePopoverCloseTimer, clearUsagePopoverHoverTimer]);
   const openUsagePopoverAfterHoverDelay = useCallback(() => {
     clearUsagePopoverHoverTimer();
+    clearUsagePopoverCloseTimer();
     usagePopoverHoverTimerRef.current = setTimeout(() => {
       usagePopoverHoverTimerRef.current = null;
       setUsagePopoverOpen(true);
     }, USAGE_POPOVER_HOVER_DELAY_MS);
-  }, [clearUsagePopoverHoverTimer]);
+  }, [clearUsagePopoverCloseTimer, clearUsagePopoverHoverTimer]);
   const closeUsagePopover = useCallback(() => {
     clearUsagePopoverHoverTimer();
+    clearUsagePopoverCloseTimer();
     setUsagePopoverOpen(false);
-  }, [clearUsagePopoverHoverTimer]);
+  }, [clearUsagePopoverCloseTimer, clearUsagePopoverHoverTimer]);
+  const scheduleUsagePopoverClose = useCallback(() => {
+    clearUsagePopoverHoverTimer();
+    clearUsagePopoverCloseTimer();
+    usagePopoverCloseTimerRef.current = setTimeout(() => {
+      usagePopoverCloseTimerRef.current = null;
+      setUsagePopoverOpen(false);
+    }, 140);
+  }, [clearUsagePopoverCloseTimer, clearUsagePopoverHoverTimer]);
   const handleUsagePopoverOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
-        setUsagePopoverOpen(true);
+        openUsagePopover();
         return;
       }
       closeUsagePopover();
     },
-    [closeUsagePopover]
+    [closeUsagePopover, openUsagePopover]
   );
 
   useEffect(
     () => () => {
       clearUsagePopoverHoverTimer();
+      clearUsagePopoverCloseTimer();
     },
-    [clearUsagePopoverHoverTimer]
+    [clearUsagePopoverCloseTimer, clearUsagePopoverHoverTimer]
   );
-
   const trigger = (
     <button
       type="button"
@@ -527,13 +558,14 @@ function AgentUsageChip({
       data-testid="agent-gui-usage-chip"
       data-usage-level={usageLevel}
       onBlur={tooltipsEnabled ? closeUsagePopover : undefined}
+      onClick={tooltipsEnabled ? openUsagePopover : undefined}
       onFocus={tooltipsEnabled ? openUsagePopoverAfterHoverDelay : undefined}
       onPointerEnter={(event) => {
         if (tooltipsEnabled && event.pointerType !== "touch") {
           openUsagePopoverAfterHoverDelay();
         }
       }}
-      onPointerLeave={tooltipsEnabled ? closeUsagePopover : undefined}
+      onPointerLeave={tooltipsEnabled ? scheduleUsagePopoverClose : undefined}
       title={chipLabel}
       style={{
         background: `conic-gradient(${ringColor} ${clampedPercent}%, color-mix(in srgb, ${ringColor} 16%, transparent) 0)`
@@ -562,6 +594,9 @@ function AgentUsageChip({
           align="end"
           className="w-[320px] max-w-[calc(100vw-32px)] gap-3 text-xs"
           data-testid="agent-gui-usage-popover"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onPointerEnter={openUsagePopover}
+          onPointerLeave={scheduleUsagePopoverClose}
         >
           <div className="flex min-w-0 flex-col gap-3">
             <span className="text-[13px] font-semibold leading-4">
@@ -572,72 +607,25 @@ function AgentUsageChip({
                 label={labels.usageContextWindowLabel}
                 value={`${formatSlashStatusTokenCount(usedTokens)} / ${formatSlashStatusTokenCount(totalTokens)} (${clampedPercent}%)`}
                 percent={clampedPercent}
+                barColor={agentUsageBarColor(clampedPercent)}
                 testId="agent-gui-usage-context-meter"
               />
             ) : null}
-            {limits.length > 0 ? (
-              <div className="flex min-w-0 flex-col gap-2">
-                <span className="font-semibold">{labels.usageLimitsLabel}</span>
-                {limits.map((limit) => (
-                  <AgentUsageMeter
-                    key={limit.id}
-                    label={limit.label}
-                    value={`${limit.value}${limit.reset ? ` (${limit.reset})` : ""}`}
-                    percent={
-                      typeof limit.percentRemaining === "number" &&
-                      Number.isFinite(limit.percentRemaining)
-                        ? limit.percentRemaining
-                        : null
-                    }
-                  />
-                ))}
-              </div>
+            {compactSupported && onCompact ? (
+              <button
+                type="button"
+                data-testid="agent-gui-compact-button"
+                disabled={compactDisabled}
+                className="nodrag inline-flex items-center justify-center rounded-[6px] bg-[var(--transparency-block)] px-2 py-1 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-background-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--transparency-block)] [-webkit-app-region:no-drag]"
+                onClick={onCompact}
+              >
+                {labels.usageCompactAction}
+              </button>
             ) : null}
           </div>
         </PopoverContent>
       ) : null}
     </Popover>
-  );
-}
-
-function AgentUsageMeter({
-  label,
-  value,
-  percent,
-  testId
-}: {
-  label: string;
-  value: string;
-  percent: number | null;
-  testId?: string;
-}): React.JSX.Element {
-  const clampedPercent =
-    typeof percent === "number" && Number.isFinite(percent)
-      ? Math.max(0, Math.min(100, percent))
-      : null;
-
-  return (
-    <div className="grid min-w-0 gap-1" data-testid={testId}>
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-[var(--text-secondary)]">
-          {label}
-        </span>
-        <span className="shrink-0 whitespace-nowrap text-[var(--text-secondary)]">
-          {value}
-        </span>
-      </div>
-      {clampedPercent !== null ? (
-        <span
-          aria-hidden="true"
-          className="relative h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--text-primary)_10%,transparent)]"
-        >
-          <span
-            className="absolute inset-y-0 left-0 min-w-0.5 rounded-full bg-[var(--agent-gui-text-primary,var(--text-primary))]"
-            style={{ width: `${clampedPercent}%` }}
-          />
-        </span>
-      ) : null}
-    </div>
   );
 }
 
@@ -2487,12 +2475,14 @@ export function AgentComposer({
                           image.uploadError ? "true" : undefined
                         }
                       >
-                        <ZoomableImage
-                          src={image.previewUrl}
-                          alt={image.name}
-                          className="size-full object-cover"
-                          draggable={false}
-                        />
+                        <ConversationImageContextMenu src={image.previewUrl}>
+                          <ZoomableImage
+                            src={image.previewUrl}
+                            alt={image.name}
+                            className="size-full object-cover"
+                            draggable={false}
+                          />
+                        </ConversationImageContextMenu>
                         {image.uploading ? (
                           <div
                             className="absolute inset-0 grid place-items-center bg-[color-mix(in_srgb,var(--background-fronted)_62%,transparent)]"
@@ -2805,14 +2795,20 @@ export function AgentComposer({
                   percentUsed={usage.percentUsed}
                   usedTokens={usage.usedTokens}
                   totalTokens={usage.totalTokens}
-                  limits={slashStatus?.limits ?? []}
                   tooltipsEnabled={!previewMode}
+                  compactSupported={compactSupported ?? false}
+                  compactDisabled={
+                    !hasCompactableContext ||
+                    settingsControlsDisabled ||
+                    inputDisabled
+                  }
+                  onCompact={() => onSubmit(textPromptContent("/compact"))}
                   labels={{
                     usageChipLabel: labels.usageChipLabel,
                     usageTooltipLabel: labels.usageTooltipLabel,
                     usagePopoverTitle: labels.usagePopoverTitle,
                     usageContextWindowLabel: labels.usageContextWindowLabel,
-                    usageLimitsLabel: labels.usageLimitsLabel
+                    usageCompactAction: labels.usageCompactAction
                   }}
                 />
               ) : null}

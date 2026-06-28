@@ -319,11 +319,18 @@ export function createAgentGuiWorkbenchContribution(
       const {
         activation,
         dockEntryId,
-        instanceId,
+        instanceId: descriptorInstanceId,
         provider,
         reuseDockEntryNode,
         targetAgentSessionId
       } = createAgentGuiWorkbenchLaunchDescriptor(request);
+      // Locate an already-open node currently showing this session (its launch
+      // instanceId may differ from the session-keyed one, e.g. a conversation
+      // started fresh as a draft) so we focus it instead of opening a duplicate.
+      const existingInstanceId = targetAgentSessionId
+        ? nodeStateSource.findInstanceIdByAgentSessionId(targetAgentSessionId)
+        : null;
+      const instanceId = existingInstanceId ?? descriptorInstanceId;
       const title = resolveAgentGuiWorkbenchProviderLabel(provider);
       if (targetAgentSessionId) {
         const previousState = nodeStateSource.readNodeState({

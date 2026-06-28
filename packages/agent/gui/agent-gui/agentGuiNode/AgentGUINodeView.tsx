@@ -13,7 +13,19 @@ import {
 } from "react";
 import { useSnapshot } from "valtio";
 import { proxy } from "valtio/vanilla";
-import { ChevronRight, ExternalLink, Info, Wrench } from "lucide-react";
+import {
+  ChevronRight,
+  ExternalLink,
+  Info,
+  Settings,
+  Wrench
+} from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "../../app/renderer/components/ui/popover";
+import { AgentUsageMeter } from "./AgentUsageMeter";
 import { openAgentEnvPanel } from "../../shared/agentEnv/agentEnvPanelStore";
 import type {
   ReferenceLocateTarget,
@@ -261,6 +273,7 @@ export interface AgentGUIViewLabels {
   emptyProvider?: string;
   conversations: string;
   newConversation: string;
+  agentConfig: string;
   agentEnvSetup: string;
   noConversations: string;
   emptyProjectConversations: string;
@@ -1218,6 +1231,7 @@ export function AgentGUINodeView({
         createConversationDisabled,
         openclawGateway,
         isCollapsed: conversationRailCollapsed,
+        slashStatusLimits,
         onCreateConversation: requestCreateConversation,
         onOpenAgentEnvSetup: openAgentEnvSetup,
         onRetryOpenclawGateway: retryOpenclawGateway,
@@ -1250,6 +1264,7 @@ export function AgentGUINodeView({
         retryOpenclawGateway,
         selectConversation,
         selectProjectDirectory,
+        slashStatusLimits,
         toggleConversationPinned,
         uiLanguage,
         viewModel.activeConversationId,
@@ -1894,6 +1909,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       usageContextWindowLabel: labels.usageContextWindowLabel,
       usageTokensLabel: labels.usageTokensLabel,
       usageLimitsLabel: labels.usageLimitsLabel,
+      usageCompactAction: labels.usageCompactAction,
       fileMentionPalette: labels.fileMentionPalette,
       fileMentionLoading: labels.fileMentionLoading,
       fileMentionEmpty: labels.fileMentionEmpty,
@@ -1992,6 +2008,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       labels.usageChipLabel,
       labels.usageContextWindowLabel,
       labels.usageLimitsLabel,
+      labels.usageCompactAction,
       labels.usagePopoverTitle,
       labels.usageTokensLabel,
       labels.stop,
@@ -2060,6 +2077,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       draftContent: viewModel.draftContent,
       availableCommands: viewModel.availableCommands,
       hasCompactableContext: viewModel.hasSentUserMessage,
+      compactSupported: viewModel.compactSupported,
       availableSkills: viewModel.availableSkills,
       disabled: composerDisabled,
       disabledReason: composerDisabledReason,
@@ -2140,6 +2158,7 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
       updateSelectedProjectPath,
       viewModel.availableCommands,
       viewModel.availableSkills,
+      viewModel.compactSupported,
       viewModel.composerSettings,
       viewModel.currentUserId,
       viewModel.data.provider,
@@ -2161,10 +2180,9 @@ const AgentGUIDetailPane = memo(function AgentGUIDetailPane({
   const emptyHeroComposerProps = useMemo<AgentComposerProps>(
     () => ({
       ...bottomDockComposerProps,
-      compactSupported: viewModel.compactSupported,
       layoutMode: "hero"
     }),
-    [bottomDockComposerProps, viewModel.compactSupported]
+    [bottomDockComposerProps]
   );
   const bottomDockStoreState = useMemo<AgentGUIBottomDockStoreSnapshot>(
     () => ({
@@ -2869,6 +2887,7 @@ interface AgentGUIConversationRailPaneProps {
   createConversationDisabled: boolean;
   openclawGateway: OpenclawGatewayViewModel | null;
   isCollapsed: boolean;
+  slashStatusLimits: readonly AgentComposerSlashStatusLimit[];
   onCreateConversation: (options?: { projectPath?: string | null }) => void;
   onOpenAgentEnvSetup: () => void;
   onRetryOpenclawGateway: () => void;
@@ -3157,6 +3176,7 @@ const AgentGUIConversationRailPane = memo(
     createConversationDisabled,
     openclawGateway,
     isCollapsed,
+    slashStatusLimits,
     onCreateConversation,
     onOpenAgentEnvSetup,
     onRetryOpenclawGateway,
@@ -3413,17 +3433,62 @@ const AgentGUIConversationRailPane = memo(
           )}
         </ScrollArea>
         <div className="shrink-0 border-t border-[var(--border-1)] px-2 py-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            className="flex w-full items-center justify-start gap-2 text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            title={labels.agentEnvSetup}
-            disabled={previewMode}
-            onClick={() => onOpenAgentEnvSetup()}
-          >
-            <Wrench aria-hidden="true" size={16} strokeWidth={1.8} />
-            <span>{labels.agentEnvSetup}</span>
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex w-full items-center justify-start gap-2 text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                title={labels.agentConfig}
+                disabled={previewMode}
+              >
+                <Settings aria-hidden="true" size={16} strokeWidth={1.8} />
+                <span>{labels.agentConfig}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="start"
+              className="w-[300px] max-w-[calc(100vw-32px)] gap-3 text-xs"
+              data-testid="agent-gui-config-menu"
+            >
+              <div className="flex min-w-0 flex-col gap-3">
+                {slashStatusLimits.length > 0 ? (
+                  <>
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[13px] font-semibold leading-4">
+                        {labels.slashStatusLimits}
+                      </span>
+                      {slashStatusLimits.map((limit) => (
+                        <AgentUsageMeter
+                          key={limit.id}
+                          label={limit.label}
+                          value={`${limit.value}${limit.reset ? ` (${limit.reset})` : ""}`}
+                          percent={
+                            typeof limit.percentRemaining === "number" &&
+                            Number.isFinite(limit.percentRemaining)
+                              ? limit.percentRemaining
+                              : null
+                          }
+                        />
+                      ))}
+                    </div>
+                    <span className="h-px bg-[var(--border-1)]" />
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  data-testid="agent-gui-config-env-setup"
+                  className="nodrag -mx-1 flex w-[calc(100%+0.5rem)] items-center gap-2 rounded-[6px] px-2 py-1 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-background-hover hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [-webkit-app-region:no-drag]"
+                  disabled={previewMode}
+                  onClick={() => onOpenAgentEnvSetup()}
+                >
+                  <Wrench aria-hidden="true" size={16} strokeWidth={1.8} />
+                  <span>{labels.agentEnvSetup}</span>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <ConfirmationDialog
           cancelLabel={labels.cancel}

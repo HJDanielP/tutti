@@ -148,6 +148,8 @@ export const en = {
       busyInstalling: "Setting up {{provider}}…",
       busyVerifying: "Verifying {{provider}}…",
       actionDetect: "Re-check",
+      redetectDisabledInstalling: "Can't re-check while setting up",
+      redetectDisabledChecking: "Checking…",
       actionInstall: "Set up",
       actionRepair: "Repair install",
       actionUpgrade: "Upgrade",
@@ -202,6 +204,7 @@ export const en = {
       stageProblemInstallMissing: "{{provider}} CLI not installed",
       stageProblemInstallOutdated: "{{provider}} CLI version unsupported",
       stageInstallVersionRequirement: "{{current}} · requires ≥ {{required}}",
+      stageAdapterVersionRequirement: "{{current}} · requires {{required}}",
       stageProblemAdapterMissing: "Adapter not installed",
       stageProblemAdapterMismatch: "Adapter version unsupported",
       stageProblemLoginMissing: "Not signed in",
@@ -236,9 +239,11 @@ export const en = {
       idleStatus: "Idle",
       outcomeNotificationCompletedBody:
         "The agent finished this run. Click to open the session.",
+      outcomeNotificationCompletedStatus: "Completed",
       outcomeNotificationCompletedTitle: "{{title}} completed",
       outcomeNotificationFailedBody:
         "The agent run failed. Click to open the session.",
+      outcomeNotificationFailedStatus: "Failed",
       outcomeNotificationFailedTitle: "{{title}} failed",
       waitingNotificationAction: "Review",
       waitingNotificationCommand: "Command",
