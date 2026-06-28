@@ -1786,8 +1786,9 @@ describe("AgentComposer", () => {
     expect(
       screen.getByTestId("agent-gui-usage-context-meter")
     ).toHaveTextContent("50,000 / 200,000 (25%)");
-    expect(screen.getByText("7d limit")).toBeInTheDocument();
-    expect(screen.getByText("96% left")).toBeInTheDocument();
+    // Plan limits moved out of the usage popover into the rail config menu.
+    expect(screen.queryByText("7d limit")).toBeNull();
+    expect(screen.queryByText("96% left")).toBeNull();
   });
 
   it.each([

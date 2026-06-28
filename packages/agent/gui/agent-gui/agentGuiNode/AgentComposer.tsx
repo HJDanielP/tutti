@@ -34,6 +34,7 @@ import {
 import { ZoomableImage } from "../../app/renderer/components/ZoomableImage";
 import type { AgentConversationPromptVM } from "../../shared/agentConversation/contracts/agentConversationVM";
 import { ConversationImageContextMenu } from "../../shared/agentConversation/components/ConversationImageContextMenu";
+import { AgentUsageMeter, agentUsageBarColor } from "./AgentUsageMeter";
 import { cn } from "../../app/renderer/lib/utils";
 import { AddIcon, Select, SelectTrigger } from "@tutti-os/ui-system";
 import { ListChecks, X } from "lucide-react";
@@ -452,7 +453,6 @@ function AgentUsageChip({
   percentUsed,
   usedTokens,
   totalTokens,
-  limits,
   labels,
   tooltipsEnabled = true,
   onCompact,
@@ -462,7 +462,6 @@ function AgentUsageChip({
   percentUsed: number;
   usedTokens: number | null;
   totalTokens: number | null;
-  limits: readonly AgentComposerSlashStatusLimit[];
   tooltipsEnabled?: boolean;
   onCompact?: () => void;
   compactSupported?: boolean;
@@ -473,7 +472,6 @@ function AgentUsageChip({
     | "usageTooltipLabel"
     | "usagePopoverTitle"
     | "usageContextWindowLabel"
-    | "usageLimitsLabel"
     | "usageCompactAction"
   >;
 }): React.JSX.Element {
@@ -532,26 +530,9 @@ function AgentUsageChip({
               label={labels.usageContextWindowLabel}
               value={`${formatSlashStatusTokenCount(usedTokens)} / ${formatSlashStatusTokenCount(totalTokens)} (${clampedPercent}%)`}
               percent={clampedPercent}
+              barColor={agentUsageBarColor(clampedPercent)}
               testId="agent-gui-usage-context-meter"
             />
-          ) : null}
-          {limits.length > 0 ? (
-            <div className="flex min-w-0 flex-col gap-2">
-              <span className="font-semibold">{labels.usageLimitsLabel}</span>
-              {limits.map((limit) => (
-                <AgentUsageMeter
-                  key={limit.id}
-                  label={limit.label}
-                  value={`${limit.value}${limit.reset ? ` (${limit.reset})` : ""}`}
-                  percent={
-                    typeof limit.percentRemaining === "number" &&
-                    Number.isFinite(limit.percentRemaining)
-                      ? limit.percentRemaining
-                      : null
-                  }
-                />
-              ))}
-            </div>
           ) : null}
           {compactSupported && onCompact ? (
             <button
@@ -567,47 +548,6 @@ function AgentUsageChip({
         </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-function AgentUsageMeter({
-  label,
-  value,
-  percent,
-  testId
-}: {
-  label: string;
-  value: string;
-  percent: number | null;
-  testId?: string;
-}): React.JSX.Element {
-  const clampedPercent =
-    typeof percent === "number" && Number.isFinite(percent)
-      ? Math.max(0, Math.min(100, percent))
-      : null;
-
-  return (
-    <div className="grid min-w-0 gap-1" data-testid={testId}>
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-[var(--text-secondary)]">
-          {label}
-        </span>
-        <span className="shrink-0 whitespace-nowrap text-[var(--text-secondary)]">
-          {value}
-        </span>
-      </div>
-      {clampedPercent !== null ? (
-        <span
-          aria-hidden="true"
-          className="relative h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--text-primary)_10%,transparent)]"
-        >
-          <span
-            className="absolute inset-y-0 left-0 min-w-0.5 rounded-full bg-[var(--agent-gui-text-primary,var(--text-primary))]"
-            style={{ width: `${clampedPercent}%` }}
-          />
-        </span>
-      ) : null}
-    </div>
   );
 }
 
@@ -2777,7 +2717,6 @@ export function AgentComposer({
                   percentUsed={usage.percentUsed}
                   usedTokens={usage.usedTokens}
                   totalTokens={usage.totalTokens}
-                  limits={slashStatus?.limits ?? []}
                   tooltipsEnabled={!previewMode}
                   compactSupported={compactSupported ?? false}
                   compactDisabled={
@@ -2789,7 +2728,6 @@ export function AgentComposer({
                     usageTooltipLabel: labels.usageTooltipLabel,
                     usagePopoverTitle: labels.usagePopoverTitle,
                     usageContextWindowLabel: labels.usageContextWindowLabel,
-                    usageLimitsLabel: labels.usageLimitsLabel,
                     usageCompactAction: labels.usageCompactAction
                   }}
                 />

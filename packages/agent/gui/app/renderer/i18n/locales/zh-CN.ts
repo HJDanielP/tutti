@@ -543,6 +543,7 @@ export const zhCN = {
       empty: "需要 {{provider}} 帮你做些什么？",
       conversations: "会话",
       newConversation: "新建会话",
+      agentConfig: "配置",
       agentEnvSetup: "环境检测",
       noConversations: "还没有会话",
       emptyProjectConversations: "暂无对话",
