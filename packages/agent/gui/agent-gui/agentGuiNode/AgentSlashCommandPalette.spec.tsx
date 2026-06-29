@@ -138,6 +138,13 @@ describe("AgentSlashCommandPalette", () => {
         entries={[
           {
             type: "command",
+            key: "command:compact",
+            label: "compact",
+            description: "Compact the conversation.",
+            command: { name: "compact" }
+          },
+          {
+            type: "command",
             key: "command:status",
             label: "status",
             description: "Show session status.",
@@ -150,6 +157,11 @@ describe("AgentSlashCommandPalette", () => {
         onSelectSkill={vi.fn()}
       />
     );
+
+    const compactIcon = screen
+      .getByRole("option", { name: /compact/i })
+      .querySelector("svg");
+    expect(compactIcon).toBeTruthy();
 
     const icon = screen
       .getByRole("option", { name: /status/i })
