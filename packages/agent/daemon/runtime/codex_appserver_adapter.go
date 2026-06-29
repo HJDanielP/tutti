@@ -1447,8 +1447,12 @@ func (a *CodexAppServerAdapter) awaitGoalOperationCompletion(
 			nextInitialTurn = nextTurn
 			continue
 		}
-		if err := a.requestActiveGoalContinuation(ctx, appSession, session, turnID, normalizer, emitEvents, emitCommands); err != nil {
+		continued, err = a.requestActiveGoalContinuation(ctx, appSession, session, turnID, normalizer, emitEvents, emitCommands)
+		if err != nil {
 			return nil, err
+		}
+		if !continued {
+			return finalTurn, nil
 		}
 		nextInitialTurn = nil
 	}
@@ -1502,10 +1506,10 @@ func (a *CodexAppServerAdapter) requestActiveGoalContinuation(
 	normalizer *acpTurnNormalizer,
 	emitEvents func([]activityshared.Event),
 	emitCommands CommandSnapshotSink,
-) error {
+) (bool, error) {
 	goal := a.sessionGoal(session.AgentSessionID)
 	if strings.TrimSpace(asString(goal["status"])) != "active" {
-		return nil
+		return false, nil
 	}
 	params := map[string]any{
 		"threadId": appSession.threadID,
@@ -1521,12 +1525,12 @@ func (a *CodexAppServerAdapter) requestActiveGoalContinuation(
 		a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands),
 	)
 	if err != nil {
-		return err
+		return true, err
 	}
 	if nextGoal := appServerGoalFromResult(result); len(nextGoal) > 0 {
 		a.applyGoalUpdate(session.AgentSessionID, nextGoal)
 	}
-	return nil
+	return true, nil
 }
 
 func (a *CodexAppServerAdapter) Cancel(ctx context.Context, session Session, reason string) ([]activityshared.Event, error) {
