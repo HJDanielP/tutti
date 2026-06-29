@@ -18,7 +18,13 @@ import type {
   AgentSettings
 } from "../../contexts/settings/domain/agentSettings";
 import type { WorkspaceLinkAction } from "../../actions/workspaceLinkActions";
-import type { AgentGUINodeData, NodeFrame, Point } from "../../types";
+import type {
+  AgentGUINodeData,
+  AgentGUIProviderTarget,
+  NodeFrame,
+  Point
+} from "../../types";
+import { agentGUIProviderTargetRefsEqual } from "../../providerTargets";
 import type {
   DesktopSize,
   WorkspaceDesktopAgentProbeDemandChange,
@@ -171,6 +177,8 @@ export interface AgentGUINodeProps {
     capability: AgentComposerCapabilitySettingsTarget
   ) => void;
   onAgentProviderLogin?: (provider: AgentProvider) => void;
+  providerTargets?: readonly AgentGUIProviderTarget[];
+  defaultProviderTargetId?: string | null;
   onWorkspaceFileReferencesAdded?: (input: {
     provider: AgentProvider;
     references: readonly WorkspaceFileReference[];
@@ -401,6 +409,11 @@ function agentGuiStateEquals(
   return (
     left === right ||
     (left.provider === right.provider &&
+      (left.providerTargetId ?? null) === (right.providerTargetId ?? null) &&
+      agentGUIProviderTargetRefsEqual(
+        left.providerTargetRef,
+        right.providerTargetRef
+      ) &&
       left.lastActiveAgentSessionId === right.lastActiveAgentSessionId &&
       left.conversationRailWidthPx === right.conversationRailWidthPx &&
       left.conversationRailCollapsed === right.conversationRailCollapsed &&
@@ -479,6 +492,8 @@ function areAgentGUINodePropsEqual(
     previous.onLinkAction === next.onLinkAction &&
     previous.onCapabilitySettingsRequest === next.onCapabilitySettingsRequest &&
     previous.onAgentProviderLogin === next.onAgentProviderLogin &&
+    previous.providerTargets === next.providerTargets &&
+    previous.defaultProviderTargetId === next.defaultProviderTargetId &&
     previous.onClose === next.onClose &&
     previous.onResize === next.onResize &&
     previous.onUpdateNode === next.onUpdateNode &&
@@ -531,6 +546,8 @@ export const AgentGUINode = memo(function AgentGUINode({
   capabilityMenuState,
   onCapabilitySettingsRequest,
   onAgentProviderLogin,
+  providerTargets,
+  defaultProviderTargetId = null,
   onWorkspaceFileReferencesAdded,
   onOpenConversationWindow,
   onClose,
@@ -697,6 +714,8 @@ export const AgentGUINode = memo(function AgentGUINode({
     data: state,
     openSessionRequest,
     prefillPromptRequest,
+    providerTargets,
+    defaultProviderTargetId,
     previewMode,
     onDataChange: handleDataChange,
     onShowMessage
@@ -705,13 +724,16 @@ export const AgentGUINode = memo(function AgentGUINode({
   const fallbackAgentTitle = t("sidebar.fallbackAgentLabel");
   const activeProvider =
     viewModel.activeConversation?.provider ?? state.provider;
-  const displayProviderLabel = resolveAgentGUIProviderDisplayLabel(
-    activeProvider,
-    fallbackAgentTitle
-  );
-  const windowAgentTitle =
-    getAgentHostManagedToolchainAgentByName(activeProvider)?.label ??
-    displayProviderLabel;
+  const selectedProviderTargetLabel =
+    viewModel.selectedProviderTarget?.label ??
+    resolveAgentGUIProviderDisplayLabel(state.provider, fallbackAgentTitle);
+  const displayProviderLabel = viewModel.activeConversation
+    ? resolveAgentGUIProviderDisplayLabel(activeProvider, fallbackAgentTitle)
+    : selectedProviderTargetLabel;
+  const windowAgentTitle = viewModel.activeConversation
+    ? (getAgentHostManagedToolchainAgentByName(activeProvider)?.label ??
+      displayProviderLabel)
+    : displayProviderLabel;
   const activeConversationDockTitle = viewModel.activeConversation
     ? resolveAgentGUIDockConversationTitle(viewModel.activeConversation)
     : null;

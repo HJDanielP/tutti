@@ -652,6 +652,33 @@ activity data source:
 - account or user-project lookup
 - local file picking, local file reading, and batch export helpers
 
+### Provider Targets
+
+AgentGUI distinguishes real provider identity from launch targets. `provider`
+continues to mean the concrete provider family (`codex`, `claude-code`,
+`nexight`, and so on) and remains the key for composer options, settings,
+icons, probes, provider status, and adapter policy.
+
+`providerTargets` lets a host expose multiple targets under that same provider.
+AgentGUI owns only target display and passthrough:
+
+- show `target.label` for new-session surfaces
+- keep provider behavior keyed by `target.provider`
+- persist `providerTargetId` / `providerTargetRef` in workbench node state
+- pass `providerTargetRef` through `AgentActivityRuntime.activateSession`
+
+`providerTargetRef` is an opaque host reference, not authority. AgentGUI must
+not interpret `ref.kind`, mint invocation-control tokens, resolve invocation
+plans, contact command gateways, or handle raw credentials. Host/trusted code
+must re-authenticate the current user and workspace and resolve any invocation
+plan before launching. A target may identify shared, local, remote, or other
+host-owned launch mechanisms, but those meanings stay outside AgentGUI.
+
+When `providerTargets` is omitted or empty, AgentGUI may synthesize local
+targets from the static provider catalog for picker/display compatibility. Those
+fallback targets do not change the legacy activation contract: AgentGUI does not
+persist or send their `providerTargetRef`.
+
 ### Conversation Projection
 
 Projection code converts runtime/session state into renderable view models.

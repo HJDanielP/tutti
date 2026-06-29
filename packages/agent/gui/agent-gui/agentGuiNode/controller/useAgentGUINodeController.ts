@@ -45,7 +45,12 @@ import type {
   AgentSessionState
 } from "../../../shared/agentSessionTypes";
 import { AGENT_PROVIDER_LABEL } from "../../../contexts/settings/domain/agentSettings";
-import type { AgentGUINodeData } from "../../../types";
+import type { AgentGUINodeData, AgentGUIProviderTarget } from "../../../types";
+import {
+  agentGUIProviderTargetRefsEqual,
+  normalizeAgentGUIProviderTargets,
+  resolveAgentGUIProviderTarget
+} from "../../../providerTargets";
 import {
   AGENT_GUI_RUNTIME_SESSION_ORIGIN,
   buildAgentGUIConversationModels,
@@ -3128,6 +3133,8 @@ interface UseAgentGUINodeControllerInput {
   workspacePath: string;
   avoidGroupingEdits: boolean;
   data: AgentGUINodeData;
+  providerTargets?: readonly AgentGUIProviderTarget[];
+  defaultProviderTargetId?: string | null;
   openSessionRequest?: AgentGUIOpenSessionRequest | null;
   prefillPromptRequest?: AgentGUIPrefillPromptRequest | null;
   previewMode?: boolean;
@@ -3159,6 +3166,8 @@ export function useAgentGUINodeController({
   workspacePath,
   avoidGroupingEdits,
   data,
+  providerTargets,
+  defaultProviderTargetId = null,
   openSessionRequest = null,
   prefillPromptRequest = null,
   previewMode = false,
@@ -3168,6 +3177,48 @@ export function useAgentGUINodeController({
   const agentActivityRuntime = useAgentActivityRuntime();
   const agentHostApi = useAgentHostApi();
   const agentActivitySnapshot = useAgentActivitySnapshot(workspaceId);
+  const normalizedExplicitProviderTargets = useMemo(
+    () =>
+      normalizeAgentGUIProviderTargets(providerTargets, {
+        fallbackToLocal: false
+      }),
+    [providerTargets]
+  );
+  const normalizedProviderTargets = useMemo(
+    () =>
+      normalizedExplicitProviderTargets.length > 0
+        ? normalizedExplicitProviderTargets
+        : normalizeAgentGUIProviderTargets(null),
+    [normalizedExplicitProviderTargets]
+  );
+  const selectedProviderTarget = useMemo(
+    () =>
+      resolveAgentGUIProviderTarget({
+        defaultProviderTargetId,
+        provider: data.provider,
+        providerTargetId: data.providerTargetId,
+        providerTargets: normalizedProviderTargets
+      }),
+    [
+      data.provider,
+      data.providerTargetId,
+      defaultProviderTargetId,
+      normalizedProviderTargets
+    ]
+  );
+  const selectedProviderTargetIsExplicit = useMemo(
+    () =>
+      normalizedExplicitProviderTargets.some(
+        (target) =>
+          target.provider === selectedProviderTarget.provider &&
+          target.targetId === selectedProviderTarget.targetId &&
+          agentGUIProviderTargetRefsEqual(
+            target.ref,
+            selectedProviderTarget.ref
+          )
+      ),
+    [normalizedExplicitProviderTargets, selectedProviderTarget]
+  );
   const agentActivityDisplayStatusesRef = useRef<Map<
     string,
     AgentActivityDisplayStatus
@@ -3609,6 +3660,13 @@ export function useAgentGUINodeController({
     agentActivitySnapshot
   );
   const dataRef = useRef(data);
+  const selectedProviderTargetRef = useRef(selectedProviderTarget);
+  selectedProviderTargetRef.current = selectedProviderTarget;
+  const selectedProviderTargetIsExplicitRef = useRef(
+    selectedProviderTargetIsExplicit
+  );
+  selectedProviderTargetIsExplicitRef.current =
+    selectedProviderTargetIsExplicit;
   const draftSettingsBySessionIdRef = useRef(draftSettingsBySessionId);
   const onDataChangeRef = useRef(onDataChange);
   const onShowMessageRef = useRef(onShowMessage);
@@ -6160,8 +6218,10 @@ export function useAgentGUINodeController({
 
   const startConversation = useCallback(
     (initialContentInput?: unknown, displayPrompt?: string) => {
+      const target = selectedProviderTargetRef.current;
       if (
         isCreatingConversation ||
+        target.disabled === true ||
         (data.provider === "openclaw" && openclawGateway?.status !== "ready")
       ) {
         return;
@@ -6190,7 +6250,30 @@ export function useAgentGUINodeController({
       let pendingOptimisticConversation: AgentGUIConversationSummary | null =
         null;
       void (async () => {
-        const provider = data.provider;
+        const target = selectedProviderTargetRef.current;
+        const provider = target.provider;
+        const shouldUseProviderTargetRef =
+          selectedProviderTargetIsExplicitRef.current;
+        onDataChangeRef.current((current) =>
+          current.provider === provider &&
+          (current.providerTargetId ?? null) ===
+            (shouldUseProviderTargetRef ? target.targetId : null) &&
+          agentGUIProviderTargetRefsEqual(
+            current.providerTargetRef,
+            shouldUseProviderTargetRef ? target.ref : null
+          )
+            ? current
+            : {
+                ...current,
+                provider,
+                providerTargetId: shouldUseProviderTargetRef
+                  ? target.targetId
+                  : null,
+                providerTargetRef: shouldUseProviderTargetRef
+                  ? target.ref
+                  : null
+              }
+        );
         const currentData =
           dataRef.current.provider === provider ? dataRef.current : data;
         const selectedProjectPath = selectedProjectPathRef.current;
@@ -6348,6 +6431,7 @@ export function useAgentGUINodeController({
           mode: "new",
           agentSessionId,
           provider,
+          providerTargetRef: shouldUseProviderTargetRef ? target.ref : null,
           cwd: selectedProjectPath ?? "",
           initialContent: normalizedInitialContent,
           initialDisplayPrompt,
@@ -9485,6 +9569,8 @@ export function useAgentGUINodeController({
     activeLiveState !== "activating" &&
     activeLiveState !== "failed" &&
     !activeConversationResumeUnavailable &&
+    (activeConversationId !== null ||
+      selectedProviderTarget.disabled !== true) &&
     (data.provider !== "openclaw" || openclawGateway?.status === "ready") &&
     pendingApproval === null &&
     pendingInteractivePrompt === null &&
@@ -9863,6 +9949,7 @@ export function useAgentGUINodeController({
         workspacePath,
         currentUserId,
         data,
+        selectedProviderTarget,
         conversations: visibleConversations,
         userProjects,
         activeConversation,
@@ -9930,6 +10017,7 @@ export function useAgentGUINodeController({
       conversationDetail,
       controllerActions,
       data,
+      selectedProviderTarget,
       detailError,
       draftContent,
       draftPrompt,
@@ -9954,6 +10042,7 @@ export function useAgentGUINodeController({
       pendingDeleteProjectConversations,
       pendingApproval,
       pendingInteractivePrompt,
+      selectedProviderTarget.disabled,
       queuedPrompts,
       drainingQueuedPromptId,
       currentUserId,

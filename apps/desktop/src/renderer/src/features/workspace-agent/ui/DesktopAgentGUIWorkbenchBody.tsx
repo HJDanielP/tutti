@@ -12,6 +12,7 @@ import { useSnapshot } from "valtio";
 import { AgentGUI } from "@tutti-os/agent-gui";
 import type {
   AgentActivityRuntime,
+  AgentGUIProviderTarget,
   AgentGUIProps,
   AgentHostInputApi
 } from "@tutti-os/agent-gui";
@@ -98,6 +99,8 @@ interface DesktopAgentGUIWorkbenchBodyProps {
   }) => Promise<void> | void;
   onStateChange: (state: DesktopAgentGUIWorkbenchState) => void;
   previewMode?: boolean;
+  providerTargets?: readonly AgentGUIProviderTarget[];
+  defaultProviderTargetId?: string | null;
   contextMentionProviders: NonNullable<
     AgentGUIProps["contextMentionProviders"]
   >;
@@ -157,6 +160,8 @@ function areDesktopAgentGUIWorkbenchBodyPropsEqual(
     previous.onOpenAgentConversationWindow ===
       next.onOpenAgentConversationWindow &&
     previous.previewMode === next.previewMode &&
+    previous.providerTargets === next.providerTargets &&
+    previous.defaultProviderTargetId === next.defaultProviderTargetId &&
     previous.contextMentionProviders === next.contextMentionProviders &&
     previous.runtimeApi === next.runtimeApi &&
     previous.trackAgentProviderChatReady === next.trackAgentProviderChatReady &&
@@ -229,6 +234,8 @@ function DesktopAgentGUIWorkbenchBodyImpl({
   onOpenAgentConversationWindow,
   onStateChange,
   previewMode = false,
+  providerTargets,
+  defaultProviderTargetId = null,
   contextMentionProviders,
   runtimeApi,
   trackAgentProviderChatReady,
@@ -954,6 +961,8 @@ function DesktopAgentGUIWorkbenchBodyImpl({
         prefillPromptRequest={prefillPromptRequest}
         managedAgentsState={managedAgentsState}
         nodeId={context.node.id}
+        providerTargets={providerTargets}
+        defaultProviderTargetId={defaultProviderTargetId}
         workspaceAgentProbes={workspaceAgentProbes}
         onAgentProbeDemandChange={
           previewMode ? undefined : handleAgentProbeDemandChange

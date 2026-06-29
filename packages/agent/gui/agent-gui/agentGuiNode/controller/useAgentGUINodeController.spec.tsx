@@ -953,6 +953,194 @@ describe("useAgentGUINodeController", () => {
     });
   });
 
+  it("passes the selected provider target ref when starting a new conversation", async () => {
+    const providerTargetRef = {
+      kind: "shared-agent",
+      provider: "codex" as const,
+      sharedAgentId: "agent-1"
+    };
+    const activate = vi.fn(
+      async (input: AgentHostActivateAgentSessionInput) => ({
+        session: agentSession(input.agentSessionId, {
+          provider: input.mode === "new" ? input.provider : "codex"
+        }),
+        activation: { mode: input.mode, status: "attached" as const }
+      })
+    );
+    installAgentHostApi({
+      list: vi.fn(async () => ({ presences: [], sessions: [] })),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn(() => vi.fn()),
+      activate
+    });
+    const onDataChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAgentGUINodeController({
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: agentGuiData(null),
+        providerTargets: [
+          {
+            targetId: "shared-agent:agent-1",
+            provider: "codex",
+            ref: providerTargetRef,
+            label: "Alice's Codex"
+          }
+        ],
+        defaultProviderTargetId: "shared-agent:agent-1",
+        onDataChange
+      })
+    );
+
+    act(() => {
+      result.current.actions.submitPrompt(promptBlocks("start shared codex"));
+    });
+
+    await waitFor(() => {
+      expect(activate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: "new",
+          provider: "codex",
+          providerTargetRef
+        })
+      );
+    });
+    expect(result.current.viewModel.selectedProviderTarget).toMatchObject({
+      targetId: "shared-agent:agent-1",
+      provider: "codex",
+      label: "Alice's Codex"
+    });
+    expect(onDataChange).toHaveBeenCalled();
+    const persistTargetUpdate = onDataChange.mock.calls.find(([updater]) => {
+      const next = updater(agentGuiData(null));
+      return next.providerTargetId === "shared-agent:agent-1";
+    })?.[0];
+    expect(persistTargetUpdate?.(agentGuiData(null))).toMatchObject({
+      provider: "codex",
+      providerTargetId: "shared-agent:agent-1",
+      providerTargetRef
+    });
+  });
+
+  it("does not send a fallback local provider target ref when provider targets are omitted", async () => {
+    const activate = vi.fn(
+      async (input: AgentHostActivateAgentSessionInput) => ({
+        session: agentSession(input.agentSessionId, {
+          provider: input.mode === "new" ? input.provider : "codex"
+        }),
+        activation: { mode: input.mode, status: "attached" as const }
+      })
+    );
+    installAgentHostApi({
+      list: vi.fn(async () => ({ presences: [], sessions: [] })),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn(() => vi.fn()),
+      activate
+    });
+    const onDataChange = vi.fn();
+    const initialData = agentGuiData(null);
+
+    const { result } = renderHook(() =>
+      useAgentGUINodeController({
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: initialData,
+        onDataChange
+      })
+    );
+
+    act(() => {
+      result.current.actions.submitPrompt(promptBlocks("start local codex"));
+    });
+
+    await waitFor(() => {
+      expect(activate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: "new",
+          provider: "codex",
+          providerTargetRef: null
+        })
+      );
+    });
+    const providerTargetUpdates = onDataChange.mock.calls
+      .map(([updater]) => updater(initialData))
+      .filter(
+        (next) =>
+          next !== initialData &&
+          ("providerTargetId" in next || "providerTargetRef" in next)
+      );
+    expect(providerTargetUpdates).toEqual([]);
+  });
+
+  it("does not send a fallback local provider target ref when no explicit target matches the provider", async () => {
+    const activate = vi.fn(
+      async (input: AgentHostActivateAgentSessionInput) => ({
+        session: agentSession(input.agentSessionId, {
+          provider: input.mode === "new" ? input.provider : "claude-code"
+        }),
+        activation: { mode: input.mode, status: "attached" as const }
+      })
+    );
+    installAgentHostApi({
+      list: vi.fn(async () => ({ presences: [], sessions: [] })),
+      listSessionTimeline: vi.fn(async () => ({ timelineItems: [] })),
+      subscribeEvents: vi.fn(() => vi.fn()),
+      activate
+    });
+    const onDataChange = vi.fn();
+    const initialData = agentGuiData(null, "claude-code");
+
+    const { result } = renderHook(() =>
+      useAgentGUINodeController({
+        workspaceId: "room-1",
+        currentUserId: "user-1",
+        workspacePath: "/workspace",
+        avoidGroupingEdits: false,
+        data: initialData,
+        providerTargets: [
+          {
+            targetId: "shared-agent:codex-1",
+            provider: "codex",
+            ref: {
+              kind: "shared-agent",
+              provider: "codex",
+              sharedAgentId: "codex-1"
+            },
+            label: "Alice's Codex"
+          }
+        ],
+        onDataChange
+      })
+    );
+
+    act(() => {
+      result.current.actions.submitPrompt(promptBlocks("start local claude"));
+    });
+
+    await waitFor(() => {
+      expect(activate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: "new",
+          provider: "claude-code",
+          providerTargetRef: null
+        })
+      );
+    });
+    const providerTargetUpdates = onDataChange.mock.calls
+      .map(([updater]) => updater(initialData))
+      .filter(
+        (next) =>
+          next !== initialData &&
+          ("providerTargetId" in next || "providerTargetRef" in next)
+      );
+    expect(providerTargetUpdates).toEqual([]);
+  });
+
   it("prefills draft prompts without activating or executing a session", async () => {
     const activate = vi.fn(
       async (input: AgentHostActivateAgentSessionInput) => ({
@@ -13673,6 +13861,7 @@ function installAgentActivityRuntimeForHostMocks({
         ...(input.mode === "new"
           ? {
               provider: input.provider,
+              providerTargetRef: input.providerTargetRef,
               cwd: input.cwd,
               initialContent: input.initialContent,
               title: input.title,
