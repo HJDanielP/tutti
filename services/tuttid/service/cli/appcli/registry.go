@@ -189,7 +189,7 @@ func (r *Registry) Invoke(ctx context.Context, request cliservice.InvokeRequest)
 	if request.OutputMode == "" {
 		request.OutputMode = serviceOutputMode(command.Capability.Output.DefaultMode)
 	}
-	input, err := appclicore.NormalizeInput(command.Manifest.InputSchema, request.Input)
+	input, warnings, err := appclicore.NormalizeInputWithWarnings(command.Manifest.InputSchema, request.Input)
 	if err != nil {
 		return cliservice.CommandOutput{}, serviceInvokeError(err)
 	}
@@ -214,11 +214,30 @@ func (r *Registry) Invoke(ctx context.Context, request cliservice.InvokeRequest)
 	if err != nil {
 		return cliservice.CommandOutput{}, serviceInvokeError(err)
 	}
+	output = appendInputWarningsToOutput(output, warnings)
 	output, err = appclicore.ValidateCommandOutput(command.Capability.Output, output)
 	if err != nil {
 		return cliservice.CommandOutput{}, serviceInvokeError(err)
 	}
 	return serviceCommandOutput(output), nil
+}
+
+func appendInputWarningsToOutput(output appclicore.CommandOutput, warnings []appclicore.InputWarning) appclicore.CommandOutput {
+	if len(warnings) == 0 || output.Kind != appclicore.OutputModeJSON {
+		return output
+	}
+	if output.Value == nil {
+		output.Value = map[string]any{}
+	}
+	values := make([]map[string]any, 0, len(warnings))
+	for _, warning := range warnings {
+		values = append(values, map[string]any{
+			"code":    warning.Code,
+			"message": warning.Message,
+		})
+	}
+	output.Value["warnings"] = values
+	return output
 }
 
 func (r *Registry) command(workspaceID string, commandID string) (appclicore.RegisteredApp, appclicore.Command, bool) {

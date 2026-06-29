@@ -47,6 +47,10 @@ Keep these semantics stable unless the app CLI manifest version changes:
 - app commands may declare optional `visibility: "integration"` to stay out of
   ordinary user and Agent discovery while remaining available to app-runtime
   integrations; omitted visibility is `public`
+- app command input schema properties may include `enum` and `default`
+  annotations when their values match the declared property type; `default` is
+  metadata for help and discovery, not a host-side input value that is injected
+  into handler requests
 
 Do not require migration for existing app manifests when changing builtin CLI
 implementation internals.

@@ -224,6 +224,10 @@ func TestRegistryInvokeIgnoresUnknownInput(t *testing.T) {
 	if output.Kind != cliservice.OutputModeJSON {
 		t.Fatalf("output = %#v", output)
 	}
+	warnings, ok := output.Value["warnings"].([]map[string]any)
+	if !ok || len(warnings) != 1 || warnings[0]["code"] != "unknown_input_ignored" {
+		t.Fatalf("output warnings = %#v", output.Value["warnings"])
+	}
 	input, ok := envelope["input"].(map[string]any)
 	if !ok || input["name"] != "daily" {
 		t.Fatalf("envelope input = %#v", envelope["input"])
