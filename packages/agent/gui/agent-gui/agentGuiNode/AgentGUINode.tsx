@@ -960,6 +960,22 @@ export const AgentGUINode = memo(function AgentGUINode({
       batchDeleteProjectSessionsConfirm: t(
         "agentHost.agentGui.batchDeleteProjectSessionsConfirm"
       ),
+      conversationsSectionMoreActions: t(
+        "agentHost.agentGui.conversationsSectionMoreActions"
+      ),
+      batchDeleteConversations: t(
+        "agentHost.agentGui.batchDeleteConversations"
+      ),
+      batchDeleteConversationsTitle: t(
+        "agentHost.agentGui.batchDeleteConversationsTitle"
+      ),
+      batchDeleteConversationsBody: (count: number) =>
+        t("agentHost.agentGui.batchDeleteConversationsBody", {
+          count
+        }),
+      batchDeleteConversationsConfirm: t(
+        "agentHost.agentGui.batchDeleteConversationsConfirm"
+      ),
       approvalRequired: t("agentHost.agentGui.approvalRequired", {
         provider: displayProviderLabel
       }),

@@ -650,6 +650,11 @@ export const zhCN = {
       batchDeleteProjectSessionsBody:
         "将删除「{{project}}」下的 {{count}} 个会话。删除后无法恢复。",
       batchDeleteProjectSessionsConfirm: "删除会话",
+      conversationsSectionMoreActions: "对话操作",
+      batchDeleteConversations: "批量删除对话",
+      batchDeleteConversationsTitle: "删除对话？",
+      batchDeleteConversationsBody: "将删除 {{count}} 个对话。删除后无法恢复。",
+      batchDeleteConversationsConfirm: "删除对话",
       runtimeSessionOnly: "这里只显示 runtime 会话。",
       approvalRequired: "{{provider}} 请求你的授权。",
       approvalUnavailable: "没有可用选项。",

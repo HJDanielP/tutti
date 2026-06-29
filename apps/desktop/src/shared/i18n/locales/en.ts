@@ -266,8 +266,7 @@ export const en = {
     },
     externalImport: {
       back: "Back",
-      description:
-        "Import local Codex and Claude Code project history from the last 30 days",
+      description: "Import local Codex and Claude Code conversation history",
       done: "Done",
       empty: "No local Codex or Claude Code project history was found",
       errors: "Skipped items",
@@ -280,6 +279,22 @@ export const en = {
       projectOptionDescription: "Use existing project folders",
       projectOptionTitle: "Projects ({{count}})",
       providerDescription: "Choose which local apps to scan",
+      selectTitle: "Select conversations to import",
+      selectDescription:
+        "Search and check the projects and conversations to import",
+      searchPlaceholder: "Search projects and conversations",
+      selectAll: "Select all",
+      selectedCount: "{{selected}} of {{total}} selected",
+      noResults: "No conversations match your search",
+      registerProjects: "Also register project folders",
+      sessionMessages: "{{count}} messages",
+      rangeLabel: "Time range",
+      range7: "7 days",
+      range30: "30 days",
+      range90: "90 days",
+      rangeAll: "All",
+      selectSession: "Select {{title}}",
+      selectProjectGroup: "Select all in {{label}}",
       promptDescription:
         "Tutti can import recent {{provider}} project conversations",
       promptImport: "Import",
