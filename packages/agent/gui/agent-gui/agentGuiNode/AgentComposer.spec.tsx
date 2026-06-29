@@ -459,7 +459,7 @@ describe("AgentComposer", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("wraps composer draft images in a right-click copy menu", () => {
+  it("renders composer draft images with image actions", () => {
     render(
       <AgentComposer
         workspaceId="workspace-1"
@@ -503,9 +503,7 @@ describe("AgentComposer", () => {
     const drafts = screen.getByTestId("agent-gui-composer-image-drafts");
     expect(drafts).toHaveClass("w-full");
     expect(drafts.className).not.toContain("max-w-[320px]");
-    expect(
-      drafts.querySelector('[data-slot="context-menu-trigger"]')
-    ).not.toBeNull();
+    expect(screen.getByRole("img", { name: "earth.png" })).toBeInTheDocument();
   });
 
   it("hides the permission dropdown and the plan badge when only plan mode is supported and inactive", () => {
@@ -1929,7 +1927,7 @@ describe("AgentComposer", () => {
       /\.agent-gui-node__composer\[data-layout="dock"\][\s\S]*?\.agent-gui-node__composer-prompt-input-area:hover[\s\S]*?::-webkit-scrollbar,[\s\S]*?\.agent-gui-node__composer\[data-layout="dock"\][\s\S]*?\.agent-gui-node__composer-prompt-input-area:focus-within[\s\S]*?::-webkit-scrollbar\s*{[^}]*display:\s*block/s
     );
     expect(css).toMatch(
-      /\.agent-gui-node__composer\[data-layout="dock"\]\s+\.agent-gui-node__composer-textarea p\s*{[^}]*display:\s*block[^}]*width:\s*auto[^}]*min-width:\s*0[^}]*overflow:\s*visible[^}]*overflow-wrap:\s*anywhere[^}]*white-space:\s*pre-wrap/s
+      /\.agent-gui-node__composer\[data-layout="dock"\]\s+\.agent-gui-node__composer-textarea\s+p\s*{[^}]*display:\s*block[^}]*width:\s*auto[^}]*min-width:\s*0[^}]*overflow:\s*visible[^}]*overflow-wrap:\s*anywhere[^}]*white-space:\s*pre-wrap/s
     );
     expect(css).toMatch(
       /\.agent-gui-node__composer\[data-layout="dock"\][\s\S]*?\.agent-rich-text-placeholder-node:first-child\s*{[^}]*position:\s*relative[^}]*display:\s*block[^}]*min-height:\s*24px/s
