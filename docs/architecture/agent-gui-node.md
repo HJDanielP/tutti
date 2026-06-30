@@ -284,6 +284,11 @@ The session list is not owned by AgentGuiNode. AgentGuiNode may keep query,
 selection, pending create/delete/submit overlays, and read-state UI metadata.
 The session rows themselves come from the runtime snapshot and are refreshed
 through `load`, event reconciliation, or explicit session fetches.
+The desktop adapter should keep broad session-list loads bounded before they
+enter `AgentActivityRuntime`; large workspaces can accumulate hundreds or
+thousands of historical agent sessions, and pushing all of them through the
+runtime snapshot forces AgentGuiNode to repeatedly project and reconcile data
+the user is unlikely to inspect in the rail.
 Conversation-list read-state metadata is notification-style UI state. Historical
 imports that carry `runtimeContext.imported === true` should remain visible in
 the rail, but they must not seed unread completion lamps as though they just
