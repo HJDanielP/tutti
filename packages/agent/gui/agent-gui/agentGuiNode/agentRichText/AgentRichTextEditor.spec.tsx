@@ -713,6 +713,84 @@ describe("AgentRichTextEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("keeps line-start caret anchors out of copied prompt text", async () => {
+    const clipboardData = writableClipboard();
+    render(
+      <AgentRichTextEditor
+        value={
+          "[@README.md](/workspace/docs/README.md)\n[@docs](/workspace/docs)"
+        }
+        disabled={false}
+        placeholder="Prompt"
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    await waitFor(() => expect(editor).toHaveTextContent("README.md"));
+    selectEditorContents(editor);
+    fireEvent.copy(editor, { clipboardData });
+    expect(clipboardData.getData("text/plain")).not.toContain("\u200B");
+    expect(clipboardData.getData("text/plain")).toBe(
+      "[@README.md](/workspace/docs/README.md)\n[@docs](/workspace/docs)"
+    );
+  });
+
+  it("skips line-start caret anchors when navigating right into a mention", async () => {
+    const onChange = vi.fn();
+    const ref = createRef<AgentRichTextEditorHandle>();
+    render(
+      <AgentRichTextEditor
+        ref={ref}
+        value="[@README.md](/workspace/docs/README.md)"
+        disabled={false}
+        placeholder="Prompt"
+        onChange={onChange}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    await waitFor(() => expect(editor).toHaveTextContent("README.md"));
+    act(() => {
+      ref.current?.focusAtStart();
+    });
+    fireEvent.keyDown(editor, { key: "ArrowRight" });
+    fireEvent.paste(editor, { clipboardData: clipboard("x") });
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith(
+        "[@README.md](/workspace/docs/README.md)x"
+      )
+    );
+  });
+
+  it("skips line-start caret anchors when navigating left over a mention", async () => {
+    const onChange = vi.fn();
+    const ref = createRef<AgentRichTextEditorHandle>();
+    render(
+      <AgentRichTextEditor
+        ref={ref}
+        value="[@README.md](/workspace/docs/README.md)"
+        disabled={false}
+        placeholder="Prompt"
+        onChange={onChange}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    await waitFor(() => expect(editor).toHaveTextContent("README.md"));
+    act(() => {
+      ref.current?.focusAtEnd();
+    });
+    expect(ref.current?.getPromptTextBeforeSelection()).not.toBe("");
+    fireEvent.keyDown(editor, { key: "ArrowLeft" });
+    expect(ref.current?.getPromptTextBeforeSelection()).toBe("");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("removes hydrated file mentions through the icon hover remove button", async () => {
     const onChange = vi.fn();
     render(
