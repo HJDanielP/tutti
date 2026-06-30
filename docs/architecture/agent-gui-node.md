@@ -241,6 +241,17 @@ is reloaded or a different oldest durable version is reached. Do not let scroll
 position and `isLoadingOlderMessages=false` form an immediate retry loop against
 the same failing backend page.
 
+The selected detail window is a UI-local page cache, not proof that the full
+durable transcript has loaded. If live updates or snapshot reconciliation seed a
+detail window before the selected session's initial message page resolves, do
+not treat that window as a complete cache just because it has renderable rows.
+Either force the initial `listSessionMessages(order="desc")` page load, or mark
+the window as having older history so top-of-transcript prefetch can request the
+missing page. This is especially important when the oldest loaded durable
+version is greater than the first persisted version: otherwise the visible top
+row can be a later assistant/tool message even while the scroll container is
+already at the top.
+
 ### First Prompt In A New Conversation
 
 ```text
@@ -459,6 +470,27 @@ User-visible rules:
 - Working/error/attention badges should come from session status, pending
   interactive/approval projection, or explicit local pending state. Do not infer
   them from row text.
+
+### Conversation Titles Across Surfaces
+
+```text
+runtime snapshot session + cached messages
+  -> Agent GUI title projection
+  -> rail row / detail header / workbench header / dock popup / toast title
+```
+
+User-visible rules:
+
+- AgentGUI conversation titles must use the shared title projection before they
+  reach desktop-owned chrome, dock previews, message center cards, or toast
+  notifications. Do not display raw `session.title.trim()` in those surfaces.
+- Live runtime snapshot data is the primary source for workbench and dock
+  titles. `lastActiveConversationTitle` is a hydration fallback only; it must not
+  override a current snapshot title and must be cleared when starting a new
+  conversation.
+- Title projection must normalize rich mention markdown, strip provider-only and
+  untitled placeholders from workbench chrome, and use cached first-user-message
+  content only when the session title is not displayable.
 
 ### Detail Pane And Transcript
 

@@ -707,6 +707,12 @@ export const en = {
       batchDeleteProjectSessionsBody:
         "This will delete {{count}} sessions in “{{project}}”. Deleted sessions cannot be recovered.",
       batchDeleteProjectSessionsConfirm: "Delete sessions",
+      conversationsSectionMoreActions: "Conversation actions",
+      batchDeleteConversations: "Batch delete conversations",
+      batchDeleteConversationsTitle: "Delete conversations?",
+      batchDeleteConversationsBody:
+        "This will delete {{count}} conversations. Deleted conversations cannot be recovered.",
+      batchDeleteConversationsConfirm: "Delete conversations",
       runtimeSessionOnly: "Only runtime sessions appear here.",
       approvalRequired: "{{provider}} requests your authorization.",
       approvalUnavailable: "No choices are available.",

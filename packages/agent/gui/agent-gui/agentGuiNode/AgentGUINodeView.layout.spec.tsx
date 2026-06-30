@@ -1663,6 +1663,7 @@ function createActions(): AgentGUINodeViewProps["actions"] {
     toggleConversationPinned: vi.fn(),
     removeProject: vi.fn(),
     confirmDeleteProjectConversations: vi.fn(),
+    confirmDeleteConversations: vi.fn(),
     requestDeleteConversation: vi.fn(),
     cancelDeleteConversation: vi.fn(),
     confirmDeleteConversation: vi.fn()
@@ -1921,6 +1922,12 @@ function createLabels(): AgentGUIViewLabels {
     batchDeleteProjectSessionsBody: (count: number, project: string) =>
       `batchDeleteProjectSessionsBody:${count}:${project}`,
     batchDeleteProjectSessionsConfirm: "batchDeleteProjectSessionsConfirm",
+    conversationsSectionMoreActions: "conversationsSectionMoreActions",
+    batchDeleteConversations: "batchDeleteConversations",
+    batchDeleteConversationsTitle: "batchDeleteConversationsTitle",
+    batchDeleteConversationsBody: (count: number) =>
+      `batchDeleteConversationsBody:${count}`,
+    batchDeleteConversationsConfirm: "batchDeleteConversationsConfirm",
     approvalRequired: "approvalRequired",
     approvalUnavailable: "approvalUnavailable",
     authRequired: "authRequired",
