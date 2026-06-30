@@ -839,9 +839,7 @@ describe("AgentComposer", () => {
     expect(goalBadge).toBeInTheDocument();
     // Hovering the badge reveals a cancel affordance hinting it is clickable.
     expect(goalBadge).toHaveClass("group");
-    expect(
-      goalBadge.querySelector(".group-hover\\:opacity-100")
-    ).toBeTruthy();
+    expect(goalBadge.querySelector(".group-hover\\:opacity-100")).toBeTruthy();
     expect(screen.getByRole("textbox")).toHaveValue("");
 
     fireEvent.change(screen.getByRole("textbox"), {
