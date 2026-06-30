@@ -10,7 +10,14 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Extension, type Editor, type JSONContent } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type EditorState,
+  type Transaction
+} from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { cn } from "../../../app/renderer/lib/utils";
@@ -27,6 +34,7 @@ import {
   plainTextToAgentRichTextInlineContent,
   plainTextToAgentRichTextDoc
 } from "./agentRichTextDocument";
+import { AGENT_RICH_TEXT_CARET_ANCHOR } from "./agentRichTextCaretAnchor";
 import {
   createAgentFileMentionContent,
   createAgentMentionContent
@@ -94,9 +102,15 @@ function buildWorkspaceFileMentionDropContent(
     path: string;
     name: string;
     kind: AgentFileMentionKind;
-  }>
+  }>,
+  options: { prefixCaretAnchor?: boolean } = {}
 ): JSONContent[] {
-  return entries.flatMap((entry) => [
+  return entries.flatMap((entry, index) => [
+    ...(index === 0 && options.prefixCaretAnchor
+      ? ([
+          { type: "text", text: AGENT_RICH_TEXT_CARET_ANCHOR }
+        ] as JSONContent[])
+      : []),
     {
       type: "agentFileMention",
       attrs: {
@@ -109,6 +123,98 @@ function buildWorkspaceFileMentionDropContent(
     },
     { type: "text", text: " " }
   ]);
+}
+
+function isPromptVisualLineStart(editor: Editor, position: number): boolean {
+  if (position <= 1) {
+    return true;
+  }
+  return (
+    editor.state.doc.textBetween(
+      Math.max(1, position - 1),
+      position,
+      "\n",
+      "\n"
+    ) === "\n"
+  );
+}
+
+function findCaretAnchorBeforeAtomicRun(
+  doc: ProseMirrorNode,
+  position: number
+): number | null {
+  let anchorPosition: number | null = null;
+  doc.descendants((node, nodePosition) => {
+    if (nodePosition >= position) {
+      return false;
+    }
+    if (node.isText) {
+      const text = node.text ?? "";
+      for (let offset = 0; offset < text.length; offset += 1) {
+        const characterPosition = nodePosition + offset;
+        if (characterPosition >= position) {
+          return false;
+        }
+        if (text[offset] === AGENT_RICH_TEXT_CARET_ANCHOR) {
+          anchorPosition = characterPosition;
+          continue;
+        }
+        if (anchorPosition !== null) {
+          anchorPosition = null;
+        }
+      }
+      return true;
+    }
+    if (node.type.name === "agentFileMention") {
+      return false;
+    }
+    if (node.isInline && anchorPosition !== null) {
+      anchorPosition = null;
+    }
+    return true;
+  });
+  return anchorPosition;
+}
+
+function moveSelectionOverCaretAnchor(
+  state: EditorState,
+  dispatch: (transaction: Transaction) => void,
+  key: string
+): boolean {
+  const { doc, selection } = state;
+  if (!selection.empty) {
+    return false;
+  }
+  const position = selection.from;
+  if (key === "ArrowLeft") {
+    const anchorPosition = findCaretAnchorBeforeAtomicRun(doc, position);
+    if (anchorPosition === null) {
+      return false;
+    }
+    dispatch(state.tr.setSelection(TextSelection.create(doc, anchorPosition)));
+    return true;
+  }
+  if (
+    key === "ArrowRight" &&
+    position < doc.content.size &&
+    doc.textBetween(position, position + 1) === AGENT_RICH_TEXT_CARET_ANCHOR
+  ) {
+    const afterAnchor = position + 1;
+    const mentionAfterAnchor = doc.resolve(afterAnchor).nodeAfter;
+    dispatch(
+      state.tr.setSelection(
+        TextSelection.create(
+          doc,
+          afterAnchor +
+            (mentionAfterAnchor?.type.name === "agentFileMention"
+              ? mentionAfterAnchor.nodeSize
+              : 0)
+        )
+      )
+    );
+    return true;
+  }
+  return false;
 }
 
 function createAgentRichTextPlaceholderExtension(
@@ -138,6 +244,43 @@ function createAgentRichTextPlaceholderExtension(
                   "data-agent-rich-text-placeholder": getPlaceholder()
                 })
               ]);
+            }
+          }
+        })
+      ];
+    }
+  });
+}
+
+function createAgentRichTextCaretAnchorExtension(): Extension {
+  return Extension.create({
+    name: "agentRichTextCaretAnchor",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey("agentRichTextCaretAnchor"),
+          props: {
+            handleKeyDown(view, event) {
+              if (
+                (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
+                event.shiftKey ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.altKey
+              ) {
+                return false;
+              }
+              if (
+                moveSelectionOverCaretAnchor(
+                  view.state,
+                  (transaction) => view.dispatch(transaction),
+                  event.key
+                )
+              ) {
+                event.preventDefault();
+                return true;
+              }
+              return false;
             }
           }
         })
@@ -459,6 +602,7 @@ export const AgentRichTextEditor = forwardRef<
         { skills: availableSkillsRef.current },
         { capabilities: availableCapabilitiesRef.current }
       ),
+      createAgentRichTextCaretAnchorExtension(),
       createAgentRichTextPlaceholderExtension(() => placeholderRef.current)
     ],
     [enableFileMentionSuggestions]
@@ -740,7 +884,12 @@ export const AgentRichTextEditor = forwardRef<
             .focus()
             .insertContentAt(
               insertPosition,
-              buildWorkspaceFileMentionDropContent(entries)
+              buildWorkspaceFileMentionDropContent(entries, {
+                prefixCaretAnchor: isPromptVisualLineStart(
+                  currentEditor,
+                  insertPosition
+                )
+              })
             )
             .run();
           return true;
@@ -776,6 +925,28 @@ export const AgentRichTextEditor = forwardRef<
       event.preventDefault();
       event.stopPropagation();
       return;
+    }
+    if (
+      (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey
+    ) {
+      const currentEditor = editorRef.current;
+      if (
+        currentEditor &&
+        !currentEditor.isDestroyed &&
+        moveSelectionOverCaretAnchor(
+          currentEditor.state,
+          (transaction) => currentEditor.view.dispatch(transaction),
+          event.key
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
     }
     if (
       event.key === "Enter" &&
@@ -888,7 +1059,14 @@ export const AgentRichTextEditor = forwardRef<
         currentEditor
           .chain()
           .focus()
-          .insertContent(createAgentFileMentionContent(items))
+          .insertContent(
+            createAgentFileMentionContent(items, {
+              prefixCaretAnchor: isPromptVisualLineStart(
+                currentEditor,
+                currentEditor.state.selection.from
+              )
+            })
+          )
           .run();
       },
       insertMentionItems(items) {
@@ -899,7 +1077,14 @@ export const AgentRichTextEditor = forwardRef<
         currentEditor
           .chain()
           .focus()
-          .insertContent(createAgentMentionContent(items))
+          .insertContent(
+            createAgentMentionContent(items, {
+              prefixCaretAnchor: isPromptVisualLineStart(
+                currentEditor,
+                currentEditor.state.selection.from
+              )
+            })
+          )
           .run();
       },
       replaceTextBeforeSelection(length, text) {
