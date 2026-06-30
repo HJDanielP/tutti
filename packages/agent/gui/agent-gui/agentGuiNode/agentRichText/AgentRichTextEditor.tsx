@@ -76,7 +76,7 @@ export interface AgentRichTextEditorProps {
   promptImagesSupported?: boolean;
   onPromptImagesUnsupported?: () => void;
   onPasteImages?: (images: AgentRichTextPastedImage[]) => void;
-  getPathForFile?: (file: File) => string;
+  getReferenceForFile?: (file: File) => WorkspaceFileReference | null;
 }
 
 export interface AgentRichTextEditorHandle {
@@ -458,7 +458,7 @@ export const AgentRichTextEditor = forwardRef<
     promptImagesSupported = true,
     onPromptImagesUnsupported,
     onPasteImages,
-    getPathForFile
+    getReferenceForFile
   },
   ref
 ): React.JSX.Element {
@@ -480,7 +480,7 @@ export const AgentRichTextEditor = forwardRef<
   const onPromptImagesUnsupportedRef = useRef(onPromptImagesUnsupported);
   const onPasteImagesRef = useRef(onPasteImages);
   const promptImagesSupportedRef = useRef(promptImagesSupported);
-  const getPathForFileRef = useRef(getPathForFile);
+  const getReferenceForFileRef = useRef(getReferenceForFile);
   const placeholderRef = useRef(placeholder);
   const removeMentionLabelRef = useRef(removeMentionLabel);
   const availableSkillsRef = useRef(availableSkills);
@@ -622,7 +622,7 @@ export const AgentRichTextEditor = forwardRef<
   onPromptImagesUnsupportedRef.current = onPromptImagesUnsupported;
   onPasteImagesRef.current = onPasteImages;
   promptImagesSupportedRef.current = promptImagesSupported;
-  getPathForFileRef.current = getPathForFile;
+  getReferenceForFileRef.current = getReferenceForFile;
   placeholderRef.current = placeholder;
   removeMentionLabelRef.current = removeMentionLabel;
   availableSkillsRef.current = availableSkills;
@@ -749,22 +749,24 @@ export const AgentRichTextEditor = forwardRef<
             });
             return true;
           }
-          const getPathForFileFn = getPathForFileRef.current;
-          if (getPathForFileFn) {
+          const getReferenceForFileFn = getReferenceForFileRef.current;
+          if (getReferenceForFileFn) {
             const nonImageFiles = nonImageFilesFromDataTransfer(
               event.clipboardData
             );
             if (nonImageFiles.length > 0) {
-              const paths = nonImageFiles
+              const references = nonImageFiles
                 .map((file) => {
                   try {
-                    return getPathForFileFn(file);
+                    return getReferenceForFileFn(file);
                   } catch {
                     return null;
                   }
                 })
-                .filter((p): p is string => Boolean(p));
-              if (paths.length > 0) {
+                .filter((reference): reference is WorkspaceFileReference =>
+                  Boolean(reference?.path)
+                );
+              if (references.length > 0) {
                 event.preventDefault();
                 const currentEditor = editorRef.current;
                 if (!currentEditor) {
@@ -776,18 +778,12 @@ export const AgentRichTextEditor = forwardRef<
                   );
                 }
                 currentEditor.commands.insertContent(
-                  createAgentFileMentionContent(
-                    paths.map((path) => ({
-                      path,
-                      kind: "file"
-                    })),
-                    {
-                      prefixCaretAnchor: isPromptVisualLineStart(
-                        currentEditor,
-                        currentEditor.state.selection.from
-                      )
-                    }
-                  )
+                  createAgentFileMentionContent(references, {
+                    prefixCaretAnchor: isPromptVisualLineStart(
+                      currentEditor,
+                      currentEditor.state.selection.from
+                    )
+                  })
                 );
                 return true;
               }

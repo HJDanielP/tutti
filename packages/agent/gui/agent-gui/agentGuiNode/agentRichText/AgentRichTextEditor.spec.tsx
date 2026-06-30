@@ -63,6 +63,19 @@ function createDataTransferStub(files: readonly File[] = []): DataTransfer {
   return dataTransfer as unknown as DataTransfer;
 }
 
+function createDataTransferFilesFallbackStub(
+  files: readonly File[] = []
+): DataTransfer {
+  const dataTransfer = createDataTransferStub(files) as unknown as {
+    items: Array<{ getAsFile: () => File | null }>;
+  };
+  dataTransfer.items = dataTransfer.items.map((item) => ({
+    ...item,
+    getAsFile: () => null
+  }));
+  return dataTransfer as unknown as DataTransfer;
+}
+
 function selectEditorText(editor: HTMLElement, from: number, to: number): void {
   const textNode = editor.querySelector("p")?.firstChild;
   if (!textNode) {
@@ -148,7 +161,10 @@ describe("AgentRichTextEditor", () => {
         placeholder="Prompt"
         onChange={onChange}
         onSubmit={vi.fn()}
-        getPathForFile={(file) => `/workspace/docs/${file.name}`}
+        getReferenceForFile={(file) => ({
+          path: `/workspace/docs/${file.name}`,
+          kind: "file"
+        })}
       />
     );
 
@@ -169,6 +185,120 @@ describe("AgentRichTextEditor", () => {
     expect(mention).toHaveAttribute(
       "data-agent-mention-href",
       "/workspace/docs/README.md"
+    );
+  });
+
+  it("pastes folders as directory mention chips", async () => {
+    const onChange = vi.fn();
+    render(
+      <AgentRichTextEditor
+        value=""
+        disabled={false}
+        placeholder="Prompt"
+        onChange={onChange}
+        onSubmit={vi.fn()}
+        getReferenceForFile={(file) => ({
+          path: `/workspace/docs/${file.name}`,
+          kind: "folder"
+        })}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    fireEvent.paste(editor, {
+      clipboardData: createDataTransferStub([new File([""], "assets")])
+    });
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith(
+        "[@assets](/workspace/docs/assets/) "
+      )
+    );
+    const mention = editor.querySelector('[data-agent-file-mention="true"]');
+    expect(mention).toHaveAttribute("data-agent-file-entry-kind", "directory");
+    expect(mention).toHaveAttribute("data-agent-file-visual-kind", "folder");
+  });
+
+  it("pastes files when clipboard items cannot resolve files but files are present", async () => {
+    const onChange = vi.fn();
+    render(
+      <AgentRichTextEditor
+        value=""
+        disabled={false}
+        placeholder="Prompt"
+        onChange={onChange}
+        onSubmit={vi.fn()}
+        getReferenceForFile={(file) => ({
+          path: `/workspace/docs/${file.name}`,
+          kind: "file"
+        })}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    fireEvent.paste(editor, {
+      clipboardData: createDataTransferFilesFallbackStub([
+        new File(["readme"], "README.md", { type: "text/markdown" })
+      ])
+    });
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith(
+        "[@README.md](/workspace/docs/README.md) "
+      )
+    );
+  });
+
+  it("does not paste supported image files with empty MIME types as file mention chips", async () => {
+    const getReferenceForFile = vi.fn((file: File) => ({
+      path: `/workspace/docs/${file.name}`,
+      kind: "file" as const
+    }));
+    render(
+      <AgentRichTextEditor
+        value=""
+        disabled={false}
+        placeholder="Prompt"
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+        getReferenceForFile={getReferenceForFile}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    fireEvent.paste(editor, {
+      clipboardData: createDataTransferStub([new File(["png"], "photo.png")])
+    });
+
+    expect(getReferenceForFile).not.toHaveBeenCalled();
+    expect(editor.querySelector('[data-agent-file-mention="true"]')).toBeNull();
+  });
+
+  it("still pastes unsupported image-like files with empty MIME types as file mention chips", async () => {
+    const onChange = vi.fn();
+    render(
+      <AgentRichTextEditor
+        value=""
+        disabled={false}
+        placeholder="Prompt"
+        onChange={onChange}
+        onSubmit={vi.fn()}
+        getReferenceForFile={(file) => ({
+          path: `/workspace/docs/${file.name}`,
+          kind: "file"
+        })}
+      />
+    );
+
+    const editor = await screen.findByRole("textbox", { name: "Prompt" });
+    fireEvent.paste(editor, {
+      clipboardData: createDataTransferStub([new File(["gif"], "clip.gif")])
+    });
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith(
+        "[@clip.gif](/workspace/docs/clip.gif) "
+      )
     );
   });
 

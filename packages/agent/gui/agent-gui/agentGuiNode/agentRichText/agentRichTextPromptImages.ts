@@ -26,6 +26,11 @@ export function imageFilesFromDataTransfer(
       files.push(file);
     }
   }
+  if (files.length === 0) {
+    return Array.from(dataTransfer.files ?? []).filter((file) =>
+      supportedPromptImageMimeType(file.type)
+    );
+  }
   return files;
 }
 
@@ -39,7 +44,9 @@ export function nonImageFilesFromDataTransfer(
   const items = (dataTransfer as { items?: DataTransferItemList | null }).items;
   if (!items) {
     return Array.from(dataTransfer.files ?? []).filter(
-      (file) => !supportedPromptImageMimeType(file.type)
+      (file) =>
+        !supportedPromptImageMimeType(file.type) &&
+        !supportedPromptImageFileName(file.name)
     );
   }
   for (const item of Array.from(items)) {
@@ -47,9 +54,19 @@ export function nonImageFilesFromDataTransfer(
       continue;
     }
     const file = item.getAsFile();
+    if (file && supportedPromptImageFileName(file.name)) {
+      continue;
+    }
     if (file) {
       files.push(file);
     }
+  }
+  if (files.length === 0) {
+    return Array.from(dataTransfer.files ?? []).filter(
+      (file) =>
+        !supportedPromptImageMimeType(file.type) &&
+        !supportedPromptImageFileName(file.name)
+    );
   }
   return files;
 }
@@ -60,6 +77,10 @@ export function supportedPromptImageMimeType(
   return (
     value === "image/png" || value === "image/jpeg" || value === "image/webp"
   );
+}
+
+function supportedPromptImageFileName(value: string): boolean {
+  return /\.(png|jpe?g|webp)$/i.test(value.trim());
 }
 
 export async function readAgentRichTextPromptImages(

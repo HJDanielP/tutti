@@ -815,7 +815,7 @@ export function AgentComposer({
   const draftFiles = draftContent.files ?? [];
   const agentActivityRuntime = useOptionalAgentActivityRuntime();
   const agentHostApi = useOptionalAgentHostApi();
-  const getPathForFile = agentHostApi?.workspace.getPathForFile;
+  const getReferenceForFile = agentHostApi?.workspace.getReferenceForFile;
   const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   const [isReviewPickerOpen, setIsReviewPickerOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -2926,7 +2926,7 @@ export function AgentComposer({
                     promptImagesSupported={promptImagesSupported}
                     onPromptImagesUnsupported={onPromptImagesUnsupported}
                     onPasteImages={handlePastedImages}
-                    getPathForFile={getPathForFile}
+                    getReferenceForFile={getReferenceForFile}
                   />
                   {!isHeroLayout ? composerActionButton : null}
                 </div>
