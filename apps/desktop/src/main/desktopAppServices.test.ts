@@ -138,6 +138,9 @@ function createUpdateService(): AppUpdateService {
     async installUpdate() {
       throw new Error("not used");
     },
+    isQuitAndInstallPending() {
+      return false;
+    },
     onStateChanged() {
       return () => undefined;
     }
