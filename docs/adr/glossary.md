@@ -57,3 +57,12 @@
 - **Strangler shim (Exec inversion)** — the risk control for ADR 0005 Step 7: keep
   the blocking `Exec([]events,error)` as a thin wrapper over the async core; migrate
   callers incrementally; delete the wrapper last. Reversible, no big-bang.
+- **serverRequest/resolved** — codex notification that a server-request was resolved
+  (possibly out-of-band). The authoritative terminal for a pending approval; tutti
+  does not handle it today → the stall class (1ec14c03). ADR 0006 adds it.
+- **Durable pending approval** — an approval represented as a reconcilable item in the
+  unified projection (pending/resolved/interrupted), not a parked goroutine on a
+  channel. Responder holds codex's RPC and responds async. (ADR 0006)
+- **Interrupted-pending policy** — on reconnect, a surviving pending approval is marked
+  interrupted + re-offered/re-driven, never silently rejected; RPC revival is not
+  assumed (bounded by codex re-issue behavior on resume). (ADR 0006)
