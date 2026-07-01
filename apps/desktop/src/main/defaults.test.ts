@@ -211,13 +211,17 @@ test("resolveDesktopLoginProtocolClientRegistration passes app path in developme
         appPath: "/repo/apps/desktop",
         executablePath:
           "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
-        isPackaged: false
+        isPackaged: false,
+        argv: [
+          "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+          "/repo/apps/desktop/dist/main/index.js"
+        ]
       }),
       {
         scheme: "tutti-dev",
         executablePath:
           "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
-        args: ["/repo/apps/desktop"]
+        args: ["/repo/apps/desktop/dist/main/index.js"]
       }
     );
 

@@ -84,16 +84,22 @@ export function resolveDesktopLoginProtocolClientRegistration(options: {
   appPath: string;
   executablePath: string;
   isPackaged: boolean;
+  argv?: readonly string[];
 }): DesktopProtocolClientRegistration {
   const scheme = resolveDesktopLoginProtocolScheme();
   if (resolveTuttiEnv() !== "development" || options.isPackaged) {
     return { scheme };
   }
+  const developmentEntryPath = options.argv?.[1]?.trim();
+  const appEntryPath =
+    developmentEntryPath && !developmentEntryPath.startsWith("-")
+      ? developmentEntryPath
+      : options.appPath;
 
   return {
     scheme,
     executablePath: options.executablePath,
-    args: [options.appPath]
+    args: [appEntryPath]
   };
 }
 
