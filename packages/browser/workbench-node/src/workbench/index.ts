@@ -12,9 +12,9 @@ import type {
 } from "@tutti-os/workbench-surface";
 import type { BrowserNodeFeature } from "../core/feature.ts";
 import {
-  BrowserNode,
-  BrowserNodeWorkbenchHeader
-} from "../react/BrowserNode.tsx";
+  BrowserTabsNode,
+  BrowserTabsNodeHeader
+} from "../react/BrowserTabsNode.tsx";
 
 export interface BrowserNodeOpenUrlActivationPayload {
   title?: string;
@@ -24,6 +24,7 @@ export interface BrowserNodeOpenUrlActivationPayload {
 export interface BrowserNodeExternalState {
   title?: string | null;
   url?: string | null;
+  tabs?: { url: string }[];
 }
 
 export interface CreateBrowserNodeDefinitionInput {
@@ -75,6 +76,15 @@ const defaultBrowserNodeFrame: WorkbenchFrame = {
 
 export const defaultBrowserNodeTypeId = "browser";
 
+function resolveActiveBrowserTabId(
+  feature: BrowserNodeFeature,
+  containerNodeId: string
+): string {
+  return (
+    feature.tabStore.getState(containerNodeId).activeTabId ?? containerNodeId
+  );
+}
+
 export function createBrowserNodeDefinition({
   defaultUrl,
   feature,
@@ -84,19 +94,32 @@ export function createBrowserNodeDefinition({
   typeId = defaultBrowserNodeTypeId
 }: CreateBrowserNodeDefinitionInput): WorkbenchHostNodeDefinition<BrowserNodeExternalState> {
   return {
+    createLease: ({ node }) => ({
+      // Drop the node's tab list when the window closes (not on minimize) so the
+      // tab store does not retain containers for closed Browser windows.
+      release() {
+        feature.tabStore.clearContainer(node.id);
+      }
+    }),
     frame,
     instance: {
       mode: "multi"
     },
     renderBody: (context) =>
-      createElement(BrowserNode, {
+      createElement(BrowserTabsNode, {
+        activation: context.activation,
         defaultUrl: resolveBrowserNodeInitialUrl({
           activation: context.activation,
           defaultUrl,
           externalNodeState: context.externalNodeState
         }),
         feature,
+        newTabUrl: defaultUrl,
+        restoreTabs: context.externalNodeState?.tabs,
         nodeId: context.node.id,
+        onClearActivation: (sequence) =>
+          context.host.clearNodeActivation?.(context.node.id, sequence),
+        onCloseRequest: () => context.host.requestNodeClose(context.node.id),
         onFocusRequest: context.isFocused ? undefined : () => context.focus(),
         onNavigated: onNavigated
           ? (url) =>
@@ -104,12 +127,10 @@ export function createBrowserNodeDefinition({
                 nodeId: context.node.id,
                 url
               })
-          : undefined,
-        showHeader: false,
-        syncDefaultUrl: true
+          : undefined
       }),
     renderHeader: (headerContext) =>
-      createElement(BrowserNodeWorkbenchHeader, {
+      createElement(BrowserTabsNodeHeader, {
         defaultActions: renderTrafficLights
           ? renderTrafficLights(headerContext)
           : headerContext.defaultActions,
@@ -138,7 +159,9 @@ export function createBrowserNodeDefinition({
       defaultOpen: false,
       minimizedDock: {
         capturePreview: ({ node }) =>
-          feature.hostApi.capturePreview?.({ nodeId: node.id }) ?? null,
+          feature.hostApi.capturePreview?.({
+            nodeId: resolveActiveBrowserTabId(feature, node.id)
+          }) ?? null,
         kind: "snapshot"
       },
       minimizable: true,
@@ -152,7 +175,9 @@ export function createBrowserDockEntry(
 ): WorkbenchHostDockEntry {
   return {
     capturePopupItemPreview: ({ node }) =>
-      input.feature.hostApi.capturePreview?.({ nodeId: node.id }) ?? null,
+      input.feature.hostApi.capturePreview?.({
+        nodeId: resolveActiveBrowserTabId(input.feature, node.id)
+      }) ?? null,
     icon: input.dockIcon ?? null,
     id: input.id ?? defaultBrowserNodeTypeId,
     label: input.feature.i18n.t("dockLabel"),
@@ -161,7 +186,9 @@ export function createBrowserDockEntry(
       node.data.typeId === (input.typeId ?? defaultBrowserNodeTypeId),
     order: input.order,
     resolvePopupItem: ({ node }) => {
-      const runtime = input.feature.runtimeStore.getNodeState(node.id);
+      const runtime = input.feature.runtimeStore.getNodeState(
+        resolveActiveBrowserTabId(input.feature, node.id)
+      );
       const title = runtime.title?.trim() || node.title;
       const url = runtime.url?.trim() || node.data.instanceId;
       return {

@@ -383,6 +383,7 @@ export function BrowserNodeHeader({
   withBorder?: boolean;
 }): JSX.Element {
   const [reloadAnimationKey, setReloadAnimationKey] = useState(0);
+  const selectAllOnFocusRef = useRef(false);
 
   const handleReload = (): void => {
     setReloadAnimationKey((currentKey) => currentKey + 1);
@@ -477,7 +478,19 @@ export function BrowserNodeHeader({
           size="sm"
           value={draftUrl}
           onChange={(event) => onDraftUrlChange(event.target.value)}
-          onFocus={onFocusRequest}
+          onFocus={(event) => {
+            onFocusRequest?.();
+            selectAllOnFocusRef.current = true;
+            event.currentTarget.select();
+          }}
+          onMouseUp={(event) => {
+            // Keep the focus-driven select-all from collapsing on the click that
+            // focused the field; later clicks position the caret normally.
+            if (selectAllOnFocusRef.current) {
+              selectAllOnFocusRef.current = false;
+              event.preventDefault();
+            }
+          }}
         />
         {isLoading ? (
           <LoadingIcon className="pointer-events-none absolute right-2 top-1/2 z-[1] size-4 -translate-y-1/2 animate-spin text-[var(--text-tertiary)]" />
