@@ -74,7 +74,8 @@ export function createWorkspaceBrowserContribution(input: {
       sectionId: "apps"
     },
     externalStateSource: createWorkspaceBrowserNodeExternalStateSource({
-      runtimeStore: feature.runtimeStore
+      runtimeStore: feature.runtimeStore,
+      tabStore: feature.tabStore
     }),
     feature,
     node: {

@@ -1,4 +1,5 @@
 export interface WorkspaceBrowserLaunchRequest {
+  openInTab?: boolean;
   reuseIfOpen?: boolean;
   source?:
     | "agent_command"
@@ -6,6 +7,7 @@ export interface WorkspaceBrowserLaunchRequest {
     | "file_manager"
     | "terminal"
     | "workspace_app";
+  sourceNodeId?: string;
   url: string;
   workspaceId: string;
 }
@@ -49,8 +51,12 @@ export async function requestWorkspaceBrowserLaunch(
   return dispatchWorkspaceBrowserLaunch({
     handler: launchHandlersByWorkspaceId.get(normalizedWorkspaceId),
     request: {
-      reuseIfOpen: request.reuseIfOpen,
+      ...(request.openInTab !== undefined ? { openInTab: request.openInTab } : {}),
+      ...(request.reuseIfOpen !== undefined
+        ? { reuseIfOpen: request.reuseIfOpen }
+        : {}),
       ...(request.source ? { source: request.source } : {}),
+      ...(request.sourceNodeId ? { sourceNodeId: request.sourceNodeId } : {}),
       url: normalizedUrl,
       workspaceId: normalizedWorkspaceId
     }
@@ -86,8 +92,16 @@ function dispatchWorkspaceBrowserLaunch(input: {
   }
 
   return input.handler({
-    reuseIfOpen: input.request.reuseIfOpen,
+    ...(input.request.openInTab !== undefined
+      ? { openInTab: input.request.openInTab }
+      : {}),
+    ...(input.request.reuseIfOpen !== undefined
+      ? { reuseIfOpen: input.request.reuseIfOpen }
+      : {}),
     ...(input.request.source ? { source: input.request.source } : {}),
+    ...(input.request.sourceNodeId
+      ? { sourceNodeId: input.request.sourceNodeId }
+      : {}),
     url: input.request.url,
     workspaceId: input.request.workspaceId
   });

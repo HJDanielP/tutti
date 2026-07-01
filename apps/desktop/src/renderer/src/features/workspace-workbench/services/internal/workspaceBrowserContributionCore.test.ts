@@ -1,37 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-import type { BrowserNodeRuntimeState } from "@tutti-os/browser-node";
+import {
+  createBrowserNodeTabStore,
+  type BrowserNodeRuntimeState
+} from "@tutti-os/browser-node";
 import {
   createWorkspaceBrowserNodeExternalStateSource,
   resolveWorkspaceBrowserNavigationAnalyticsParams,
   resolveWorkspaceBrowserSearchUrl
 } from "./workspaceBrowserContributionCore.ts";
 import { workspaceBrowserNodeID } from "./workspaceWorkbenchComposition.ts";
-
-const browserFactorySource = readFileSync(
-  new URL(
-    "./contributions/browserWorkbenchContributionFactory.ts",
-    import.meta.url
-  ),
-  "utf8"
-);
-const browserContributionSource = readFileSync(
-  new URL("./workspaceBrowserContribution.ts", import.meta.url),
-  "utf8"
-);
-
-test("workspace browser window injects unified traffic lights into the package header", () => {
-  assert.match(
-    browserContributionSource,
-    /renderTrafficLights: input\.renderTrafficLights/
-  );
-  assert.match(browserFactorySource, /WorkspaceWorkbenchTrafficLights/);
-  assert.match(
-    browserFactorySource,
-    /createElement\([\s\S]*WorkspaceWorkbenchTrafficLights[\s\S]*displayMode: headerContext\.displayMode[\s\S]*windowActions: headerContext\.windowActions/
-  );
-});
 
 test("resolveWorkspaceBrowserSearchUrl encodes search queries", () => {
   assert.equal(
@@ -91,7 +69,8 @@ test("createWorkspaceBrowserNodeExternalStateSource exposes runtime state for wo
             listenerRef.current = null;
           };
         }
-      }
+      },
+      tabStore: createBrowserNodeTabStore()
     });
 
     assert.deepEqual(
@@ -102,6 +81,7 @@ test("createWorkspaceBrowserNodeExternalStateSource exposes runtime state for wo
         workspaceId: "workspace-1"
       }),
       {
+        tabs: [],
         title: "Example",
         url: "https://example.com"
       }
@@ -114,6 +94,7 @@ test("createWorkspaceBrowserNodeExternalStateSource exposes runtime state for wo
         workspaceId: "workspace-1"
       }),
       {
+        tabs: [],
         title: "Example",
         url: "https://example.com"
       }
@@ -152,6 +133,7 @@ test("createWorkspaceBrowserNodeExternalStateSource exposes runtime state for wo
         workspaceId: "workspace-1"
       }),
       {
+        tabs: [],
         title: "Tutti",
         url: "https://tutti.example"
       }

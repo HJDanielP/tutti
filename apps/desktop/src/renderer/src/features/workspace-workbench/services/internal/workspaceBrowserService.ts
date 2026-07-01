@@ -128,7 +128,13 @@ function launchOpenUrl(
   source?: "browser" | "workspace_app"
 ) {
   void requestWorkspaceBrowserLaunch({
-    reuseIfOpen: event.reuseIfOpen,
+    ...(event.openInTab !== undefined
+      ? { openInTab: event.openInTab }
+      : {}),
+    ...(event.reuseIfOpen !== undefined
+      ? { reuseIfOpen: event.reuseIfOpen }
+      : {}),
+    ...(event.sourceNodeId ? { sourceNodeId: event.sourceNodeId } : {}),
     ...(source ? { source } : {}),
     url: event.url,
     workspaceId

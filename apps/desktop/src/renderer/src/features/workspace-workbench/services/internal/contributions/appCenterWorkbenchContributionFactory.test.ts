@@ -47,6 +47,7 @@ test("workspace app browser feature keeps browser events connected", async () =>
     {
       reuseIfOpen: false,
       source: "workspace_app",
+      sourceNodeId: "workspace-app-webview:42",
       url: "https://example.com/app-link",
       workspaceId: "workspace-app-open-url"
     }
@@ -106,6 +107,7 @@ test("workspace app browser feature launches workspace app window-open events", 
     {
       reuseIfOpen: false,
       source: "workspace_app",
+      sourceNodeId: "workspace-app:99",
       url: "https://www.producthunt.com/products/vc-boom",
       workspaceId: "workspace-app-window-open-url"
     }
@@ -160,6 +162,7 @@ test("workspace app browser feature keeps current app runtime URLs inside the ap
     {
       reuseIfOpen: true,
       source: "workspace_app",
+      sourceNodeId: "workspace-app-webview:app:group-chat",
       url: "http://127.0.0.1:5678/local-preview",
       workspaceId: "workspace-app-runtime-open-url"
     }

@@ -49,6 +49,8 @@ function isWorkspaceBrowserLocalhost(hostname: string): boolean {
 export interface WorkspaceBrowserNodeExternalState {
   title: string | null;
   url: string | null;
+  /** All open tab URLs so the full tab strip is restored on relaunch. */
+  tabs?: { url: string }[];
 }
 
 export function createWorkspaceBrowserNodeExternalStateSource(input: {
@@ -56,34 +58,57 @@ export function createWorkspaceBrowserNodeExternalStateSource(input: {
     getSnapshot(): Record<string, BrowserNodeRuntimeState | undefined>;
     subscribe(listener: () => void): () => void;
   };
+  tabStore: {
+    getState(containerId: string): {
+      activeTabId: string | null;
+      tabs: readonly { initialUrl: string; tabId: string }[];
+    };
+    subscribe(listener: () => void): () => void;
+  };
 }): WorkbenchHostExternalStateSource<
   WorkspaceBrowserNodeExternalState | null,
   null
 > {
+  const resolveRuntimeNodeId = (containerNodeId: string): string =>
+    input.tabStore.getState(containerNodeId).activeTabId ?? containerNodeId;
+
+  const readState = (
+    request: WorkbenchHostExternalStateLookupInput
+  ): WorkspaceBrowserNodeExternalState | null => {
+    if (!isBrowserNodeExternalStateRequest(request)) return null;
+    const tabState = input.tabStore.getState(request.nodeId);
+    const runtime = input.runtimeStore.getSnapshot();
+    const base = readWorkspaceBrowserRuntimeNodeState(
+      runtime,
+      resolveRuntimeNodeId(request.nodeId)
+    );
+    if (!base && tabState.tabs.length === 0) return null;
+
+    return {
+      title: base?.title ?? null,
+      url: base?.url ?? null,
+      // Persist each tab's *current* URL from the runtime store so a
+      // navigated tab is restored to the page the user was viewing, not
+      // the initial new-tab URL it was created with.
+      tabs: tabState.tabs.map((t) => ({
+        url: runtime[t.tabId]?.url?.trim() || t.initialUrl
+      }))
+    };
+  };
+
   return {
-    getNodeState(request) {
-      if (!isBrowserNodeExternalStateRequest(request)) {
-        return null;
-      }
-      return readWorkspaceBrowserRuntimeNodeState(
-        input.runtimeStore.getSnapshot(),
-        request.nodeId
-      );
-    },
-    getSnapshotNodeState(request) {
-      if (!isBrowserNodeExternalStateRequest(request)) {
-        return null;
-      }
-      return readWorkspaceBrowserRuntimeNodeState(
-        input.runtimeStore.getSnapshot(),
-        request.nodeId
-      );
-    },
+    getNodeState: readState,
+    getSnapshotNodeState: readState,
     getWorkspaceState() {
       return null;
     },
     subscribe(listener) {
-      return input.runtimeStore.subscribe(listener);
+      const unsubscribeRuntime = input.runtimeStore.subscribe(listener);
+      const unsubscribeTabs = input.tabStore.subscribe(listener);
+      return () => {
+        unsubscribeRuntime();
+        unsubscribeTabs();
+      };
     }
   };
 }

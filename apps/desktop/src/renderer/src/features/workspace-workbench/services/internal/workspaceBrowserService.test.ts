@@ -144,12 +144,14 @@ test("workspace browser service launches open-url once from the owning route", a
   assert.deepEqual(requests, [
     {
       reuseIfOpen: false,
-      url: "https://example.com/browser-popup",
+      sourceNodeId: "browser:node-1",
+        url: "https://example.com/browser-popup",
       workspaceId: "workspace-browser-open-url"
     },
     {
       reuseIfOpen: false,
-      url: "https://example.com/app-popup",
+      sourceNodeId: "workspace-app:99",
+        url: "https://example.com/app-popup",
       workspaceId: "workspace-browser-open-url"
     }
   ]);

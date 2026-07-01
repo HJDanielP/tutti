@@ -4,6 +4,7 @@ import type {
   WorkspaceAgentProvider,
   WorkspaceSummary
 } from "@tutti-os/client-tuttid-ts";
+import { resolveBrowserContainerNodeId } from "@tutti-os/browser-node";
 import {
   defaultIssueManagerWorkbenchTypeId,
   issueManagerOpenActivationType,
@@ -1024,12 +1025,9 @@ async function openWorkspaceBrowserNode(
   host: WorkbenchHostHandle,
   request: WorkspaceBrowserLaunchRequest
 ): Promise<boolean> {
-  const existingNodeId =
-    request.reuseIfOpen === false
-      ? null
-      : resolveCurrentWorkspaceBrowserNodeId(host);
+  const reuseNodeId = resolveWorkspaceBrowserReuseNodeId(host, request);
   const nodeId =
-    existingNodeId ??
+    reuseNodeId ??
     (await host.launchNode({
       launchSource: request.source,
       reason: "host",
@@ -1039,16 +1037,45 @@ async function openWorkspaceBrowserNode(
     return false;
   }
 
+  // Any open-url that reuses an existing Browser window opens as a new tab
+  // (in-page links and external app / agent / file opens alike) instead of
+  // navigating the page or spawning a separate window. A freshly launched
+  // window instead seeds its first tab from the same url.
+  const asTab = reuseNodeId !== null;
   host.activateNode(
     { nodeId },
     {
-      payload: {
-        url: request.url
-      },
+      payload: asTab ? { asTab: true, url: request.url } : { url: request.url },
       type: "open-url"
     }
   );
   return true;
+}
+
+function resolveWorkspaceBrowserReuseNodeId(
+  host: WorkbenchHostHandle,
+  request: WorkspaceBrowserLaunchRequest
+): string | null {
+  // Prefer the exact Browser window the link was clicked in (in-page links carry
+  // their source tab id), then fall back to any open Browser window. Every
+  // source — in-page links and external app / agent / file opens — reuses an
+  // open window as a new tab; only when none is open do we spawn a window.
+  const sourceContainerId = request.sourceNodeId
+    ? resolveBrowserContainerNodeId(request.sourceNodeId)
+    : null;
+  if (
+    sourceContainerId &&
+    host
+      .getSnapshot()
+      .nodes.some(
+        (node) =>
+          node.id === sourceContainerId &&
+          node.data.typeId === workspaceBrowserNodeID
+      )
+  ) {
+    return sourceContainerId;
+  }
+  return resolveCurrentWorkspaceBrowserNodeId(host);
 }
 
 function resolveCurrentWorkspaceBrowserNodeId(

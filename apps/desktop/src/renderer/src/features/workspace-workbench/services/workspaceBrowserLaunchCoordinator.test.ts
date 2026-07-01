@@ -37,7 +37,6 @@ test("workspace browser launch coordinator dispatches normalized URL requests", 
   );
   assert.deepEqual(requests, [
     {
-      reuseIfOpen: undefined,
       url: "http://localhost:9999/",
       workspaceId: "workspace-1"
     }
@@ -136,7 +135,6 @@ test("workspace browser host file launch coordinator dispatches file URLs", asyn
 
   assert.deepEqual(requests, [
     {
-      reuseIfOpen: undefined,
       source: "file_manager",
       url: "file:///Users/local/project/index.html",
       workspaceId: "workspace-files"
