@@ -42,6 +42,11 @@ const browserNodeEn = {
     unsupportedUrl: "This page cannot be opened."
   },
   loadFailed: "Page load failed",
+  tabs: {
+    close: "Close tab",
+    new: "New tab",
+    untitled: "New tab"
+  },
   title: "Browser"
 } as const satisfies I18nDictionary;
 
@@ -67,6 +72,11 @@ const browserNodeZhCN = {
     unsupportedUrl: "无法打开此页面。"
   },
   loadFailed: "页面加载失败",
+  tabs: {
+    close: "关闭标签页",
+    new: "新建标签页",
+    untitled: "新标签页"
+  },
   title: "浏览器"
 } as const satisfies I18nDictionary;
 
@@ -88,6 +98,9 @@ export type BrowserNodeI18nKey =
   | "errors.unsupportedProtocol"
   | "errors.unsupportedUrl"
   | "loadFailed"
+  | "tabs.close"
+  | "tabs.new"
+  | "tabs.untitled"
   | "title";
 
 export type BrowserNodeI18nRuntime = I18nRuntime<BrowserNodeI18nKey>;
