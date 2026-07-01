@@ -5,7 +5,6 @@ import type {
   PutDesktopPreferencesRequest
 } from "@tutti-os/client-tuttid-ts";
 import {
-  defaultDesktopAgentConversationDetailMode,
   defaultDesktopMinimizeAnimation,
   desktopWorkbenchWindowSnappingEqual,
   normalizeDesktopAgentConversationDetailMode,
@@ -273,8 +272,7 @@ function preferencesEqual(
       left.agentConversationDetailMode
     ) ===
       normalizeDesktopAgentConversationDetailMode(
-        right.agentConversationDetailMode ??
-          defaultDesktopAgentConversationDetailMode
+        right.agentConversationDetailMode
       ) &&
     (left.browserUseConnectionMode ?? "isolated") ===
       (right.browserUseConnectionMode ?? "isolated") &&

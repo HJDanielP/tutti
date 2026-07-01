@@ -249,7 +249,10 @@ func codexConfigWithTuttiConversationDetailMode(content string, conversationDeta
 
 func codexConfigWithConversationDetailModeInstructions(content string, conversationDetailMode string) (string, bool) {
 	instructions := agentConversationDetailModeInstructions(conversationDetailMode)
-	if strings.TrimSpace(instructions) == "" || strings.Contains(content, "### Non-technical UI") {
+	if strings.TrimSpace(instructions) == "" {
+		return codexConfigWithoutConversationDetailModeInstructions(content)
+	}
+	if strings.Contains(content, instructions) {
 		return content, false
 	}
 	line := `developer_instructions = ` + strconv.Quote(instructions)
@@ -279,6 +282,50 @@ func codexConfigWithConversationDetailModeInstructions(content string, conversat
 		return line + "\n", true
 	}
 	return line + "\n\n" + strings.TrimLeft(content, "\r\n"), true
+}
+
+func codexConfigWithoutConversationDetailModeInstructions(content string) (string, bool) {
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	for index, existingLine := range lines {
+		trimmed := strings.TrimSpace(existingLine)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") {
+			break
+		}
+		if !codexConfigLineHasKey(trimmed, "developer_instructions") {
+			continue
+		}
+		value, endIndex, ok := codexConfigStringAssignmentValueAt(lines, index, "developer_instructions")
+		if !ok {
+			return content, false
+		}
+		nextValue, removed := codexDeveloperInstructionsWithoutConversationDetailMode(value)
+		if !removed {
+			return content, false
+		}
+		nextLines := make([]string, 0, len(lines)-(endIndex-index))
+		nextLines = append(nextLines, lines[:index]...)
+		if strings.TrimSpace(nextValue) != "" {
+			nextLines = append(nextLines, `developer_instructions = `+strconv.Quote(nextValue))
+		}
+		nextLines = append(nextLines, lines[endIndex+1:]...)
+		return strings.Join(nextLines, "\n"), true
+	}
+	return content, false
+}
+
+func codexDeveloperInstructionsWithoutConversationDetailMode(value string) (string, bool) {
+	instructions := nonTechnicalUIConversationDetailModeInstructions
+	if !strings.Contains(value, instructions) {
+		return value, false
+	}
+	next := strings.ReplaceAll(value, instructions, "")
+	for strings.Contains(next, "\n\n\n") {
+		next = strings.ReplaceAll(next, "\n\n\n", "\n\n")
+	}
+	return strings.TrimSpace(next), true
 }
 
 func codexConfigWithProjectRootMarkersDisabled(content string) (string, bool) {
@@ -375,7 +422,16 @@ func codexConfigStringAssignmentValue(line string, key string) (string, bool) {
 	for index := 1; index < len(rawValue); index++ {
 		char := rawValue[index]
 		if quote == '"' && escaped {
-			builder.WriteByte(char)
+			switch char {
+			case 'n':
+				builder.WriteByte('\n')
+			case 'r':
+				builder.WriteByte('\r')
+			case 't':
+				builder.WriteByte('\t')
+			default:
+				builder.WriteByte(char)
+			}
 			escaped = false
 			continue
 		}

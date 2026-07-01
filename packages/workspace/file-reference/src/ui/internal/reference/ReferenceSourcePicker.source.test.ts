@@ -161,6 +161,10 @@ test("reference source picker renders rows with workspace file manager entry ico
     source,
     /WorkspaceFileEntryIcon,\s*useWorkspaceFileEntryIconUrls,/
   );
+  assert.match(
+    source,
+    /includeImageThumbnails:\s*resolveEntryIconUrl !== undefined,/
+  );
   assert.match(source, /function referenceNodeToWorkspaceFileEntry/);
   assert.match(source, /function ReferenceNodeIcon/);
   assert.match(

@@ -219,8 +219,8 @@ func TestReporterSendsMessageOnlyReport(t *testing.T) {
 		MessageUpdates: []agentsessionstore.WorkspaceAgentMessageUpdate{{
 			AgentSessionID: "agent-session-1",
 			MessageID:      "message-1",
-			Seq:            1,
 			TurnID:         "turn-1",
+			Seq:            1,
 			Role:           "assistant",
 			Kind:           "text",
 			Payload:        map[string]any{"text": "hello"},
@@ -1175,8 +1175,8 @@ func mixedMessageUpdateReportInput() agentsessionstore.ReportActivityInput {
 		MessageUpdates: []agentsessionstore.WorkspaceAgentMessageUpdate{{
 			AgentSessionID: "agent-session-1",
 			MessageID:      "message-1",
-			Seq:            1,
 			TurnID:         "turn-1",
+			Seq:            1,
 			Role:           "assistant",
 			Kind:           "text",
 			Payload:        map[string]any{"text": "hello"},

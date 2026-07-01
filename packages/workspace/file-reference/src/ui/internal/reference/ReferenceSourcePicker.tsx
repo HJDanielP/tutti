@@ -241,6 +241,7 @@ export function ReferenceSourcePicker({
   );
   const iconUrls = useWorkspaceFileEntryIconUrls({
     entries: retainedIconEntries,
+    includeImageThumbnails: resolveEntryIconUrl !== undefined,
     resolveEntryIconUrl
   });
 

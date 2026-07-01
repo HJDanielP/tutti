@@ -1652,6 +1652,83 @@ func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesPersistsAgentGUIConversati
 	}
 }
 
+func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesRequiresAgentConversationDetailMode(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewRoutes(DaemonAPI{
+		PreferencesService: stubPreferencesService{
+			putFn: func(context.Context, preferencesservice.PutInput) (preferencesbiz.DesktopPreferences, error) {
+				t.Fatal("Put should not be called when agent conversation detail mode is missing")
+				return preferencesbiz.DesktopPreferences{}, nil
+			},
+		},
+	}))
+
+	recorder := performGeneratedRouteRequest(t, mux, http.MethodPut, "/v1/preferences/desktop", map[string]any{
+		"preferences": map[string]any{
+			"defaultAgentProvider": "codex",
+			"appCatalogChannel":    "production",
+			"dockIconStyle":        "default",
+			"dockPlacement":        "bottom",
+			"locale":               "en",
+			"minimizeAnimation":    "scale",
+			"sleepPreventionMode":  "never",
+			"themeSource":          "dark",
+			"updateChannel":        "stable",
+			"updatePolicy":         "prompt",
+		},
+	})
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+
+	assertGeneratedRouteError(
+		t,
+		recorder,
+		tuttigenerated.InvalidRequest,
+		"missing_desktop_agent_conversation_detail_mode",
+		"desktop agent conversation detail mode is required",
+	)
+}
+
+func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesValidatesAgentConversationDetailMode(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, NewRoutes(DaemonAPI{
+		PreferencesService: stubPreferencesService{
+			putFn: func(context.Context, preferencesservice.PutInput) (preferencesbiz.DesktopPreferences, error) {
+				t.Fatal("Put should not be called when agent conversation detail mode is invalid")
+				return preferencesbiz.DesktopPreferences{}, nil
+			},
+		},
+	}))
+
+	recorder := performGeneratedRouteRequest(t, mux, http.MethodPut, "/v1/preferences/desktop", map[string]any{
+		"preferences": map[string]any{
+			"agentConversationDetailMode": "daily",
+			"defaultAgentProvider":        "codex",
+			"appCatalogChannel":           "production",
+			"dockIconStyle":               "default",
+			"dockPlacement":               "bottom",
+			"locale":                      "en",
+			"minimizeAnimation":           "scale",
+			"sleepPreventionMode":         "never",
+			"themeSource":                 "dark",
+			"updateChannel":               "stable",
+			"updatePolicy":                "prompt",
+		},
+	})
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+
+	assertGeneratedRouteError(
+		t,
+		recorder,
+		tuttigenerated.InvalidRequest,
+		"unsupported_desktop_agent_conversation_detail_mode",
+		"desktop agent conversation detail mode is unsupported",
+	)
+}
+
 func TestDaemonAPIGeneratedRoutesPutDesktopPreferencesValidatesLocale(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, NewRoutes(DaemonAPI{
