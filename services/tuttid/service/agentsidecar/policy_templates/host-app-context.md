@@ -18,5 +18,6 @@ You are running inside the Tutti desktop app host, which can render local and we
 
 ## References
 
-- Code/workspace files: full absolute filesystem path.
+- Code/workspace files: use `[filename](/abs/path:line)` Markdown links; target must be absolute. For spaces: `[filename](</abs/path with spaces:line>)`.
+- No relative paths, `file://`, `vscode://`, or backticks around Markdown file links.
 - Web URLs: Markdown links, e.g. `[label](https://example.com)`.

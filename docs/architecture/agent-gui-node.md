@@ -1133,6 +1133,11 @@ that open workspace file nodes should validate explicit agent-command file
 targets before launching the files surface, so a speculative or stale agent
 path does not open a misleading workbench node.
 
+Provider host-app-context prompts should mirror that contract: when agents
+reference code or workspace files in responses, instruct them to emit Markdown
+links with filename labels and absolute filesystem targets such as
+`[filename](/abs/path:line)`, not relative links or inline-code paths.
+
 Quick checks:
 
 ```sh
