@@ -561,7 +561,7 @@ func (s Service) statusForSpec(ctx context.Context, spec ProviderSpec, now time.
 	auth := s.resolveAuth(ctx, spec, installed, runtimeResolution.CLIPath)
 	cliVersion := ""
 	if installed {
-		cliVersion = s.cliVersion(ctx, runtimeResolution.CLIPath)
+		cliVersion = s.cliVersion(ctx, runtimeResolution.CLIPath, runtimeResolution.Env)
 	}
 	codexPlatformOK := true
 	if spec.Provider == agentprovider.Codex && installed {

@@ -347,7 +347,7 @@ func (s Service) providerCLIRequiresInstall(spec ProviderSpec, runtime providerR
 	if !s.codexPlatformBinaryOK(runtime.CLIPath) {
 		return true
 	}
-	return !codexVersionMeetsMinimum(s.cliVersion(context.Background(), runtime.CLIPath))
+	return !codexVersionMeetsMinimum(s.cliVersion(context.Background(), runtime.CLIPath, runtime.Env))
 }
 
 func adapterPackageRequirementSatisfied(requirement AdapterPackageRequirement, version string) bool {
@@ -391,7 +391,7 @@ func (s Service) executeInstaller(
 	case InstallerKindShellCommand:
 		result, err := s.installCommand(installCtx, InstallCommandInput{
 			Command:  spec.ShellCommand,
-			Env:      s.commandResolver().Env(nil),
+			Env:      s.shellCommandInstallerEnv(installCtx, spec),
 			OnStdout: activeActionStdoutAppender(ctx, provider),
 		})
 		if err == nil && result.ExitCode == 0 {
@@ -438,6 +438,23 @@ func (s Service) executeInstaller(
 	default:
 		return command, InstallCommandResult{ExitCode: 1, Stderr: fmt.Sprintf("unsupported installer kind %q", spec.Kind)}, nil
 	}
+}
+
+func (s Service) shellCommandInstallerEnv(ctx context.Context, spec InstallerSpec) []string {
+	resolver := s.commandResolver()
+	if !shellCommandUsesNPM(spec.ShellCommand) {
+		return resolver.Env(nil)
+	}
+	appRuntime, ok := s.resolveManagedNodeRuntimeForProvider(ctx, false)
+	if !ok {
+		return resolver.Env(nil)
+	}
+	return resolver.Env(appRuntime.EnvOverrides)
+}
+
+func shellCommandUsesNPM(command string) bool {
+	fields := strings.Fields(command)
+	return len(fields) > 0 && fields[0] == npmBinaryName()
 }
 
 func installerLockCommand(spec InstallerSpec) string {
