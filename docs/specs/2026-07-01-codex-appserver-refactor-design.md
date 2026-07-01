@@ -3,7 +3,7 @@
 - Date: 2026-07-01
 - Branch: `refactor/codex-appserver-layering`
 - Baseline: rebased onto `origin/main` (includes #602 thread-scope, #604 session recycling, #608 attach hydration)
-- Status: Design (decisions locked; ready for implementation planning)
+- Status: Design (decisions locked; **refined 2026-07-02 via grilling — see § Design Refinements + `docs/adr/`**; ready for implementation planning)
 
 ## Problem
 
@@ -32,7 +32,7 @@ We reverse-derived the design goal from the real bug record (merged PRs + log-an
 
 | Cluster | Symptom & source | Root cause |
 |---|---|---|
-| **A. daemon↔desktop hydration / optimistic reconcile** (highest frequency) | "user sends a message, their own message disappears, only the Agent reply shows" (sessions `7633ebb9` / `2d73bad7` / `08920807`); #608 hydrate-after-attach; #585 / `aab952ba` keep submitted prompts visible / drain queued prompts. | Desktop performs its own optimistic echo + version tracking + reconcile; the transactional boundary is fragile. A live counter-example to the "second core" rule. **Note: the actual defect is desktop-rooted** — daemon correctly holds the user row at `version=1`; desktop pushed `after_version=1` without ever painting it. |
+| **A. daemon↔desktop hydration / optimistic reconcile** (highest frequency) | "user sends a message, their own message disappears, only the Agent reply shows" (sessions `7633ebb9` / `2d73bad7` / `08920807`); #608 hydrate-after-attach; #585 / `aab952ba` keep submitted prompts visible / drain queued prompts. | Desktop performs its own optimistic echo + version tracking + reconcile; the transactional boundary is fragile. A live counter-example to the "second core" rule. **Refined (ADR 0004): the defect is NOT purely desktop-rooted.** `Version` is a **millisecond wall-clock timestamp** (`reporter.go:375,510`), so a same-ms collision between the user row and the first reply event lets the `after_version` cursor drop BOTH — a daemon-side co-conspirator. The daemon-half fix (Step 4) makes `Version` a monotonic gap-free per-session cursor; the desktop reconcile stays Step 9. |
 | **B. thread / sub-agent identity** | #602 foreign-thread events dropped. | `session ≡ thread` flat model; a sub-agent's child thread has nowhere to go, so #602 could only *drop* it via `appServerNotificationThreadMismatch`. |
 | **C. turn / compaction lifecycle** | compact click fails after context hits 100% (session `67009835`); `4118312f` wait for `turn/completed` before closing a compact turn; `2412b08d` false compact alert from cumulative token count. | Turn lifecycle (including special compact turns) is not a robust, explicit state machine. |
 | **D. session / live-session lifecycle** | #604 bolted an idle-recycle path into `controller.go` (2592 lines). | Live-session lifecycle is bolted on, not owned by a layer. |
@@ -61,16 +61,16 @@ We reverse-derived the design goal from the real bug record (merged PRs + log-an
 |---|---|---|
 | D1 | **Only the *Codex-over-ACP* path (`codex_adapter.go`) is retired.** App-server is Codex's only future path. The **generic ACP stack is retained** — other agents integrate through it. | Product direction. `standard_acp_adapter.go` (Gemini / Hermes / Claude / future agents) and the shared ACP infra stay; only Codex's use of ACP goes away. |
 | D2 | **The typed protocol boundary comes from codegen anchored on the official upstream schema**, not hand-written structs and not vendoring an external SDK. | Official `codex-rs/app-server-protocol` ships `src/bin/export.rs` emitting JSON Schema + TS. Upstream is the single source of truth; drift becomes automatically visible. |
-| D3 | **Codegen in one step** — no interim hand-written structs. | Avoids building a typed layer only to throw it away; the pipeline is small and already proven downstream. |
+| D3 | **Codegen in one step** — no interim hand-written structs. **Refined (ADR 0001):** the "pipeline" is a **ported-and-slimmed `codex-sdk-go/internal/codegen`** (~1066-line Go generator: JSON Schema → go-jsonschema types + rendered RPC stubs from the `ClientRequest`/`ServerRequest` `oneOf` unions), not "just run go-jsonschema". **Generate the full protocol surface (~84 client / 8 server-req / 64 notif) + an unavoidable hand-maintained type supplement** (cf. SDK `manual_types.go`); **this refactor wires only the four-state-machine subset** — the rest is additive/unwired. Full capability alignment is a direction, not this refactor's wiring scope. | Avoids building a typed layer only to throw it away; the pipeline is small and already proven downstream. |
 | D4 | **The JSON-RPC transport is already shared and stays shared.** `acp_client.go` is a generic JSON-RPC-over-stdio client (`newACPClient` + `newAppServerJSONRPCClient`); it is **retained** as generic infra. The refactor adds a typed `Client` façade *on top of it* for the Codex app-server path; generic ACP adapters keep using the shared client. | A typed boundary above the shared client, not a transport merge/removal. |
 | D5 | **Do not vendor `codex-sdk-go` wholesale into the daemon core.** Use it as pipeline template + skeleton reference + calibration baseline. | Supply-chain trust for daemon core; its facade semantics are its own product opinions. |
 | **D6** | **The design goal is consolidating four state machines (thread / turn+compact / session-lifecycle / hydration-snapshot) into explicit single-owner layers; codegen is enabling infra, not the goal.** Each layer's acceptance is a bug class made structurally impossible, verified by the bug corpus. | Reverse-derived from the real bug record: the tangle, not the hand-written strings, is what ships bugs. #602's lesson — patching a bug in a tangled layer just reproduces it — forces "clean the layer first, then fix by construction." |
 | **D7** | **The reducer/resolver seam is the type (`activityshared.Event`), not a new cross-protocol interface.** Rule: no Codex-wire type appears in any signature that touches `activityshared.Event`. | `activityshared.Event` is already agent-agnostic (typed `EventPayload`, `Provider` field, no Codex/ACP words) and already emitted by all three adapters. A shared `Reduce(Notification)` across ACP + app-server would require a fake unified input type. Extract an interface only when a *second* real implementation (a future standard_acp refactor) shows what is genuinely shared. |
-| **D8** | **Thread becomes a first-class object with a registry; routing replaces #602's drop-filter.** The typed `Client` owns `threadId → thread context` and routes each notification to the right per-thread reducer. | The `session ≡ thread` flat model is the root of the entire foreign-thread bug class. Routing (not filtering) makes it impossible by construction and matches the `codex-sdk-go` `Thread/TurnHandle` shape. |
+| **D8** | **Thread becomes a first-class object with a registry; routing replaces #602's drop-filter.** The typed `Client` owns `threadId → thread context` and routes each notification to the right reducer. **Refined (ADR 0003):** a **single reducer + `map[childThreadID]parent` + a suppress-set + an `OwnerThreadID` stamp** — NOT one reducer instance per thread (t3code/traycer both do the lighter form). | The `session ≡ thread` flat model is the root of the entire foreign-thread bug class. Routing (not filtering) makes it impossible by construction and matches the `codex-sdk-go` `Thread/TurnHandle` shape. |
 | **D9** | **Cluster A: daemon contract in scope; desktop rewrite deferred (Step 9).** This refactor guarantees a `clientSubmitId`-keyed, gap-free, resyncable snapshot; the desktop optimistic/reconcile rewrite is a separate final step. | The defect is desktop-rooted; pulling the renderer into a daemon-layering refactor breaks the one-layer-per-step discipline and balloons blast radius. Freeze the contract now so the desktop fix has a foundation. |
-| **D10** | **Sub-agent child-thread events are routed to populate the parent collab tool card; nested visualization deferred.** | A sub-agent is a child thread surfaced in the parent as a single `collabAgentToolCall` item. Routing (D8) lets the card carry accurate final status/output/errors — exactly what #602 groped at with `appServerCollabAgentRawOutput`. Nested step-by-step view touches the renderer (out of scope) and is made cheap later by the registry. |
+| **D10** | **Sub-agent child-thread events are routed with preserved identity (`OwnerThreadID`); the summary card stays parent-item-driven; nested visualization deferred.** | A sub-agent is a child thread surfaced in the parent as a single `collabAgentToolCall` item. **Refined (ADR 0003):** the card's final status/output already comes from the *parent* item (`appServerCollabAgentRawOutput`; pinned by Step 0), so routing's real job is (a) stop child events corrupting the parent turn and (b) **preserve child identity** so the nested view is cheap later. Linkage is the parent item's **`receiverThreadIds`** (parent declares its children), NOT `Thread.parentThreadId`. Child lifecycle/turn noise is suppressed; substantive child events are re-homed under `OwnerThreadID`. "Made cheap by the registry" REQUIRES this identity preservation — dropping child events (naive) would forfeit it. |
 | **Ops-1** | Generated protocol package: **`packages/agent/daemon/runtime/codexproto`** (same module as its consumer; promote to a shared location only if another Go module needs it). | Lowest-friction placement; no premature sharing. |
-| **Ops-2** | Schema artifacts: **vendored (committed) + CI drift check.** Commit the `export` output so builds need no Rust toolchain and are reproducible; CI regenerates from a pinned codex checkout and diffs to catch drift. | Gets reproducibility and freshness together. |
+| **Ops-2** | Schema artifacts: **vendored (committed) + CI drift check.** **Refined (ADR 0002):** vendor the upstream **already-committed** `schema/json/*.json` at a **pinned codex commit SHA** (the schema is tracked in the codex repo — `git ls-files …/schema/json`), stamped into `metadata_gen.go`. **No Rust `export` run / no Rust toolchain** (this removes Risk #1). CI re-fetches the same ref and diffs. Record the source SHA alongside the Step-0 binary baseline (`codex-cli 0.142.5`). Generated types allow **unknown fields** + an **unknown-method fallback** (cf. t3code `handleUnknown*`) since the runtime binary floats. | Gets reproducibility and freshness together, without a Rust toolchain. |
 
 ## ACP Surface: Keep vs Remove
 
@@ -90,10 +90,10 @@ The ACP code in `packages/agent/daemon/runtime` is a **generic multi-agent stack
 
 | State machine | Cluster | Owning layer / step | By-construction fix |
 |---|---|---|---|
-| **Thread identity** | B | Thread registry in typed `Client` (Step 3) | Route by `threadId` instead of dropping foreign threads. |
+| **Thread identity** | B | Thread registry in typed `Client` (Step 3) | Route by `threadId` (link via parent item's `receiverThreadIds`), stamp child events with `OwnerThreadID`, suppress child lifecycle noise — instead of dropping foreign threads. (ADR 0003) |
 | **Turn + compaction lifecycle** | C | Reducer (turn events, Step 4) + facade (Step 5) | Explicit turn state machine; compact is a first-class special turn (close only on `turn/completed`; correct token accounting). |
 | **Session / live-session lifecycle** | D | Thread/Turn facade (Step 7), reconciled with `controller.go` | Facade owns idle-detection/recycling instead of it being bolted on. |
-| **Hydration / snapshot contract** | A | Reducer output (Step 4, daemon-half) + deferred desktop (Step 9) | Daemon emits a `clientSubmitId`-keyed, gap-free, resyncable snapshot; desktop stops guessing. |
+| **Hydration / snapshot contract** | A | Reducer output (Step 4, daemon-half) + deferred desktop (Step 9) | Daemon emits a `clientSubmitId`-keyed, gap-free, resyncable snapshot; desktop stops guessing. **`Version` = monotonic gap-free per-session cursor (not a ms timestamp); display order = `OccurredAtUnixMS`; identity = `MessageID=f(clientSubmitId)`. (ADR 0004)** |
 
 ## Reference Mapping (borrow per-concern, never mono-copy)
 
@@ -152,8 +152,8 @@ All four state machines are consolidated, but sequenced into independently shipp
 - **Exit:** a test set (including the bug corpus) that every subsequent step must keep green.
 
 ### Step 1 — Typed protocol layer (codegen, one step) · *enabling infra*
-- New package `packages/agent/daemon/runtime/codexproto`: run official `export` → generate protocol types + RPC stubs → version-stamp. Vendor the artifacts (Ops-2).
-- Add CI drift check (regenerate from pinned codex checkout and diff).
+- New package `packages/agent/daemon/runtime/codexproto`: **vendor upstream's committed `schema/json/*.json` at a pinned codex SHA** (no Rust `export` run) → ported-and-slimmed `codex-sdk-go/internal/codegen` generates types + RPC stubs → version-stamp the SHA. Full surface generated; subset wired (ADR 0001/0002).
+- Add CI drift check (re-fetch the same pinned ref and diff).
 - **Purely additive** — nothing consumes it yet.
 - **Exit:** generated typed layer builds; drift check runs in CI.
 
@@ -164,15 +164,16 @@ All four state machines are consolidated, but sequenced into independently shipp
 - **Exit:** Codex app-server path speaks through the typed `Client`; generic ACP stack untouched; tests green.
 
 ### Step 3 — Thread registry (state machine B)
-- Promote thread to a first-class object: the `Client` owns `threadId → thread context` and routes each notification to the right per-thread reducer.
-- **Routing replaces #602's `appServerNotificationThreadMismatch` drop-filter.** Child (sub-agent) threads route to their own context; their result folds into the parent's `collabAgentToolCall` card (D10).
-- **Exit:** foreign-thread bug class impossible by construction; #602 regression tests pass via routing (not dropping); the drop-filter is removed.
+- Promote thread to a first-class object: a single reducer owns a `map[childThreadID]parent` seeded from the parent `collabAgentToolCall` item's **`receiverThreadIds`** (ADR 0003).
+- **Routing replaces #602's `appServerNotificationThreadMismatch` drop-filter.** Identity-preserving (design "option 丙", per traycer's `subagent-nesting.ts`): suppress child lifecycle/turn noise; re-home substantive child events stamped with a new **`OwnerThreadID`** on `activityshared.Event`; the summary `collabAgentToolCall` card stays parent-item-driven (Step 0 test unchanged). Unknown/grandchild threads fall through to the ADR-0002 unknown-fallback.
+- **Concurrency:** each child thread is its own `OwnerThreadID` lane (multiple sub-agents → distinct cards; parent+child simultaneous → parent stream uncorrupted). Flat re-tag-to-parent-turn (t3code) is rejected — it garbles concurrent output.
+- **Exit:** foreign-thread bug class impossible by construction; #602 regression tests pass via routing (not dropping); the drop-filter is removed; child identity preserved so the deferred nested view (Step 9) is cheap.
 
 ### Step 4 — Event Reducer + hydration/snapshot contract (state machine A, daemon-half)
 - Pull event handling out of the 1816-line file into a focused reducer: app-server notification → tutti typed activity event.
 - Bake in the official **lossless tier**: deltas / `item/completed` / `turn/completed` guaranteed; progress-class events may degrade.
-- **Define the daemon snapshot/hydration contract:** complete, `clientSubmitId`-keyed, gap-free, fully resyncable — so an unpainted-but-real user row cannot be skipped by `after_version`, and the desktop can always recover the true state.
-- **Exit:** reducer is a standalone, tested unit; the Cluster A snapshot contract is specified and tested at the daemon boundary; adapter no longer parses raw notifications inline.
+- **Define the daemon snapshot/hydration contract:** complete, `clientSubmitId`-keyed, gap-free, fully resyncable. **Refined (ADR 0004):** replace `Version = ms timestamp` with a **store-assigned per-session monotonic gap-free counter** (the delivery cursor; assigned at `upsertSessionMessagesLocked`, preserved on merge) so a same-ms collision can no longer let `after_version` skip the user row; **sort/display by `OccurredAtUnixMS`** (robust to out-of-order replay); identity = `MessageID=f(clientSubmitId)`. No data migration (store is in-memory, replay-rebuilt); no durable event-log (future direction). Add `OwnerThreadID` from Step 3.
+- **Exit:** reducer is a standalone, tested unit; the Cluster A snapshot contract is specified and tested at the daemon boundary (monotonic cursor + resync-at-0 + stable `MessageID`); adapter no longer parses raw notifications inline.
 
 ### Step 5 — Turn + compaction lifecycle (state machine C)
 - Make the turn lifecycle an explicit state machine spanning the reducer (turn events) and facade; **compaction is a first-class special turn** (closed only on `turn/completed`; token accounting that cannot raise false compact alerts).
@@ -208,9 +209,10 @@ All four state machines are consolidated, but sequenced into independently shipp
 
 | Risk | Mitigation |
 |---|---|
-| Codegen toolchain depends on the Rust `export` bin / `go-jsonschema` | Vendor the schema output (Ops-2); document the regen command; CI drift check catches skew. |
-| Upstream schema churn mid-refactor | Pin a baseline version (Step 0); treat version bumps as isolated, reviewable diffs. |
-| **Routing (D8) changes behavior: child-thread events were dropped, now attributed** | Scope the change to populating the parent collab card (D10); nested rendering stays out of scope; Cluster B regression tests assert the parent card outcome, not new streams. |
+| ~~Codegen toolchain depends on the Rust `export` bin~~ | **Removed (ADR 0002):** vendor upstream's *committed* `schema/json/*.json` at a pinned SHA — no Rust toolchain. Residual: `go-jsonschema` (a Go lib import, not a CLI). |
+| Runtime codex binary floats vs the pinned schema SHA | CI drift only guards codexproto-vs-pinned-source; tolerate binary drift with unknown-field decoding + unknown-method fallback (ADR 0002). |
+| Upstream schema churn mid-refactor | Pin a baseline SHA + binary version (Step 0); treat version bumps as isolated, reviewable diffs. |
+| **Routing (D8) changes behavior: child-thread events were dropped, now attributed** | Identity-preserving routing (ADR 0003): summary card stays parent-item-driven; child events stamped `OwnerThreadID`, lifecycle noise suppressed; nested rendering deferred; Cluster B regression tests assert the parent card outcome, not new streams. |
 | **Four-state-machine scope creep** | Each state machine is one step with a bug-class acceptance gate; the desktop half of Cluster A is explicitly deferred (Step 9); no step combines layers. |
 | Cluster A daemon contract implies but does not deliver the desktop fix | Step 9 is explicit and sequenced; the contract is frozen and tested at the daemon boundary so the desktop fix has a stable foundation. |
 | Step 8 deletion accidentally breaks the generic ACP stack | Keep/Remove table + deletion invariant; generic ACP tests gate the deletion; prune Codex-only branches in place. |
@@ -222,3 +224,14 @@ All four state machines are consolidated, but sequenced into independently shipp
 - **Vendored vs CI-regenerated schema** → vendored + CI drift check (Ops-2).
 - **Reducer/resolver interface breadth** → seam-is-the-type; no cross-protocol interface now (D7).
 - **Refactor vs bug-fixing** → all four state machines in scope, sequenced; bugs reverse-define the goal and gate each step (D6); Cluster A desktop-half deferred to Step 9 (D9); sub-agent routing scoped to the parent card (D10).
+
+## Design Refinements (grilling session, 2026-07-02)
+
+Decisions refined against three real consumers (`codex-sdk-go`, `t3code`, `traycer`) and verified against tutti code. Full rationale in `docs/adr/`:
+
+- **[ADR 0001](../adr/0001-codex-appserver-codegen-approach.md)** — codegen: port-and-slim `codex-sdk-go/internal/codegen`; generate the **full** protocol surface, **wire only the four-state-machine subset**; full capability alignment is a direction, not this refactor's wiring scope.
+- **[ADR 0002](../adr/0002-codexproto-pinning-source-drift.md)** — pin a codex **commit SHA** + stamp; **vendor the committed schema JSON** (no Rust `export` → removes Risk #1); tolerate the floating runtime binary with unknown-field decode + unknown-method fallback; `collaborationMode/list` is "used-but-unexported" → manual supplement.
+- **[ADR 0003](../adr/0003-step3-thread-registry-subagent-routing.md)** — Step 3 identity-preserving routing (traycer model): single reducer + `map[childThreadID]parent` from `receiverThreadIds` + suppress-set + **`OwnerThreadID`**; summary card unchanged; corrects D8 (no per-thread reducer) and D10 (linkage = `receiverThreadIds`, identity preservation makes nested cheap).
+- **[ADR 0004](../adr/0004-step4-hydration-monotonic-cursor.md)** — Step 4 `Version` is a **ms timestamp**, not `1,2,3`; same-ms collision is a **daemon-side** contributor to Cluster A. Fix: monotonic gap-free per-session **cursor** + `OccurredAtUnixMS` display order + `MessageID` identity. No data migration; durable event-log = future direction.
+
+Glossary: `docs/adr/glossary.md`.
