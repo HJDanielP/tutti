@@ -43,6 +43,42 @@ Use this shape for new entries:
 
 ## Current Entries
 
+### Codex npm install misses the platform package
+
+- Symptom:
+  The Codex environment dialog says the CLI is installed, but the adapter or
+  `codex app-server` probe is still missing. Logs may show
+  `Missing optional dependency @openai/codex-darwin-arm64`, a long wait on an
+  npm registry, or a later repair failure such as `ENOTEMPTY` while moving an
+  existing `@openai/codex` directory.
+- Quick checks:
+  Inspect the npm debug log under the install cache for
+  `reify failed optional dependency`, then check whether the matching platform
+  package directory contains both `package.json` and the vendor `codex`
+  executable. Compare the selected registry with a temporary prefix/cache
+  install before changing the user's real install.
+- Root cause:
+  `@openai/codex` installs a JavaScript launcher plus a per-platform optional
+  package such as `@openai/codex-darwin-arm64`. npm can exit successfully even
+  when an optional dependency fetch failed, which leaves the launcher installed
+  but unable to start. A registry can also be reachable but too slow for the
+  platform tarball, so retrying the same source burns the install timeout before
+  mirrors are tried.
+- Fix:
+  Keep Codex installs on the Tutti-managed Node/npm runtime, install with
+  optional dependencies included, and rank configured npm registries with a
+  lightweight package metadata probe before attempting the install. Preserve
+  `TUTTI_AGENT_NPM_REGISTRY` as an explicit single-registry pin with no mirror
+  fallback.
+- Validation:
+  Reproduce in a temporary prefix/cache using the Tutti-managed npm. Confirm
+  `codex --version`, the platform package metadata and vendor binary, and a
+  short `codex app-server` probe before touching the user's real install.
+- References:
+  [npm_registry.go](../../services/tuttid/service/agentstatus/npm_registry.go)
+  [installer_codex_cli.go](../../services/tuttid/service/agentstatus/installer_codex_cli.go)
+  [codex_platform.go](../../services/tuttid/service/agentstatus/codex_platform.go)
+
 ### Dynamic CLI input rejects plausible flags
 
 - Symptom:
@@ -739,6 +775,36 @@ delimited by ---`, and the composer skill picker may show partial or
 - Validation:
   Add or update `agentstatus` tests for the Codex status/login command shape,
   then run `cd services/tuttid && go test ./service/agentstatus`.
+
+### Codex app-server subagent output appears as the parent reply
+
+- Symptom:
+  A parent Codex AgentGUI turn that spawned subagents ends with a subagent-only
+  answer such as `{"n":7}`, or a failed Agent/subagent tool detail shows the
+  prompt again under Output even though the tool never returned a result.
+- Quick checks:
+  Compare `workspace_agent_sessions.provider_session_id` with app-server
+  notification `threadId` values in `tuttid.log`/run traces. Inspect
+  `workspace_agent_messages.payload` for the suspect tool call: if it has
+  `input.prompt`/`input.task` but no `output` or `error`, the GUI must not
+  synthesize an Output section from the summary or prompt.
+- Root cause:
+  Codex app-server streams parent and child-thread notifications over the same
+  connection. Transcript, tool, and `turn/completed` notifications must be
+  scoped to the active provider thread before they update the parent turn. On
+  the renderer side, task-like tools use the summary/title for compact labels,
+  but missing result payloads are not tool output.
+- Fix:
+  Drop notifications that carry a non-empty `threadId` different from the
+  session `provider_session_id`, with debug logging that records expected
+  thread, event thread, turn, item id/type/status, and method. Keep notifications
+  without `threadId` compatible. For Agent/task cards, render Output only from
+  actual `output`/`error` payload text, not from the prompt or summary.
+- Validation:
+  Add a Codex app-server test that injects foreign-thread `agentMessage` and
+  `turn/completed` notifications during a parent turn, plus AgentGUI projection
+  tests for failed Agent calls with prompt-only payloads. Run the focused Go and
+  GUI specs for those paths.
 
 ### Concurrent agent CLI installs corrupt shared npm global state
 
