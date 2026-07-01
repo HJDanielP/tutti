@@ -41,20 +41,19 @@ func TestAppServerCollabAgentCompletedCarriesResultOutput(t *testing.T) {
 	}
 }
 
-// CURRENT behavior (#602): a notification whose threadId differs from the
-// session's provider thread is dropped (mismatch == true). Step 3 replaces this
-// drop with per-thread routing; when Step 3 lands, the "foreign thread" case
-// changes from "dropped" to "routed to its own context" and THIS test's
-// expectation is updated deliberately. Any earlier change is a regression.
+// Step 3 routing behavior: linked child threads are preserved under the parent
+// session with OwnerThreadID, while unknown foreign threads still drop.
 func TestAppServerForeignThreadMismatch(t *testing.T) {
 	t.Parallel()
 
-	session := Session{AgentSessionID: "s1", ProviderSessionID: "codex-thread-1"}
+	adapter := NewCodexAppServerAdapter(nil)
+	session := Session{AgentSessionID: "s1", Provider: ProviderCodex, ProviderSessionID: "codex-thread-1"}
+	adapter.storeSession(session.AgentSessionID, &codexAppServerSession{threadID: session.ProviderSessionID})
 
 	cases := []struct {
 		name   string
 		params map[string]any
-		want   bool // true == dropped as foreign
+		want   bool // true == dropped
 	}{
 		{
 			name:   "same thread is not dropped",
@@ -77,9 +76,9 @@ func TestAppServerForeignThreadMismatch(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := appServerNotificationThreadMismatch(session, appServerNotifyItemStarted, tc.params)
+			got := adapter.appServerNotificationRoute(session, appServerNotifyItemStarted, tc.params).drop
 			if got != tc.want {
-				t.Fatalf("appServerNotificationThreadMismatch = %v, want %v", got, tc.want)
+				t.Fatalf("drop = %v, want %v", got, tc.want)
 			}
 		})
 	}

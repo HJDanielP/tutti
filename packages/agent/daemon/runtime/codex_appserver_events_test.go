@@ -1,9 +1,21 @@
 package agentruntime
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
+
+	activityshared "github.com/tutti-os/tutti/packages/agentactivity/daemon/activity/events"
 )
+
+func mustJSONRawMessage(t *testing.T, value any) json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return raw
+}
 
 // appServerUserInputAnswers is the codex-specific translation of the GUI's
 // interactive answer payload into codex's requestUserInput response. The GUI
@@ -94,6 +106,81 @@ func TestAppServerUserInputIncludesSkillAndMentionItems(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("appServerUserInput = %#v, want %#v", got, want)
+	}
+}
+
+func TestCodexAppServerAdapterRoutesLinkedChildThreadEvents(t *testing.T) {
+	t.Parallel()
+
+	adapter := NewCodexAppServerAdapter(nil)
+	session := Session{
+		AgentSessionID:    "agent-session-1",
+		Provider:          ProviderCodex,
+		ProviderSessionID: "parent-thread-1",
+		CWD:               "/workspace",
+	}
+	adapter.storeSession(session.AgentSessionID, &codexAppServerSession{threadID: session.ProviderSessionID})
+	normalizer := newACPTurnNormalizer()
+
+	parentEvents := adapter.appServerNotificationEvents(nil, session, "parent-turn-1", acpMessage{
+		Method: appServerNotifyItemStarted,
+		Params: mustJSONRawMessage(t, map[string]any{
+			"threadId": session.ProviderSessionID,
+			"turnId":   "parent-turn-1",
+			"item": map[string]any{
+				"type":              "collabAgentToolCall",
+				"id":                "spawn-child-1",
+				"tool":              "spawnAgent",
+				"status":            "inProgress",
+				"prompt":            "inspect",
+				"receiverThreadIds": []any{"child-thread-1"},
+			},
+		}),
+	}, normalizer, nil)
+	if len(parentEvents) != 1 || parentEvents[0].OwnerThreadID != "" {
+		t.Fatalf("parent collab events = %#v, want one top-level event", parentEvents)
+	}
+
+	childLifecycleEvents := adapter.appServerNotificationEvents(nil, session, "parent-turn-1", acpMessage{
+		Method: appServerNotifyTurnCompleted,
+		Params: mustJSONRawMessage(t, map[string]any{
+			"threadId": "child-thread-1",
+			"turn":     map[string]any{"id": "child-turn-1", "status": "completed"},
+		}),
+	}, normalizer, nil)
+	if len(childLifecycleEvents) != 0 {
+		t.Fatalf("child lifecycle events = %#v, want suppressed", childLifecycleEvents)
+	}
+
+	childEvents := adapter.appServerNotificationEvents(nil, session, "parent-turn-1", acpMessage{
+		Method: appServerNotifyAgentMessageDelta,
+		Params: mustJSONRawMessage(t, map[string]any{
+			"threadId": "child-thread-1",
+			"turnId":   "child-turn-1",
+			"itemId":   "child-msg-1",
+			"delta":    "child output",
+		}),
+	}, normalizer, nil)
+	if len(childEvents) != 1 {
+		t.Fatalf("child events = %#v, want one event", childEvents)
+	}
+	event := childEvents[0]
+	if event.OwnerThreadID != "child-thread-1" {
+		t.Fatalf("OwnerThreadID = %q, want child-thread-1", event.OwnerThreadID)
+	}
+	if event.AgentSessionID != session.AgentSessionID || event.ProviderSessionID != session.ProviderSessionID {
+		t.Fatalf("event session = %q/%q, want parent session", event.AgentSessionID, event.ProviderSessionID)
+	}
+	if event.Payload.TurnID != "child-turn-1" {
+		t.Fatalf("TurnID = %q, want child-turn-1", event.Payload.TurnID)
+	}
+	if event.Payload.Role != activityshared.MessageRoleAssistant || event.Payload.Content != "child output" {
+		t.Fatalf("child payload = %#v", event.Payload)
+	}
+
+	parentAfterChild := normalizer.AppendAssistantChunk(session, "parent-turn-1", "parent output")
+	if len(parentAfterChild) != 1 || parentAfterChild[0].Payload.Content != "parent output" {
+		t.Fatalf("parent normalizer was corrupted by child lane: %#v", parentAfterChild)
 	}
 }
 

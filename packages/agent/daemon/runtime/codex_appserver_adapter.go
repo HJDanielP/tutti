@@ -126,8 +126,15 @@ type codexAppServerSession struct {
 	authMessage     string
 	activeTurnID    string
 	activeTurn      *codexAppServerActiveTurn
+	childThreads    map[string]*codexAppServerThreadContext
 	acpLiveState
 	pendingRequests map[string]*pendingACPRequest
+}
+
+type codexAppServerThreadContext struct {
+	parentThreadID string
+	parentItemID   string
+	normalizer     *acpTurnNormalizer
 }
 
 // codexAppServerActiveTurn carries the streaming context of an in-flight

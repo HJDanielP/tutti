@@ -58,8 +58,17 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 	if len(message.Params) > 0 {
 		_ = json.Unmarshal(message.Params, &params)
 	}
-	if appServerNotificationThreadMismatch(session, message.Method, params) {
+	route := a.appServerNotificationRoute(session, message.Method, params)
+	if route.drop {
 		return nil
+	}
+	if route.normalizer != nil {
+		normalizer = route.normalizer
+	}
+	turnID = firstNonEmpty(route.turnID, turnID)
+	ownerThreadID := route.ownerThreadID
+	emit := func(events []activityshared.Event) []activityshared.Event {
+		return appServerEventsWithOwnerThreadID(events, ownerThreadID)
 	}
 	switch message.Method {
 	case appServerNotifyTurnStarted:
@@ -86,18 +95,18 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 		if normalizer == nil {
 			return nil
 		}
-		return normalizer.AppendAssistantChunk(session, turnID, asStringRaw(params["delta"]))
+		return emit(normalizer.AppendAssistantChunk(session, turnID, asStringRaw(params["delta"])))
 	case appServerNotifyReasoningSummaryPart, appServerNotifyThreadSettingsUpdated:
 		return nil
 	case appServerNotifyReasoningDelta, appServerNotifyReasoningSummary:
 		if normalizer == nil {
 			return nil
 		}
-		return normalizer.AppendThinkingChunk(session, turnID, appServerReasoningDeltaText(params))
+		return emit(normalizer.AppendThinkingChunk(session, turnID, appServerReasoningDeltaText(params)))
 	case appServerNotifyItemStarted:
-		return a.appServerItemEvents(session, turnID, payloadObject(params["item"]), false, normalizer)
+		return emit(a.appServerItemEvents(session, turnID, payloadObject(params["item"]), false, normalizer))
 	case appServerNotifyItemCompleted:
-		return a.appServerItemEvents(session, turnID, payloadObject(params["item"]), true, normalizer)
+		return emit(a.appServerItemEvents(session, turnID, payloadObject(params["item"]), true, normalizer))
 	case appServerNotifyPlanUpdated:
 		if normalizer == nil {
 			return nil
@@ -107,17 +116,17 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 			return nil
 		}
 		events, _ := normalizer.ToolCallEvents(session, turnID, update)
-		return events
+		return emit(events)
 	case appServerNotifyTokenUsage:
 		a.applyTokenUsage(session.AgentSessionID, params)
 		if event, ok := acpUsageUpdatedEvent(session); ok {
-			return []activityshared.Event{event}
+			return emit([]activityshared.Event{event})
 		}
 		return nil
 	case appServerNotifyRateLimitsUpdated:
 		a.applyRateLimits(session.AgentSessionID, payloadObject(params["rateLimits"]))
 		if event, ok := acpUsageUpdatedEvent(session); ok {
-			return []activityshared.Event{event}
+			return emit([]activityshared.Event{event})
 		}
 		return nil
 	case appServerNotifyAccountUpdated:
@@ -127,28 +136,28 @@ func (a *CodexAppServerAdapter) appServerNotificationEvents(
 		if event, ok := acpSessionTitleEvent(session, map[string]any{
 			"title": asString(params["threadName"]),
 		}); ok {
-			return []activityshared.Event{event}
+			return emit([]activityshared.Event{event})
 		}
 		return nil
 	case appServerNotifyError:
 		if willRetry, _ := params["willRetry"].(bool); willRetry {
 			turnError := payloadObject(params["error"])
 			detail := asString(turnError["message"])
-			return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "transport_retry", "", detail)}
+			return emit([]activityshared.Event{appServerSystemNoticeEvent(session, turnID, "transport_retry", "", detail)})
 		}
 		// Terminal turn failures already surface as agent_visible_error in the GUI.
 		return nil
 	case appServerNotifyWarning:
-		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "warning", "", asString(params["message"]))}
+		return emit([]activityshared.Event{appServerSystemNoticeEvent(session, turnID, "warning", "", asString(params["message"]))})
 	case appServerNotifyDeprecation:
-		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "warning",
-			asString(params["summary"]), asString(params["details"]))}
+		return emit([]activityshared.Event{appServerSystemNoticeEvent(session, turnID, "warning",
+			asString(params["summary"]), asString(params["details"]))})
 	case appServerNotifyModelRerouted:
 		title := fmt.Sprintf("Codex rerouted the model from %s to %s.",
 			asString(params["fromModel"]), asString(params["toModel"]))
-		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", title, asString(params["reason"]))}
+		return emit([]activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", title, asString(params["reason"]))})
 	case appServerNotifyThreadCompacted:
-		return []activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", "Context compacted.", "")}
+		return emit([]activityshared.Event{appServerSystemNoticeEvent(session, turnID, "system_notice", "Context compacted.", "")})
 	case appServerNotifyThreadGoalUpdated:
 		a.applyGoalUpdate(session.AgentSessionID, payloadObject(params["goal"]))
 		return nil
@@ -495,12 +504,183 @@ func appServerOutputText(value any) string {
 	)
 }
 
-func appServerNotificationThreadMismatch(session Session, method string, params map[string]any) bool {
-	expectedThreadID := strings.TrimSpace(session.ProviderSessionID)
-	eventThreadID := asString(params["threadId"])
-	if expectedThreadID == "" || eventThreadID == "" || eventThreadID == expectedThreadID {
+type appServerNotificationRoute struct {
+	ownerThreadID string
+	turnID        string
+	normalizer    *acpTurnNormalizer
+	drop          bool
+}
+
+func (a *CodexAppServerAdapter) appServerNotificationRoute(
+	session Session,
+	method string,
+	params map[string]any,
+) appServerNotificationRoute {
+	parentThreadID := strings.TrimSpace(session.ProviderSessionID)
+	eventThreadID := strings.TrimSpace(asString(params["threadId"]))
+	if parentThreadID == "" || eventThreadID == "" || eventThreadID == parentThreadID {
+		a.rememberAppServerChildThreads(session.AgentSessionID, parentThreadID, payloadObject(params["item"]))
+		return appServerNotificationRoute{}
+	}
+
+	child, ok := a.appServerChildThread(session.AgentSessionID, eventThreadID)
+	if !ok {
+		a.logAppServerForeignThreadDrop(session, method, params, eventThreadID)
+		return appServerNotificationRoute{drop: true}
+	}
+	if appServerSuppressChildNotification(method) {
+		return appServerNotificationRoute{drop: true}
+	}
+	if child.normalizer == nil {
+		child.normalizer = newACPTurnNormalizer()
+		a.storeAppServerChildThread(session.AgentSessionID, eventThreadID, child)
+	}
+	return appServerNotificationRoute{
+		ownerThreadID: eventThreadID,
+		turnID:        firstNonEmpty(asString(params["turnId"]), asString(payloadObject(params["turn"])["id"])),
+		normalizer:    child.normalizer,
+	}
+}
+
+func (a *CodexAppServerAdapter) rememberAppServerChildThreads(agentSessionID string, parentThreadID string, item map[string]any) {
+	if asString(item["type"]) != "collabAgentToolCall" {
+		return
+	}
+	childThreadIDs := appServerReceiverThreadIDs(item["receiverThreadIds"])
+	if len(childThreadIDs) == 0 {
+		return
+	}
+	parentThreadID = strings.TrimSpace(parentThreadID)
+	parentItemID := strings.TrimSpace(asString(item["id"]))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	appSession := a.sessions[strings.TrimSpace(agentSessionID)]
+	if appSession == nil {
+		return
+	}
+	if appSession.childThreads == nil {
+		appSession.childThreads = make(map[string]*codexAppServerThreadContext)
+	}
+	for _, childThreadID := range childThreadIDs {
+		if childThreadID == "" || childThreadID == parentThreadID {
+			continue
+		}
+		if existing := appSession.childThreads[childThreadID]; existing != nil {
+			if existing.parentItemID == "" {
+				existing.parentItemID = parentItemID
+			}
+			if existing.parentThreadID == "" {
+				existing.parentThreadID = parentThreadID
+			}
+			continue
+		}
+		appSession.childThreads[childThreadID] = &codexAppServerThreadContext{
+			parentThreadID: parentThreadID,
+			parentItemID:   parentItemID,
+			normalizer:     newACPTurnNormalizer(),
+		}
+	}
+}
+
+func (a *CodexAppServerAdapter) appServerChildThread(agentSessionID string, childThreadID string) (*codexAppServerThreadContext, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	appSession := a.sessions[strings.TrimSpace(agentSessionID)]
+	if appSession == nil || appSession.childThreads == nil {
+		return nil, false
+	}
+	child := appSession.childThreads[strings.TrimSpace(childThreadID)]
+	if child == nil {
+		return nil, false
+	}
+	return &codexAppServerThreadContext{
+		parentThreadID: child.parentThreadID,
+		parentItemID:   child.parentItemID,
+		normalizer:     child.normalizer,
+	}, true
+}
+
+func (a *CodexAppServerAdapter) storeAppServerChildThread(
+	agentSessionID string,
+	childThreadID string,
+	child *codexAppServerThreadContext,
+) {
+	if child == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	appSession := a.sessions[strings.TrimSpace(agentSessionID)]
+	if appSession == nil {
+		return
+	}
+	if appSession.childThreads == nil {
+		appSession.childThreads = make(map[string]*codexAppServerThreadContext)
+	}
+	appSession.childThreads[strings.TrimSpace(childThreadID)] = child
+}
+
+func appServerSuppressChildNotification(method string) bool {
+	switch method {
+	case appServerNotifyThreadStarted,
+		appServerNotifyThreadSettingsUpdated,
+		appServerNotifyThreadNameUpdated,
+		appServerNotifyThreadCompacted,
+		appServerNotifyThreadGoalUpdated,
+		appServerNotifyThreadGoalCleared,
+		appServerNotifyTurnStarted,
+		appServerNotifyTurnCompleted,
+		appServerNotifyPlanUpdated,
+		appServerNotifyTokenUsage,
+		appServerNotifyRateLimitsUpdated,
+		appServerNotifyAccountUpdated:
+		return true
+	default:
 		return false
 	}
+}
+
+func appServerReceiverThreadIDs(value any) []string {
+	values, ok := value.([]any)
+	if !ok {
+		if typed, ok := value.([]string); ok {
+			out := make([]string, 0, len(typed))
+			for _, item := range typed {
+				if trimmed := strings.TrimSpace(item); trimmed != "" {
+					out = append(out, trimmed)
+				}
+			}
+			return out
+		}
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if threadID := strings.TrimSpace(asString(value)); threadID != "" {
+			out = append(out, threadID)
+		}
+	}
+	return out
+}
+
+func appServerEventsWithOwnerThreadID(events []activityshared.Event, ownerThreadID string) []activityshared.Event {
+	ownerThreadID = strings.TrimSpace(ownerThreadID)
+	if ownerThreadID == "" || len(events) == 0 {
+		return events
+	}
+	for index := range events {
+		events[index].OwnerThreadID = ownerThreadID
+	}
+	return events
+}
+
+func (a *CodexAppServerAdapter) logAppServerForeignThreadDrop(
+	session Session,
+	method string,
+	params map[string]any,
+	eventThreadID string,
+) {
+	expectedThreadID := strings.TrimSpace(session.ProviderSessionID)
 	item := payloadObject(params["item"])
 	slog.Debug(
 		"agent session app-server notification ignored for foreign thread",
@@ -513,7 +693,6 @@ func appServerNotificationThreadMismatch(session Session, method string, params 
 		"item_type", asString(item["type"]),
 		"item_status", asString(item["status"]),
 	)
-	return true
 }
 
 func appServerItemStatus(status string) string {
