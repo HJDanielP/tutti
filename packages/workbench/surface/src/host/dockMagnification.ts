@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
+import {
+  isDockMagnificationPointInsideHitBounds,
+  resolveDockMagnificationVisibleHitBounds,
+  type DockMagnificationHitBounds
+} from "./dockMagnificationBounds.ts";
+
+export {
+  isDockMagnificationPointInsideHitBounds,
+  resolveDockMagnificationVisibleHitBounds,
+  type DockMagnificationHitBounds
+} from "./dockMagnificationBounds.ts";
 
 export const DOCK_ICON_BASE_SIZE = 43.2;
 export const DOCK_ICON_PEAK_SIZE = DOCK_ICON_BASE_SIZE * 1.7;
@@ -28,13 +39,6 @@ export interface DockMagnificationSlotRect {
   left: number;
   right: number;
   top: number;
-}
-
-interface DockMagnificationHitBounds {
-  crossEnd: number;
-  crossStart: number;
-  mainEnd: number;
-  mainStart: number;
 }
 
 interface DockMagnificationPointerTrackingTarget {
@@ -121,31 +125,6 @@ export function resolveDockMagnificationHitBounds(
     mainEnd,
     mainStart
   };
-}
-
-export function isDockMagnificationPointInsideHitBounds({
-  clientX,
-  clientY,
-  dockPlacement,
-  hitBounds
-}: {
-  clientX: number;
-  clientY: number;
-  dockPlacement: "bottom" | "left";
-  hitBounds: DockMagnificationHitBounds | null;
-}): boolean {
-  if (!hitBounds) {
-    return false;
-  }
-
-  const mainAxis = dockPlacement === "left" ? clientY : clientX;
-  const crossAxis = dockPlacement === "left" ? clientX : clientY;
-  return (
-    mainAxis >= hitBounds.mainStart &&
-    mainAxis <= hitBounds.mainEnd &&
-    crossAxis >= hitBounds.crossStart &&
-    crossAxis <= hitBounds.crossEnd
-  );
 }
 
 export function createDockMagnificationGlobalPointerTracker({
@@ -371,10 +350,12 @@ function clearDockSlotMagnification(
 export function useDockMagnification({
   dockPlacement,
   dockRootRef,
+  dockViewportRef,
   slotRefs
 }: {
   dockPlacement: "bottom" | "left";
   dockRootRef: RefObject<HTMLElement | null>;
+  dockViewportRef: RefObject<HTMLElement | null>;
   slotRefs: RefObject<Map<string, HTMLElement>>;
 }) {
   const pointerAxisRef = useRef<number | null>(null);
@@ -429,6 +410,7 @@ export function useDockMagnification({
     const centers = new Map<string, number>();
     const slotRects: DockMagnificationSlotRect[] = [];
     const order: string[] = [];
+    const viewportRect = dockViewportRef.current?.getBoundingClientRect();
     for (const [anchorKey, slotElement] of slots) {
       order.push(anchorKey);
       const rect = slotElement.getBoundingClientRect();
@@ -442,12 +424,20 @@ export function useDockMagnification({
       centers.set(anchorKey, center);
     }
     slotOrderRef.current = order;
-    hitBoundsRef.current = resolveDockMagnificationHitBounds(
-      slotRects,
-      dockPlacement
-    );
+    hitBoundsRef.current = resolveDockMagnificationVisibleHitBounds({
+      dockPlacement,
+      hitBounds: resolveDockMagnificationHitBounds(slotRects, dockPlacement),
+      viewportRect: viewportRect
+        ? {
+            bottom: viewportRect.bottom,
+            left: viewportRect.left,
+            right: viewportRect.right,
+            top: viewportRect.top
+          }
+        : null
+    });
     restCentersRef.current = centers;
-  }, [dockPlacement, slotRefs]);
+  }, [dockPlacement, dockViewportRef, slotRefs]);
 
   const runAnimationFrame = useCallback(
     (frameTime: number) => {

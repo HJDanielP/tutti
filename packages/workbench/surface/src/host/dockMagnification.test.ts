@@ -15,7 +15,8 @@ import {
   mapDistanceToTargetSize,
   resolveDockMagnificationHitBounds,
   resolveDockMagnificationSlotLayoutSize,
-  resolveDockMagnificationSlotCenter
+  resolveDockMagnificationSlotCenter,
+  resolveDockMagnificationVisibleHitBounds
 } from "./dockMagnification.ts";
 
 const source = readFileSync(resolve("src/host/dockMagnification.ts"), "utf8");
@@ -157,6 +158,47 @@ test("dock magnification hit bounds include the transparent gap between slots", 
       clientY: 60,
       dockPlacement: "bottom",
       hitBounds
+    }),
+    false
+  );
+});
+
+test("dock magnification visible hit bounds clip overflow slots to the viewport", () => {
+  const slotHitBounds = resolveDockMagnificationHitBounds(
+    [
+      { bottom: 80, left: 100, right: 143.2, top: 36.8 },
+      { bottom: 80, left: 160, right: 203.2, top: 36.8 },
+      { bottom: 80, left: 720, right: 763.2, top: 36.8 }
+    ],
+    "bottom"
+  );
+  const visibleHitBounds = resolveDockMagnificationVisibleHitBounds({
+    dockPlacement: "bottom",
+    hitBounds: slotHitBounds,
+    viewportRect: { bottom: 88, left: 64, right: 560, top: 0 }
+  });
+
+  assertBoundsEqual(visibleHitBounds, {
+    crossEnd: 88,
+    crossStart: 28.8,
+    mainEnd: 560,
+    mainStart: 100
+  });
+  assert.equal(
+    isDockMagnificationPointInsideHitBounds({
+      clientX: 151.6,
+      clientY: 60,
+      dockPlacement: "bottom",
+      hitBounds: visibleHitBounds
+    }),
+    true
+  );
+  assert.equal(
+    isDockMagnificationPointInsideHitBounds({
+      clientX: 730,
+      clientY: 60,
+      dockPlacement: "bottom",
+      hitBounds: visibleHitBounds
     }),
     false
   );
