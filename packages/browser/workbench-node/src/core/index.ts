@@ -7,6 +7,14 @@ export {
   type BrowserNodeRuntimeStore
 } from "./runtimeStore.ts";
 export {
+  createBrowserNodeTabStore,
+  createBrowserTabId,
+  resolveBrowserContainerNodeId,
+  type BrowserNodeTab,
+  type BrowserNodeTabsState,
+  type BrowserNodeTabStore
+} from "./tabStore.ts";
+export {
   normalizeBrowserComparableUrl,
   resolveBrowserAddressInput,
   normalizeHostBrowserComparableUrl,

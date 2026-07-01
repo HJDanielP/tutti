@@ -4,6 +4,14 @@ export {
   type BrowserNodeFeature,
   type CreateBrowserNodeFeatureInput
 } from "./core/feature.ts";
+export {
+  createBrowserNodeTabStore,
+  createBrowserTabId,
+  resolveBrowserContainerNodeId,
+  type BrowserNodeTab,
+  type BrowserNodeTabsState,
+  type BrowserNodeTabStore
+} from "./core/tabStore.ts";
 export { resolveBrowserNavigationUrl } from "./core/url.ts";
 export type {
   BrowserNodeActivationInput,

@@ -7,6 +7,10 @@ import {
   type BrowserNodeRuntimeStore
 } from "./runtimeStore.ts";
 import {
+  createBrowserNodeTabStore,
+  type BrowserNodeTabStore
+} from "./tabStore.ts";
+import {
   resolveBrowserAddressInput,
   resolveBrowserOpenExternalUrl,
   type BrowserAddressInputResolution,
@@ -21,6 +25,7 @@ export interface BrowserNodeFeature {
   resolveAddressInput(rawInput: string): BrowserAddressInputResolution;
   resolveOpenExternalUrl(rawInput: string): BrowserNavigationUrlResolution;
   runtimeStore: BrowserNodeRuntimeStore;
+  tabStore: BrowserNodeTabStore;
   connect(): () => void;
 }
 
@@ -40,6 +45,7 @@ export interface CreateBrowserNodeFeatureInput {
   reportDiagnostic?: BrowserNodeDiagnosticReporter;
   resolveSearchUrl?: BrowserSearchUrlResolver;
   runtimeStore?: BrowserNodeRuntimeStore;
+  tabStore?: BrowserNodeTabStore;
 }
 
 export function createBrowserNodeFeature({
@@ -47,7 +53,8 @@ export function createBrowserNodeFeature({
   i18n,
   reportDiagnostic,
   resolveSearchUrl,
-  runtimeStore = createBrowserNodeRuntimeStore()
+  runtimeStore = createBrowserNodeRuntimeStore(),
+  tabStore = createBrowserNodeTabStore()
 }: CreateBrowserNodeFeatureInput): BrowserNodeFeature {
   let listenerCount = 0;
   let disconnect: (() => void) | null = null;
@@ -78,6 +85,7 @@ export function createBrowserNodeFeature({
     resolveOpenExternalUrl(rawInput) {
       return resolveBrowserOpenExternalUrl(rawInput);
     },
-    runtimeStore
+    runtimeStore,
+    tabStore
   };
 }
