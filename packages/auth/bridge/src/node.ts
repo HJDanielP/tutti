@@ -72,9 +72,11 @@ type PendingLogin = {
   accountBaseUrl: string;
   appId: string;
   appCallbackUrl: string;
+  authJsonPath: string;
   attemptId: string;
   authOrigin: string;
   bridgeToken: string;
+  completedResult?: { session: TuttiAuthSession; user: TuttiUserInfo };
   deviceId: string;
   localServerOrigin: string;
   state: string;
@@ -162,6 +164,7 @@ export function createTuttiNodeAuthClient(
         accountBaseUrl,
         appId,
         appCallbackUrl,
+        authJsonPath,
         attemptId,
         authOrigin: new URL(authLoginUrl).origin,
         bridgeToken,
@@ -181,20 +184,10 @@ export function createTuttiNodeAuthClient(
       try {
         await openUrl(loginUrl);
         const transferCode = await completion;
-        const sessionId = await redeemDesktopTransferCode(
-          pending,
-          transferCode
-        );
-        const user = await fetchUserInfo(
-          accountBaseUrl,
-          buildSessionCookie(sessionId)
-        );
-        if (!user) {
-          throw new Error("Failed to load user info after login");
+        if (pending.completedResult) {
+          return pending.completedResult;
         }
-        const session = sessionFromUser(sessionId, user);
-        await writeAuthJson(authJsonPath, session);
-        return { session, user };
+        return await completePendingLogin(pending, transferCode);
       } finally {
         await closeServer(bridge.server);
       }
@@ -382,6 +375,51 @@ async function createLoginBridgeServer(
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/oauth/callback") {
+      if (!isAllowedLoopbackHost(req, port)) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      const callbackError = trimString(url.searchParams.get("error"));
+      const callbackState = trimString(url.searchParams.get("state"));
+      const transferCode = trimString(url.searchParams.get("transfer_code"));
+      if (!stateMatches(input, callbackState)) {
+        const error = new Error("Invalid state");
+        complete(() => rejectCompletion(error));
+        sendRedirect(res, buildBridgeResultUrl(input, "error", "invalidState"));
+        return;
+      }
+      if (callbackError) {
+        const error = new Error(callbackError);
+        complete(() => rejectCompletion(error));
+        sendRedirect(
+          res,
+          buildBridgeResultUrl(input, "error", "providerError")
+        );
+        return;
+      }
+      if (!transferCode) {
+        const error = new Error("Missing transfer_code");
+        complete(() => rejectCompletion(error));
+        sendRedirect(
+          res,
+          buildBridgeResultUrl(input, "error", "missingTransferCode")
+        );
+        return;
+      }
+      try {
+        input.completedResult = await completePendingLogin(input, transferCode);
+        input.completed = true;
+        complete(() => resolveCompletion(transferCode));
+        sendRedirect(res, buildBridgeResultUrl(input, "success"));
+      } catch (error) {
+        complete(() => rejectCompletion(error));
+        sendRedirect(res, buildBridgeResultUrl(input, "error", "redeemFailed"));
+      }
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/oauth/complete") {
       if (
         !isAllowedBridgeOrigin(req, input) ||
@@ -449,6 +487,23 @@ async function createLoginBridgeServer(
   });
 
   return { server, waitForCompletion };
+}
+
+async function completePendingLogin(
+  input: PendingLogin,
+  transferCode: string
+): Promise<{ session: TuttiAuthSession; user: TuttiUserInfo }> {
+  const sessionId = await redeemDesktopTransferCode(input, transferCode);
+  const user = await fetchUserInfo(
+    input.accountBaseUrl,
+    buildSessionCookie(sessionId)
+  );
+  if (!user) {
+    throw new Error("Failed to load user info after login");
+  }
+  const session = sessionFromUser(sessionId, user);
+  await writeAuthJson(input.authJsonPath, session);
+  return { session, user };
 }
 
 async function waitForCompletion(
@@ -646,6 +701,66 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
     "Content-Type": "application/json; charset=utf-8"
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendRedirect(res: ServerResponse, location: string): void {
+  res.writeHead(302, { Location: location });
+  res.end();
+}
+
+function buildBridgeResultUrl(
+  input: PendingLogin,
+  status: string,
+  safeErrorCode?: string
+): string {
+  const url = new URL("/auth/login/callback", input.authOrigin);
+  url.searchParams.set("desktopBridgeStatus", status);
+  if (safeErrorCode) {
+    url.searchParams.set("desktopBridgeError", safeErrorCode);
+  }
+  const openAppUrl = buildSafeOpenAppUrl(
+    input.appCallbackUrl,
+    status,
+    safeErrorCode
+  );
+  if (openAppUrl) {
+    url.searchParams.set("openAppUrl", openAppUrl);
+  }
+  return url.toString();
+}
+
+function buildSafeOpenAppUrl(
+  rawUrl: string,
+  status: string,
+  safeErrorCode?: string
+): string | null {
+  try {
+    const url = new URL(rawUrl.trim());
+    if (!isAllowedAppCallbackProtocol(url.protocol)) {
+      return null;
+    }
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("desktopBridgeStatus", status);
+    if (safeErrorCode) {
+      url.searchParams.set("desktopBridgeError", safeErrorCode);
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedAppCallbackProtocol(protocol: string): boolean {
+  const legacyProtocol = `${DEFAULT_APP_ID}:`;
+  const legacyDevProtocol = `${DEFAULT_APP_ID}-dev:`;
+
+  return (
+    protocol === "tutti:" ||
+    protocol === "tutti-dev:" ||
+    protocol === legacyProtocol ||
+    protocol === legacyDevProtocol
+  );
 }
 
 function closeServer(server: Server): Promise<void> {

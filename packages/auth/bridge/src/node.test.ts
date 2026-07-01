@@ -101,6 +101,59 @@ test("node login completes bridge, redeems transfer code, writes auth json", asy
   }
 });
 
+test("node login callback redirects to web result after writing auth json", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tutti-auth-bridge-"));
+  const file = join(dir, "auth.json");
+  const accountServer = await startAccountStub();
+  try {
+    const authBase = `http://127.0.0.1:${accountServer.port}`;
+    const auth = createTuttiNodeAuthClient({
+      authJsonPath: file,
+      appCallbackUrl: "tutti://auth/login?transfer_code=bad",
+      accountBaseUrl: authBase,
+      authLoginUrl: `${authBase}/auth/login`,
+      openUrl: async (loginUrl) => {
+        const state = new URL(loginUrl).searchParams.get("state") ?? "";
+        const decoded = decodeState(state);
+        const callbackUrl = new URL(
+          "/oauth/callback",
+          decoded.localServerOrigin
+        );
+        callbackUrl.searchParams.set("state", state);
+        callbackUrl.searchParams.set("transfer_code", "transfer-1");
+        const callbackResponse = await fetch(callbackUrl, {
+          redirect: "manual"
+        });
+        assert.equal(callbackResponse.status, 302);
+        const location = callbackResponse.headers.get("location") ?? "";
+        assert.equal(location.includes("transfer-1"), false);
+        const resultUrl = new URL(location);
+        assert.equal(
+          resultUrl.searchParams.get("desktopBridgeStatus"),
+          "success"
+        );
+        const openAppUrl = resultUrl.searchParams.get("openAppUrl") ?? "";
+        assert.equal(openAppUrl.includes("transfer_code"), false);
+        assert.equal(new URL(openAppUrl).protocol, "tutti:");
+      }
+    });
+
+    const result = await auth.login();
+    assert.equal(result.session.sessionId, "session-1");
+    assert.equal((await readAuthJson(file))?.cookie, "session_id=session-1");
+    assert.deepEqual(accountServer.requests.redeem, {
+      transfer_code: "transfer-1",
+      attempt_id: accountServer.requests.redeem?.attempt_id,
+      bridge_token: accountServer.requests.redeem?.bridge_token,
+      app_id: DEFAULT_APP_ID,
+      device_id: accountServer.requests.redeem?.device_id
+    });
+  } finally {
+    await accountServer.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("node bridge rejects invalid callback state", async () => {
   const dir = await mkdtemp(join(tmpdir(), "tutti-auth-bridge-"));
   const file = join(dir, "auth.json");

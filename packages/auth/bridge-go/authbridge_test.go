@@ -9,9 +9,74 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestCallbackCompletesWritesAuthJSONAndRedirectsToWebResult(t *testing.T) {
+	account := newAccountServer(t)
+	defer account.Close()
+
+	client := newTestClient(t, account.URL)
+	attempt, err := client.StartLogin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := loginState(t, attempt.LoginURL)
+	callbackURL, err := url.Parse(state.LocalServerOrigin + "/oauth/callback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := callbackURL.Query()
+	query.Set("state", attempt.state)
+	query.Set("transfer_code", "transfer-1")
+	callbackURL.RawQuery = query.Encode()
+
+	resp, err := noRedirectClient().Get(callbackURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("callback status = %d", resp.StatusCode)
+	}
+	location := resp.Header.Get("Location")
+	resultURL, err := url.Parse(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resultURL.String() == "" || resultURL.Scheme != "https" || resultURL.Host != "tutti.sh" || resultURL.Path != "/auth/login/callback" {
+		t.Fatalf("redirect location = %q", location)
+	}
+	if got := resultURL.Query().Get("desktopBridgeStatus"); got != "success" {
+		t.Fatalf("desktopBridgeStatus = %q", got)
+	}
+	if strings.Contains(location, "transfer-1") || strings.Contains(location, "session-1") {
+		t.Fatalf("redirect leaked sensitive value: %s", location)
+	}
+	openAppURL := resultURL.Query().Get("openAppUrl")
+	if openAppURL == "" {
+		t.Fatal("openAppUrl is missing")
+	}
+	parsedOpenAppURL, err := url.Parse(openAppURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsedOpenAppURL.Scheme != "tutti" || parsedOpenAppURL.Query().Get("desktopBridgeStatus") != "success" {
+		t.Fatalf("openAppUrl = %q", openAppURL)
+	}
+
+	waitForStatus(t, attempt, statusCompleted)
+	session, err := client.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session == nil || session.SessionID != "session-1" || session.UserID != "user-1" {
+		t.Fatalf("session = %#v", session)
+	}
+}
 
 func TestStartLoginCompletesAndWritesAuthJSON(t *testing.T) {
 	account := newAccountServer(t)
@@ -121,6 +186,88 @@ func TestCompleteRejectsMismatchedStateOrigin(t *testing.T) {
 	waitForStatus(t, attempt, statusFailed)
 }
 
+func TestCallbackRedirectsProviderErrorWithoutLeakingSecrets(t *testing.T) {
+	account := newAccountServer(t)
+	defer account.Close()
+
+	client := newTestClient(t, account.URL)
+	attempt, err := client.StartLogin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := loginState(t, attempt.LoginURL)
+	callbackURL, err := url.Parse(state.LocalServerOrigin + "/oauth/callback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := callbackURL.Query()
+	query.Set("state", attempt.state)
+	query.Set("error", "access_denied")
+	query.Set("transfer_code", "transfer-1")
+	callbackURL.RawQuery = query.Encode()
+
+	resp, err := noRedirectClient().Get(callbackURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("callback status = %d", resp.StatusCode)
+	}
+	location := resp.Header.Get("Location")
+	resultURL, err := url.Parse(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := resultURL.Query().Get("desktopBridgeStatus"); got != "error" {
+		t.Fatalf("desktopBridgeStatus = %q", got)
+	}
+	if got := resultURL.Query().Get("desktopBridgeError"); got != "providerError" {
+		t.Fatalf("desktopBridgeError = %q", got)
+	}
+	if strings.Contains(location, "access_denied") || strings.Contains(location, "transfer-1") {
+		t.Fatalf("redirect leaked sensitive value: %s", location)
+	}
+	waitForStatus(t, attempt, statusFailed)
+}
+
+func TestBridgeResultOpenAppURLSchemeWhitelist(t *testing.T) {
+	allowed := buildBridgeResultURL(Config{
+		AuthLoginURL:   "https://tutti.sh/auth/login",
+		AppCallbackURL: "tutti-dev://login/callback?transfer_code=bad",
+	}, "success", "")
+	allowedURL, err := url.Parse(allowed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openAppURL := allowedURL.Query().Get("openAppUrl")
+	if openAppURL == "" {
+		t.Fatal("allowed openAppUrl is missing")
+	}
+	if strings.Contains(openAppURL, "transfer_code") {
+		t.Fatalf("openAppUrl leaked old query: %s", openAppURL)
+	}
+	parsedOpenAppURL, err := url.Parse(openAppURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsedOpenAppURL.Scheme != "tutti-dev" {
+		t.Fatalf("openAppUrl = %q", openAppURL)
+	}
+
+	blocked := buildBridgeResultURL(Config{
+		AuthLoginURL:   "https://tutti.sh/auth/login",
+		AppCallbackURL: "https://evil.example/callback",
+	}, "success", "")
+	blockedURL, err := url.Parse(blocked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := blockedURL.Query().Get("openAppUrl"); got != "" {
+		t.Fatalf("blocked openAppUrl = %q", got)
+	}
+}
+
 func TestGetUserInfoAndLogout(t *testing.T) {
 	account := newAccountServer(t)
 	defer account.Close()
@@ -165,9 +312,16 @@ func newAccountServer(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/v1/redeem_desktop_transfer_code":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Errorf("decode redeem body: %v", err)
+			}
+			if strings.TrimSpace(body["device_id"]) == "" {
+				t.Errorf("redeem device_id is empty in body %#v", body)
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"code": 0,
-				"data": map[string]string{"session_id": "session-1"},
+				"data": map[string]string{"sessionId": "session-1"},
 			})
 		case "/user/v1/user_info":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -210,4 +364,12 @@ func waitForStatus(t *testing.T, attempt *LoginAttempt, want string) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("status = %s, want %s", attempt.Status().Status, want)
+}
+
+func noRedirectClient() *http.Client {
+	return &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }

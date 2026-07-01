@@ -100,6 +100,7 @@ type LoginAttempt struct {
 	client      *Client
 	state       string
 	bridgeToken string
+	deviceID    string
 	origin      string
 	server      *http.Server
 	listener    net.Listener
@@ -194,6 +195,7 @@ func (c *Client) StartLogin(ctx context.Context) (*LoginAttempt, error) {
 		ExpiresAt:   maxExpires,
 		bridgeToken: bridgeToken,
 		client:      c,
+		deviceID:    state.DeviceID,
 		done:        make(chan struct{}),
 		idleTimeout: c.config.LoginIdleTimeout,
 		listener:    listener,
@@ -338,6 +340,8 @@ func (a *LoginAttempt) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/oauth/health":
 		a.handleHealth(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/oauth/callback":
+		a.handleCallback(w, r)
 	case r.Method == http.MethodPost && r.URL.Path == "/oauth/complete":
 		a.handleComplete(w, r)
 	default:
@@ -414,33 +418,80 @@ func (a *LoginAttempt) handleComplete(w http.ResponseWriter, r *http.Request) {
 	go a.complete(transferCode)
 }
 
+func (a *LoginAttempt) handleCallback(w http.ResponseWriter, r *http.Request) {
+	if !a.allowedHost(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	query := r.URL.Query()
+	callbackError := strings.TrimSpace(query.Get("error"))
+	callbackState := strings.TrimSpace(query.Get("state"))
+	transferCode := strings.TrimSpace(query.Get("transfer_code"))
+	if !a.stateMatches(callbackState) {
+		err := errors.New("invalid state")
+		redirectBridgeResult(w, r, a, "error", "invalidState")
+		a.markFailed(err)
+		a.closeGracefully()
+		return
+	}
+	if callbackError != "" {
+		err := errors.New(callbackError)
+		redirectBridgeResult(w, r, a, "error", "providerError")
+		a.markFailed(err)
+		a.closeGracefully()
+		return
+	}
+	if transferCode == "" {
+		err := errors.New("missing transfer_code")
+		redirectBridgeResult(w, r, a, "error", "missingTransferCode")
+		a.markFailed(err)
+		a.closeGracefully()
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := a.completeWithContext(ctx, transferCode); err != nil {
+		redirectBridgeResult(w, r, a, "error", "redeemFailed")
+		a.closeGracefully()
+		return
+	}
+	redirectBridgeResult(w, r, a, "success", "")
+	a.closeGracefully()
+}
+
 func (a *LoginAttempt) complete(transferCode string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	_ = a.completeWithContext(ctx, transferCode)
+	a.close()
+}
+
+func (a *LoginAttempt) completeWithContext(ctx context.Context, transferCode string) error {
 	sessionID, err := a.client.redeemTransferCode(ctx, a, transferCode)
 	if err != nil {
-		a.fail(err)
-		return
+		a.markFailed(err)
+		return err
 	}
 	user, err := a.client.fetchUserInfo(ctx, buildSessionCookie(sessionID))
 	if err != nil {
-		a.fail(err)
-		return
+		a.markFailed(err)
+		return err
 	}
 	if user == nil {
-		a.fail(errors.New("failed to load user info after login"))
-		return
+		err := errors.New("failed to load user info after login")
+		a.markFailed(err)
+		return err
 	}
 	if err := a.client.writeAuthJSON(sessionFromUser(sessionID, *user)); err != nil {
-		a.fail(err)
-		return
+		a.markFailed(err)
+		return err
 	}
 	a.mu.Lock()
 	a.status = statusCompleted
 	a.user = user
 	a.mu.Unlock()
-	a.close()
+	return nil
 }
 
 func (a *LoginAttempt) wait(ctx context.Context) {
@@ -463,6 +514,11 @@ func (a *LoginAttempt) serve() {
 }
 
 func (a *LoginAttempt) fail(err error) {
+	a.markFailed(err)
+	a.close()
+}
+
+func (a *LoginAttempt) markFailed(err error) {
 	a.mu.Lock()
 	if a.status == statusCompleted {
 		a.mu.Unlock()
@@ -475,7 +531,6 @@ func (a *LoginAttempt) fail(err error) {
 	}
 	a.err = err
 	a.mu.Unlock()
-	a.close()
 }
 
 func (a *LoginAttempt) close() {
@@ -483,6 +538,17 @@ func (a *LoginAttempt) close() {
 	a.doneOnce.Do(func() {
 		close(a.done)
 	})
+}
+
+func (a *LoginAttempt) closeGracefully() {
+	a.doneOnce.Do(func() {
+		close(a.done)
+	})
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = a.server.Shutdown(ctx)
+	}()
 }
 
 func (a *LoginAttempt) allowedOrigin(r *http.Request) bool {
@@ -525,17 +591,20 @@ func (c *Client) redeemTransferCode(ctx context.Context, attempt *LoginAttempt, 
 		"attempt_id":    attempt.ID,
 		"bridge_token":  attempt.bridgeToken,
 		"app_id":        c.config.AppID,
+		"device_id":     attempt.deviceID,
 	}
 	var data struct {
-		SessionID string `json:"session_id"`
+		SessionIDLegacy string `json:"session_id"`
+		SessionID       string `json:"sessionId"`
 	}
 	if err := c.postAccount(ctx, "/auth/v1/redeem_desktop_transfer_code", "", body, &data); err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(data.SessionID) == "" {
+	sessionID := firstNonEmpty(data.SessionIDLegacy, data.SessionID)
+	if strings.TrimSpace(sessionID) == "" {
 		return "", errors.New("redeem response missing session_id")
 	}
-	return data.SessionID, nil
+	return sessionID, nil
 }
 
 func (c *Client) fetchUserInfo(ctx context.Context, cookie string) (*UserInfo, error) {
@@ -689,6 +758,55 @@ func buildLoginURL(authLoginURL string, state string) string {
 	q.Set("state", state)
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func redirectBridgeResult(w http.ResponseWriter, r *http.Request, attempt *LoginAttempt, status string, safeErrorCode string) {
+	http.Redirect(w, r, buildBridgeResultURL(attempt.client.config, status, safeErrorCode), http.StatusFound)
+}
+
+func buildBridgeResultURL(config Config, status string, safeErrorCode string) string {
+	u, err := url.Parse(config.AuthLoginURL)
+	if err != nil {
+		return "/auth/login/callback"
+	}
+	u.Path = "/auth/login/callback"
+	u.RawQuery = ""
+	u.Fragment = ""
+	q := u.Query()
+	q.Set("desktopBridgeStatus", status)
+	if strings.TrimSpace(safeErrorCode) != "" {
+		q.Set("desktopBridgeError", strings.TrimSpace(safeErrorCode))
+	}
+	if openAppURL := buildSafeOpenAppURL(config.AppCallbackURL, status, safeErrorCode); openAppURL != "" {
+		q.Set("openAppUrl", openAppURL)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func buildSafeOpenAppURL(raw string, status string, safeErrorCode string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || !isAllowedAppCallbackScheme(u.Scheme) {
+		return ""
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	q := u.Query()
+	q.Set("desktopBridgeStatus", status)
+	if strings.TrimSpace(safeErrorCode) != "" {
+		q.Set("desktopBridgeError", strings.TrimSpace(safeErrorCode))
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func isAllowedAppCallbackScheme(scheme string) bool {
+	switch strings.ToLower(strings.TrimSpace(scheme)) {
+	case "tutti", "tutti-dev", "nextop", "nextop-dev":
+		return true
+	default:
+		return false
+	}
 }
 
 func buildAccountURL(baseURL string, path string) string {
