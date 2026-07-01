@@ -127,8 +127,8 @@ func TestTuttiCLIPolicyUsesPreparedCLICommandForAgentLauncherFallback(t *testing
 	}
 	if !strings.Contains(policy, "# Host App Context") ||
 		!strings.Contains(policy, "Images/videos: use Markdown") ||
-		!strings.Contains(policy, "use `[filename](/abs/path:line)` Markdown links") ||
-		!strings.Contains(policy, "No relative paths") {
+		!strings.Contains(policy, "use `[filename](/abs/path)` Markdown links") ||
+		!strings.Contains(policy, "No relative paths, line suffixes") {
 		t.Fatalf("tutti CLI policy missing host app context: %q", policy)
 	}
 

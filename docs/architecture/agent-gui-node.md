@@ -1136,7 +1136,8 @@ path does not open a misleading workbench node.
 Provider host-app-context prompts should mirror that contract: when agents
 reference code or workspace files in responses, instruct them to emit Markdown
 links with filename labels and absolute filesystem targets such as
-`[filename](/abs/path:line)`, not relative links or inline-code paths.
+`[filename](/abs/path)`, not relative links, inline-code paths, or line-suffixed
+paths.
 
 Quick checks:
 
