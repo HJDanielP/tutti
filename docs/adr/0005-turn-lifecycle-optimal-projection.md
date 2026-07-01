@@ -1,4 +1,11 @@
-# ADR 0005 — Turn lifecycle: full optimal (event-sourced projection + non-blocking command/observe), risk-controlled
+# ADR 0005 — Turn lifecycle: full optimal (reconciled projection + non-blocking command/observe), risk-controlled
+
+> **Terminology (reconcile with ADR 0004):** "projection" here means an **in-memory,
+> snapshot-reconciled** projection (folded from live events, reconciled against the
+> Step-4 snapshot, replay-rebuilt per load). It is NOT a durable append-only event
+> log — that remains **out of scope / future direction** per ADR 0004. The t3code/
+> traycer "single event log" is the *shape* we borrow (one reconciled state for
+> turns+messages+approvals), not a commitment to persist an event log.
 
 - Date: 2026-07-02
 - Status: Accepted (grilling session) — **commit to the optimal target, no compromise; de-risked by sequencing + strangler shim + shadow-compare**

@@ -56,6 +56,17 @@ original RPC is dead on reconnect → the durable model can only **display inter
 assume RPC revival. `serverRequest/resolved` is the reconcile signal that keeps the
 durable state honest regardless.
 
+## Sequencing (gate + independence)
+
+- **Gated on Step 4** (like ADR 0005 C): a durable pending approval reconcilable
+  against the snapshot needs the Step-4 unified projection to exist first.
+- **Does NOT depend on Step 7's Exec inversion.** "Hold codex's RPC + respond async"
+  is already what the current blocking-goroutine handler does (a goroutine is cheap
+  and holds the JSON-RPC request open); Step 6 keeps that as the strangler shim while
+  making the pending STATE durable and adding `serverRequest/resolved`. So Step 6
+  (approval) legitimately precedes Step 7 (Exec inversion); it introduces the
+  responder-over-durable-state pattern that Step 7 later generalizes to turns.
+
 ## Risk control
 
 - **Strangler shim:** keep the current blocking handler as a thin shim OVER the

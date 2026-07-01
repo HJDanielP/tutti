@@ -140,6 +140,13 @@ Transport ──→ typed Client ──→ Thread ┤
   consuming the frozen Cluster A snapshot contract.
 ```
 
+> **Refined (ADR 0005/0006):** the Reducer / Approval-Resolver / Facade outputs above
+> converge into **one in-memory, snapshot-reconciled per-session projection** carrying
+> turn state + messages + pending approvals (one `Version` cursor, `OwnerThreadID`
+> lanes), consumed via a **non-blocking command/observe `Exec`** (blocking signature
+> kept as a strangler shim until callers migrate). The boxes are the owning layers;
+> their *output* is unified. See § Design Refinements.
+
 ## Multi-Step Alignment Plan
 
 All four state machines are consolidated, but sequenced into independently shippable steps. Order: safety net → additive codegen → bottom-up (transport → thread → events → turn → approvals → facade) → legacy deletion → deferred desktop. Each step keeps the work-area tests green and lands its bug-class regression tests.
@@ -212,6 +219,7 @@ All four state machines are consolidated, but sequenced into independently shipp
 
 - **Contract:** Step 0's characterization tests **plus the bug corpus** are the invariant across all steps.
 - **By state machine:** each of Steps 3–7 lands its extracted unit with focused tests *and* the corresponding bug-class regression tests as its acceptance gate.
+- **Shadow-compare (ADR 0005/0006):** before the reconciled projection becomes the authoritative source of truth for turn state (Step 5) and pending approvals (Step 6), run it in parallel with the current blocking model and assert equal terminal classification against the Step-0 corpus + new golden turn/approval tests. Flip only when equal.
 - **Drift:** Step 1's CI check regenerates `codexproto` and fails on unexpected diff.
 - **Baseline command (work area):** `go build ./runtime/...` + `go test ./runtime/ -run <app-server pattern>` in `packages/agent/daemon`.
 
