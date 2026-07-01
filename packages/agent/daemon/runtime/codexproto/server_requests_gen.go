@@ -23,6 +23,122 @@ type ServerRequestHandler interface {
 	McpServerElicitationRequest(ctx context.Context, params McpServerElicitationRequestParams) (*McpServerElicitationRequestResponse, error)
 }
 
+// ParsedServerRequest represents a typed server request envelope.
+type ParsedServerRequest struct {
+	Method string
+	Params any
+	Raw json.RawMessage
+}
+
+type serverRequestParser func(json.RawMessage) (ParsedServerRequest, error)
+
+var serverRequestParsers = map[string]serverRequestParser{
+	"account/chatgptAuthTokens/refresh": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload ChatgptAuthTokensRefreshParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "account/chatgptAuthTokens/refresh", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "account/chatgptAuthTokens/refresh", Params: payload, Raw: params}, nil
+	},
+	"applyPatchApproval": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload ApplyPatchApprovalParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "applyPatchApproval", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "applyPatchApproval", Params: payload, Raw: params}, nil
+	},
+	"attestation/generate": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload AttestationGenerateParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "attestation/generate", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "attestation/generate", Params: payload, Raw: params}, nil
+	},
+	"execCommandApproval": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload ExecCommandApprovalParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "execCommandApproval", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "execCommandApproval", Params: payload, Raw: params}, nil
+	},
+	"item/commandExecution/requestApproval": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload CommandExecutionRequestApprovalParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "item/commandExecution/requestApproval", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "item/commandExecution/requestApproval", Params: payload, Raw: params}, nil
+	},
+	"item/fileChange/requestApproval": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload FileChangeRequestApprovalParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "item/fileChange/requestApproval", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "item/fileChange/requestApproval", Params: payload, Raw: params}, nil
+	},
+	"item/permissions/requestApproval": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload PermissionsRequestApprovalParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "item/permissions/requestApproval", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "item/permissions/requestApproval", Params: payload, Raw: params}, nil
+	},
+	"item/tool/call": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload DynamicToolCallParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "item/tool/call", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "item/tool/call", Params: payload, Raw: params}, nil
+	},
+	"item/tool/requestUserInput": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload ToolRequestUserInputParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "item/tool/requestUserInput", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "item/tool/requestUserInput", Params: payload, Raw: params}, nil
+	},
+	"mcpServer/elicitation/request": func(params json.RawMessage) (ParsedServerRequest, error) {
+		var payload McpServerElicitationRequestParams
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &payload); err != nil {
+				return ParsedServerRequest{Method: "mcpServer/elicitation/request", Raw: params}, err
+			}
+		}
+		return ParsedServerRequest{Method: "mcpServer/elicitation/request", Params: payload, Raw: params}, nil
+	},
+}
+
+// ParseServerRequest parses a server request by method.
+func ParseServerRequest(method string, params json.RawMessage) (ParsedServerRequest, error) {
+	if parser, ok := serverRequestParsers[method]; ok {
+		return parser(params)
+	}
+	return ParsedServerRequest{Method: method, Raw: params}, nil
+}
+
+// IsKnownServerRequestMethod reports whether method is in the generated server request surface.
+func IsKnownServerRequestMethod(method string) bool {
+	_, ok := serverRequestParsers[method]
+	return ok
+}
+
 func dispatchServerRequest(ctx context.Context, handler ServerRequestHandler, req JSONRPCRequest) (any, error) {
 	switch req.Method {
 	case "account/chatgptAuthTokens/refresh":

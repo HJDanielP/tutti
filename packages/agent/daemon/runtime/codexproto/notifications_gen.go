@@ -629,9 +629,16 @@ var notificationParsers = map[string]notificationParser{
 	},
 }
 
-func parseServerNotification(method string, params json.RawMessage) (Notification, error) {
+// ParseServerNotification parses a server notification by method.
+func ParseServerNotification(method string, params json.RawMessage) (Notification, error) {
 	if handler, ok := notificationParsers[method]; ok {
 		return handler(params)
 	}
 	return Notification{Method: method, Raw: params}, nil
+}
+
+// IsKnownServerNotificationMethod reports whether method is in the generated server notification surface.
+func IsKnownServerNotificationMethod(method string) bool {
+	_, ok := notificationParsers[method]
+	return ok
 }

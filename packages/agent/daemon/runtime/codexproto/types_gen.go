@@ -1969,17 +1969,6 @@ type ReviewDelivery string
 const ReviewDeliveryDetached ReviewDelivery = "detached"
 const ReviewDeliveryInline ReviewDelivery = "inline"
 
-type ReviewStartParams struct {
-	// Where to run the review: inline (default) on the current thread or detached on
-	// a new thread (returned in `reviewThreadId`).
-	Delivery interface{} `json:"delivery,omitempty"`
-
-	// Target corresponds to the JSON schema field "target".
-	Target ReviewStartParamsTarget `json:"target"`
-
-	// ThreadID corresponds to the JSON schema field "threadId".
-	ThreadID string `json:"threadId"`
-}
 
 type ReviewStartParamsTarget interface{}
 

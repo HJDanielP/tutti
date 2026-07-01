@@ -655,6 +655,39 @@ func renderServerRequests(methods []rpcMethod, codexCommit string) []byte {
 	}
 	b.WriteString("}\n\n")
 
+	b.WriteString("// ParsedServerRequest represents a typed server request envelope.\n")
+	b.WriteString("type ParsedServerRequest struct {\n\tMethod string\n\tParams any\n\tRaw json.RawMessage\n}\n\n")
+
+	b.WriteString("type serverRequestParser func(json.RawMessage) (ParsedServerRequest, error)\n\n")
+	b.WriteString("var serverRequestParsers = map[string]serverRequestParser{\n")
+	for _, method := range methods {
+		b.WriteString(fmt.Sprintf("\t%q: func(params json.RawMessage) (ParsedServerRequest, error) {\n", method.Method))
+		if method.ParamsType == "" {
+			b.WriteString(fmt.Sprintf("\t\treturn ParsedServerRequest{Method: %q, Params: nil, Raw: params}, nil\n", method.Method))
+		} else {
+			b.WriteString("\t\tvar payload ")
+			b.WriteString(method.ParamsType)
+			b.WriteString("\n")
+			b.WriteString("\t\tif len(params) > 0 {\n\t\t\tif err := json.Unmarshal(params, &payload); err != nil {\n\t\t\t\treturn ParsedServerRequest{Method: ")
+			b.WriteString(fmt.Sprintf("%q", method.Method))
+			b.WriteString(", Raw: params}, err\n\t\t\t}\n\t\t}\n")
+			b.WriteString("\t\treturn ParsedServerRequest{Method: ")
+			b.WriteString(fmt.Sprintf("%q", method.Method))
+			b.WriteString(", Params: payload, Raw: params}, nil\n")
+		}
+		b.WriteString("\t},\n")
+	}
+	b.WriteString("}\n\n")
+
+	b.WriteString("// ParseServerRequest parses a server request by method.\n")
+	b.WriteString("func ParseServerRequest(method string, params json.RawMessage) (ParsedServerRequest, error) {\n")
+	b.WriteString("\tif parser, ok := serverRequestParsers[method]; ok {\n\t\treturn parser(params)\n\t}\n")
+	b.WriteString("\treturn ParsedServerRequest{Method: method, Raw: params}, nil\n}\n\n")
+
+	b.WriteString("// IsKnownServerRequestMethod reports whether method is in the generated server request surface.\n")
+	b.WriteString("func IsKnownServerRequestMethod(method string) bool {\n")
+	b.WriteString("\t_, ok := serverRequestParsers[method]\n\treturn ok\n}\n\n")
+
 	b.WriteString("func dispatchServerRequest(ctx context.Context, handler ServerRequestHandler, req JSONRPCRequest) (any, error) {\n")
 	b.WriteString("\tswitch req.Method {\n")
 	for _, method := range methods {
@@ -708,9 +741,14 @@ func renderNotifications(notifications []rpcNotification, codexCommit string) []
 	}
 	b.WriteString("}\n\n")
 
-	b.WriteString("func parseServerNotification(method string, params json.RawMessage) (Notification, error) {\n")
+	b.WriteString("// ParseServerNotification parses a server notification by method.\n")
+	b.WriteString("func ParseServerNotification(method string, params json.RawMessage) (Notification, error) {\n")
 	b.WriteString("\tif handler, ok := notificationParsers[method]; ok {\n\t\treturn handler(params)\n\t}\n")
 	b.WriteString("\treturn Notification{Method: method, Raw: params}, nil\n}\n")
+
+	b.WriteString("\n// IsKnownServerNotificationMethod reports whether method is in the generated server notification surface.\n")
+	b.WriteString("func IsKnownServerNotificationMethod(method string) bool {\n")
+	b.WriteString("\t_, ok := notificationParsers[method]\n\treturn ok\n}\n")
 
 	return []byte(b.String())
 }
@@ -736,6 +774,7 @@ func manualProtocolTypes() map[string]struct{} {
 		"ItemCompletedNotification":               {},
 		"PermissionsRequestApprovalParams":        {},
 		"PermissionsRequestApprovalResponse":      {},
+		"ReviewStartParams":                       {},
 		"ThreadResumeResponse":                    {},
 		"ThreadGoal":                              {},
 		"ThreadGoalUpdatedNotification":           {},

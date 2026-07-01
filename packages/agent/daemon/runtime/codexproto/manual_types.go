@@ -47,6 +47,7 @@ type ThreadStartParams struct {
 	Cwd                   *string         `json:"cwd,omitempty"`
 	ApprovalPolicy        json.RawMessage `json:"approvalPolicy,omitempty"`
 	Sandbox               json.RawMessage `json:"sandbox,omitempty"`
+	ApprovalsReviewer     *string         `json:"approvalsReviewer,omitempty"`
 	Config                *map[string]any `json:"config,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
@@ -61,6 +62,7 @@ type ThreadResumeParams struct {
 	Cwd                   *string         `json:"cwd,omitempty"`
 	ApprovalPolicy        json.RawMessage `json:"approvalPolicy,omitempty"`
 	Sandbox               json.RawMessage `json:"sandbox,omitempty"`
+	ApprovalsReviewer     *string         `json:"approvalsReviewer,omitempty"`
 	Config                *map[string]any `json:"config,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
@@ -76,6 +78,7 @@ type ThreadForkParams struct {
 	Cwd                   *string         `json:"cwd,omitempty"`
 	ApprovalPolicy        json.RawMessage `json:"approvalPolicy,omitempty"`
 	Sandbox               json.RawMessage `json:"sandbox,omitempty"`
+	ApprovalsReviewer     *string         `json:"approvalsReviewer,omitempty"`
 	Config                *map[string]any `json:"config,omitempty"`
 	BaseInstructions      *string         `json:"baseInstructions,omitempty"`
 	DeveloperInstructions *string         `json:"developerInstructions,omitempty"`
@@ -88,15 +91,26 @@ type TurnStartParamsInputElem interface{}
 // TurnStartParams is maintained manually because the raw schema currently
 // exceeds the generator's capabilities.
 type TurnStartParams struct {
-	ThreadID       string                     `json:"threadId"`
-	Input          []TurnStartParamsInputElem `json:"input"`
-	Cwd            *string                    `json:"cwd,omitempty"`
-	ApprovalPolicy json.RawMessage            `json:"approvalPolicy,omitempty"`
-	SandboxPolicy  json.RawMessage            `json:"sandboxPolicy,omitempty"`
-	Model          *string                    `json:"model,omitempty"`
-	Effort         json.RawMessage            `json:"effort,omitempty"`
-	Summary        json.RawMessage            `json:"summary,omitempty"`
-	OutputSchema   json.RawMessage            `json:"outputSchema,omitempty"`
+	ThreadID          string                     `json:"threadId"`
+	Input             []TurnStartParamsInputElem `json:"input"`
+	Cwd               *string                    `json:"cwd,omitempty"`
+	ApprovalPolicy    json.RawMessage            `json:"approvalPolicy,omitempty"`
+	SandboxPolicy     json.RawMessage            `json:"sandboxPolicy,omitempty"`
+	Model             *string                    `json:"model,omitempty"`
+	Effort            json.RawMessage            `json:"effort,omitempty"`
+	Summary           json.RawMessage            `json:"summary,omitempty"`
+	ApprovalsReviewer *string                    `json:"approvalsReviewer,omitempty"`
+	CollaborationMode json.RawMessage            `json:"collaborationMode,omitempty"`
+	OutputSchema      json.RawMessage            `json:"outputSchema,omitempty"`
+}
+
+// ReviewStartParams is maintained manually because tutti sends the live
+// `summary` field used by the runtime but omitted from the generated schema.
+type ReviewStartParams struct {
+	ThreadID string `json:"threadId"`
+	Target   any    `json:"target"`
+	Delivery any    `json:"delivery,omitempty"`
+	Summary  any    `json:"summary,omitempty"`
 }
 
 // TurnSteerParamsInputElem aliases the sanitized generated input element type.

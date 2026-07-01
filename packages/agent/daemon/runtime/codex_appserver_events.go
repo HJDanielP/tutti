@@ -18,7 +18,7 @@ import (
 // shared ACP turn normalizer so the rest of the daemon sees one event shape.
 func (a *CodexAppServerAdapter) handleAppServerMessage(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	turnID string,
 	message acpMessage,
@@ -47,7 +47,7 @@ func (a *CodexAppServerAdapter) handleAppServerMessage(
 }
 
 func (a *CodexAppServerAdapter) appServerNotificationEvents(
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	turnID string,
 	message acpMessage,
@@ -756,7 +756,7 @@ func appServerSystemNoticeEvent(session Session, turnID string, noticeKind strin
 
 func (a *CodexAppServerAdapter) appServerServerRequest(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	turnID string,
 	message acpMessage,

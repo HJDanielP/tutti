@@ -108,7 +108,7 @@ type CodexAppServerAdapter struct {
 }
 
 type codexAppServerSession struct {
-	client                 *acpClient
+	client                 *codexAppServerClient
 	threadID               string
 	serverInfo             map[string]any
 	account                map[string]any
@@ -331,13 +331,14 @@ func (a *CodexAppServerAdapter) Start(ctx context.Context, session Session) (eve
 
 	threadParams := appServerThreadStartParams(session, a.sessionCWD(session))
 	trace.Log("thread.start.params", codexAppServerTraceThreadStartParams(session, threadParams, false))
-	threadResult, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodThreadStart,
-		threadParams,
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+	threadResult, err := trace.TypedCall(acpStartCallTimeout, appServerMethodThreadStart, func() (json.RawMessage, error) {
+		return client.ThreadStart(ctx, acpStartCallTimeout, threadParams,
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		var callErr *acpCallError
 		if errors.As(err, &callErr) && callErr.AuthRequired() {
@@ -473,21 +474,23 @@ func (a *CodexAppServerAdapter) Resume(ctx context.Context, session Session) (er
 	// usage here and fold it into the live state below.
 	var replayedUsage acpUsageState
 	replayedUsageKnown := false
-	threadResult, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodThreadResume, params,
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			if message.Method == appServerNotifyTokenUsage && len(message.Params) > 0 {
-				tokenParams := map[string]any{}
-				if json.Unmarshal(message.Params, &tokenParams) == nil {
-					if usage, ok := appServerTokenUsageState(tokenParams); ok {
-						replayedUsage = usage
-						replayedUsageKnown = true
+	threadResult, err := trace.TypedCall(acpStartCallTimeout, appServerMethodThreadResume, func() (json.RawMessage, error) {
+		return client.ThreadResume(ctx, acpStartCallTimeout, params,
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				if message.Method == appServerNotifyTokenUsage && len(message.Params) > 0 {
+					tokenParams := map[string]any{}
+					if json.Unmarshal(message.Params, &tokenParams) == nil {
+						if usage, ok := appServerTokenUsageState(tokenParams); ok {
+							replayedUsage = usage
+							replayedUsageKnown = true
+						}
 					}
 				}
-			}
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		return classifyACPResumeError(session, appServerMethodThreadResume, err)
 	}
@@ -571,7 +574,7 @@ func (a *CodexAppServerAdapter) startInitializedClient(
 	ctx context.Context,
 	session Session,
 	trace *codexAppServerStartupTrace,
-) (*acpClient, json.RawMessage, error) {
+) (*codexAppServerClient, json.RawMessage, error) {
 	if a == nil || a.transport == nil {
 		return nil, nil, errors.New("app-server process transport is unavailable")
 	}
@@ -599,7 +602,7 @@ func (a *CodexAppServerAdapter) startInitializedClient(
 	trace.Log("process.start.succeeded", map[string]any{
 		"duration_ms": time.Since(processStartedAt).Milliseconds(),
 	})
-	client := newAppServerJSONRPCClient(conn)
+	client := newCodexAppServerClient(conn)
 	client.SetStderrSink(trace.LogStderr)
 	// The session-level handler receives every message that arrives outside
 	// an in-flight RPC. Because turn/start responds immediately while the
@@ -632,15 +635,17 @@ func (a *CodexAppServerAdapter) startInitializedClient(
 		}
 	}()
 
-	initializeResult, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodInitialize, map[string]any{
-		"clientInfo": codexClientInfoParams(a.host, spawnEnv),
-		"capabilities": map[string]any{
-			"experimentalApi": true,
-		},
-	}, func(ctx context.Context, message acpMessage) error {
-		trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-		_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-		return err
+	initializeResult, err := trace.TypedCall(acpStartCallTimeout, appServerMethodInitialize, func() (json.RawMessage, error) {
+		return client.Initialize(ctx, acpStartCallTimeout, map[string]any{
+			"clientInfo": codexClientInfoParams(a.host, spawnEnv),
+			"capabilities": map[string]any{
+				"experimentalApi": true,
+			},
+		}, func(ctx context.Context, message acpMessage) error {
+			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+			return err
+		})
 	})
 	if err != nil {
 		slog.Warn("agent session app-server initialize failed",
@@ -653,7 +658,7 @@ func (a *CodexAppServerAdapter) startInitializedClient(
 	}
 	trace.Log("initialized.notify.begin", nil)
 	notifyStartedAt := time.Now()
-	if err := client.Notify(ctx, appServerMethodInitialized, nil); err != nil {
+	if err := client.Initialized(ctx); err != nil {
 		trace.Log("initialized.notify.failed", map[string]any{
 			"duration_ms": time.Since(notifyStartedAt).Milliseconds(),
 			"error":       err.Error(),
@@ -669,16 +674,18 @@ func (a *CodexAppServerAdapter) startInitializedClient(
 
 func (a *CodexAppServerAdapter) fetchAccount(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	trace *codexAppServerStartupTrace,
 ) (map[string]any, bool) {
-	result, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodAccountRead, map[string]any{},
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+	result, err := trace.TypedCall(acpStartCallTimeout, appServerMethodAccountRead, func() (json.RawMessage, error) {
+		return client.AccountRead(ctx, acpStartCallTimeout, map[string]any{},
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		// Account introspection is best-effort; authentication problems will
 		// surface from thread/start instead.
@@ -700,16 +707,18 @@ func (a *CodexAppServerAdapter) fetchAccount(
 
 func (a *CodexAppServerAdapter) fetchModels(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	trace *codexAppServerStartupTrace,
 ) []map[string]any {
-	result, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodModelList, map[string]any{},
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+	result, err := trace.TypedCall(acpStartCallTimeout, appServerMethodModelList, func() (json.RawMessage, error) {
+		return client.ModelList(ctx, acpStartCallTimeout, map[string]any{},
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		return nil
 	}
@@ -727,10 +736,12 @@ func (a *CodexAppServerAdapter) fetchModels(
 
 func (a *CodexAppServerAdapter) fetchModelsNoHandler(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	trace *codexAppServerStartupTrace,
 ) []map[string]any {
-	result, err := trace.CallNoHandler(ctx, client, acpStartCallTimeout, appServerMethodModelList, map[string]any{})
+	result, err := trace.TypedCallNoHandler(acpStartCallTimeout, appServerMethodModelList, func() (json.RawMessage, error) {
+		return client.ModelListNoHandler(ctx, acpStartCallTimeout, map[string]any{})
+	})
 	if err != nil {
 		return nil
 	}
@@ -748,16 +759,18 @@ func (a *CodexAppServerAdapter) fetchModelsNoHandler(
 
 func (a *CodexAppServerAdapter) fetchRateLimits(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	trace *codexAppServerStartupTrace,
 ) map[string]any {
-	result, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodRateLimitsRead, nil,
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+	result, err := trace.TypedCall(acpStartCallTimeout, appServerMethodRateLimitsRead, func() (json.RawMessage, error) {
+		return client.AccountRateLimitsRead(ctx, acpStartCallTimeout,
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		return nil
 	}
@@ -775,10 +788,12 @@ func (a *CodexAppServerAdapter) fetchRateLimits(
 
 func (a *CodexAppServerAdapter) fetchRateLimitsNoHandler(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	trace *codexAppServerStartupTrace,
 ) map[string]any {
-	result, err := trace.CallNoHandler(ctx, client, acpStartCallTimeout, appServerMethodRateLimitsRead, nil)
+	result, err := trace.TypedCallNoHandler(acpStartCallTimeout, appServerMethodRateLimitsRead, func() (json.RawMessage, error) {
+		return client.AccountRateLimitsReadNoHandler(ctx, acpStartCallTimeout)
+	})
 	if err != nil {
 		return nil
 	}
@@ -800,16 +815,18 @@ func (a *CodexAppServerAdapter) fetchRateLimitsNoHandler(
 // Best effort: any error means the capability stays off.
 func (a *CodexAppServerAdapter) fetchCollaborationModeMasks(
 	ctx context.Context,
-	client *acpClient,
+	client *codexAppServerClient,
 	session Session,
 	trace *codexAppServerStartupTrace,
 ) (map[string]any, map[string]any) {
-	result, err := trace.Call(ctx, client, acpStartCallTimeout, appServerMethodCollaborationModeList, map[string]any{},
-		func(ctx context.Context, message acpMessage) error {
-			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
-			_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
-			return err
-		})
+	result, err := trace.TypedCall(acpStartCallTimeout, appServerMethodCollaborationModeList, func() (json.RawMessage, error) {
+		return client.CollaborationModeList(ctx, acpStartCallTimeout,
+			func(ctx context.Context, message acpMessage) error {
+				trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
+				_, err := a.handleAppServerMessage(ctx, client, session, "", message, nil, nil, nil)
+				return err
+			})
+	})
 	if err != nil {
 		return nil, nil
 	}
@@ -1148,7 +1165,7 @@ func (a *CodexAppServerAdapter) Exec(
 	turnParams := appServerTurnStartParams(session, appSession.threadID, content, appSession.planModeMask, appSession.defaultModeMask, appSession.defaultModel)
 	trace.Log("turn.start.params", codexAppServerTraceTurnStartParams(session, turnParams, content))
 	turnStartedAt := time.Now()
-	result, err := appSession.client.Call(ctx, appServerMethodTurnStart, turnParams,
+	result, err := appSession.client.TurnStart(ctx, turnParams,
 		func(ctx context.Context, message acpMessage) error {
 			trace.LogMessage(message.Method, len(message.ID) > 0, len(message.Params))
 			next, err := a.handleAppServerMessage(ctx, appSession.client, session, turnID, message, normalizer, emitEvents, emitCommands)
@@ -1287,7 +1304,7 @@ func (a *CodexAppServerAdapter) steerActiveTurn(
 	activeTurnID string,
 	emit EventSink,
 ) ([]activityshared.Event, error) {
-	_, err := appSession.client.CallNoHandler(ctx, appServerMethodTurnSteer, map[string]any{
+	_, err := appSession.client.TurnSteerNoHandler(ctx, map[string]any{
 		"threadId":       appSession.threadID,
 		"expectedTurnId": activeTurnID,
 		"input":          appServerUserInput(content),
@@ -1321,7 +1338,7 @@ func (a *CodexAppServerAdapter) execSlashCommand(
 	command, args := splitSlashCommand(displayPrompt)
 	switch command {
 	case appServerSlashCompact:
-		_, err := appSession.client.Call(ctx, appServerMethodThreadCompact, map[string]any{
+		_, err := appSession.client.ThreadCompactStart(ctx, map[string]any{
 			"threadId": appSession.threadID,
 		}, a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands))
 		if err != nil {
@@ -1362,7 +1379,7 @@ func (a *CodexAppServerAdapter) execSlashCommand(
 	case appServerSlashGoal:
 		method, params := appServerGoalSlashRequest(args, appSession.threadID)
 		goalObjective := strings.TrimSpace(asString(params["objective"]))
-		result, err := appSession.client.Call(ctx, method, params,
+		result, err := appSession.callGoal(ctx, method, params,
 			a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands))
 		if err != nil {
 			emitTerminal([]activityshared.Event{newTurnActivityEvent(session, EventTurnFailed, turnID, SessionStatusFailed, "", "", acpFailureMetadata(err))})
@@ -1423,7 +1440,7 @@ func (a *CodexAppServerAdapter) execSlashCommand(
 	case appServerSlashReview:
 		return a.execReviewSlashCommand(ctx, appSession, session, args, turnID, appTurn, normalizer, emitEvents, emitTerminal, emitCommands)
 	case appServerSlashUndo:
-		_, err := appSession.client.Call(ctx, appServerMethodThreadRollback, map[string]any{
+		_, err := appSession.client.ThreadRollback(ctx, map[string]any{
 			"threadId": appSession.threadID,
 			"numTurns": 1,
 		}, a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands))
@@ -1544,9 +1561,8 @@ func (a *CodexAppServerAdapter) requestActiveGoalContinuation(
 	if objective := strings.TrimSpace(asStringRaw(goal["objective"])); objective != "" {
 		params["objective"] = objective
 	}
-	result, err := appSession.client.Call(
+	result, err := appSession.client.ThreadGoalSet(
 		ctx,
-		appServerMethodThreadGoalSet,
 		params,
 		a.appServerMessageHandler(appSession, session, turnID, normalizer, emitEvents, emitCommands),
 	)
@@ -1650,7 +1666,7 @@ func (a *CodexAppServerAdapter) sendTurnInterrupt(
 ) {
 	interruptCtx, cancel := context.WithTimeout(context.Background(), acpPermissionModeTimeout)
 	defer cancel()
-	if _, err := appSession.client.CallNoHandler(interruptCtx, appServerMethodTurnInterrupt, map[string]any{
+	if _, err := appSession.client.TurnInterruptNoHandler(interruptCtx, acpPermissionModeTimeout, map[string]any{
 		"threadId": appSession.threadID,
 		"turnId":   activeTurnID,
 	}); err != nil {
