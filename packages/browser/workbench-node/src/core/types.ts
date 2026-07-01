@@ -68,6 +68,12 @@ export interface BrowserNodeOpenUrlEvent {
   type: "open-url";
   sourceNodeId: string;
   url: string;
+  /**
+   * Set when the open-url request originates from an in-page link / popup inside
+   * a Browser guest. The Workbench host opens it as a new tab in the existing
+   * Browser window instead of navigating or spawning a separate window.
+   */
+  openInTab?: boolean;
   reuseIfOpen?: boolean;
   title?: string;
 }

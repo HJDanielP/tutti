@@ -588,6 +588,7 @@ test("blocks cross-origin Browser Node guest navigation for policy-bound session
     events.filter((event) => event.type === "open-url"),
     [
       {
+        openInTab: true,
         reuseIfOpen: true,
         sourceNodeId: "app-1",
         type: "open-url",
@@ -645,6 +646,7 @@ test("converts guest preload open-url requests into Browser Node open-url events
     events.filter((event) => event.type === "open-url"),
     [
       {
+        openInTab: true,
         reuseIfOpen: true,
         sourceNodeId: "browser-target-blank",
         type: "open-url",
@@ -690,6 +692,7 @@ test("keeps Google GIS OAuth popups native while routing ordinary popups through
     events.filter((event) => event.type === "open-url"),
     [
       {
+        openInTab: true,
         reuseIfOpen: true,
         sourceNodeId: "browser-google-oauth",
         type: "open-url",
@@ -764,6 +767,7 @@ test("registerBrowserNodeElectronMain routes guest open-url IPC through the owne
     sentEvents.filter((event) => event.type === "open-url"),
     [
       {
+        openInTab: true,
         reuseIfOpen: true,
         sourceNodeId: "browser-ipc-open-url",
         type: "open-url",

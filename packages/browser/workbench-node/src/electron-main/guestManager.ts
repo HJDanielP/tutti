@@ -534,6 +534,7 @@ export function createBrowserGuestManager({
         webContentsId: session.webContentsId
       });
       emit({
+        openInTab: true,
         reuseIfOpen: true,
         sourceNodeId: session.nodeId,
         type: "open-url",
