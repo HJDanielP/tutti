@@ -14,6 +14,11 @@ import (
 
 type codexAppServerClient struct {
 	raw *acpClient
+	// closeOnce makes Close idempotent: the client is closed from several
+	// owners (session replacement, lifecycle Close/Release, force-cancel,
+	// startup failure defers) and only the first close may reach the process.
+	closeOnce sync.Once
+	closeErr  error
 	// parsedNotificationMethods tracks notification methods already run
 	// through the typed schema parse (telemetry only).
 	parsedNotificationMethods sync.Map
@@ -55,7 +60,10 @@ func (c *codexAppServerClient) Close() error {
 	if c == nil || c.raw == nil {
 		return nil
 	}
-	return c.raw.Close()
+	c.closeOnce.Do(func() {
+		c.closeErr = c.raw.Close()
+	})
+	return c.closeErr
 }
 
 func (c *codexAppServerClient) Done() <-chan struct{} {

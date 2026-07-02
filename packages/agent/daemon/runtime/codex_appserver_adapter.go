@@ -103,9 +103,20 @@ type CodexAppServerAdapter struct {
 	commandSink CommandSnapshotSink
 	eventSink   SessionEventSink
 	configSink  ConfigOptionsUpdateSink
+	// lifecycleMu guards lifecycleLocks; the per-session locks serialize
+	// Start/Resume/Close/ReleaseLiveSession per agent session so concurrent
+	// lifecycle calls can never leave two live app-server processes for the
+	// same session. Different sessions never contend.
+	lifecycleMu    sync.Mutex
+	lifecycleLocks map[string]*codexAppServerSessionLock
 	// cancelGraceWindow bounds the graceful-interrupt wait in Cancel before the
 	// process is force-closed. Zero falls back to the default.
 	cancelGraceWindow time.Duration
+}
+
+type codexAppServerSessionLock struct {
+	mu   sync.Mutex
+	refs int
 }
 
 type codexAppServerSession struct {
@@ -177,6 +188,7 @@ func NewCodexAppServerAdapterWithHostMetadata(transport ProcessTransport, host H
 		transport:         transport,
 		host:              host,
 		sessions:          make(map[string]*codexAppServerSession),
+		lifecycleLocks:    make(map[string]*codexAppServerSessionLock),
 		cancelGraceWindow: defaultCodexAppServerCancelGraceWindow,
 	}
 }
@@ -287,10 +299,19 @@ func (a *CodexAppServerAdapter) commandString() string {
 }
 
 func (a *CodexAppServerAdapter) Start(ctx context.Context, session Session) (events []activityshared.Event, err error) {
+	unlockLifecycle := a.lockSessionLifecycle(session.AgentSessionID)
+	defer unlockLifecycle()
 	trace := newCodexAppServerStartupTrace(session)
 	defer func() {
 		trace.Finish(err)
 	}()
+	// One session owns at most one live app-server process. Starting over a
+	// session that already holds a live client replaces it: stop the old
+	// client first, then spawn the new process.
+	if existing := a.getSession(session.AgentSessionID); existing != nil && existing.client != nil {
+		a.rejectPendingRequests(session.AgentSessionID, errPermissionRequestCanceled)
+		_ = a.closeLiveSession(session.AgentSessionID)
+	}
 	client, initializeResult, err := a.startInitializedClient(ctx, session, trace)
 	if err != nil {
 		return nil, err
@@ -427,6 +448,12 @@ func (a *CodexAppServerAdapter) Resume(ctx context.Context, session Session) (er
 	if strings.TrimSpace(session.ProviderSessionID) == "" {
 		return missingProviderSessionResumeError(session)
 	}
+	unlockLifecycle := a.lockSessionLifecycle(session.AgentSessionID)
+	defer unlockLifecycle()
+	// Resume may run over a session that still holds a live client. Unlike
+	// Start, the old client is kept alive until the replacement has resumed
+	// successfully (storeSession closes it on replace): if the new spawn or
+	// thread/resume fails, the previous session must remain usable.
 	trace := newCodexAppServerStartupTrace(session)
 	defer func() {
 		trace.Finish(err)
@@ -554,6 +581,8 @@ func (a *CodexAppServerAdapter) Close(_ context.Context, session Session) error 
 		return nil
 	}
 	agentSessionID := strings.TrimSpace(session.AgentSessionID)
+	unlockLifecycle := a.lockSessionLifecycle(agentSessionID)
+	defer unlockLifecycle()
 	a.rejectPendingRequests(agentSessionID, errPermissionRequestCanceled)
 	return a.closeLiveSession(agentSessionID)
 }
@@ -563,6 +592,8 @@ func (a *CodexAppServerAdapter) ReleaseLiveSession(_ context.Context, session Se
 		return nil
 	}
 	agentSessionID := strings.TrimSpace(session.AgentSessionID)
+	unlockLifecycle := a.lockSessionLifecycle(agentSessionID)
+	defer unlockLifecycle()
 	if a.hasLiveSessionWork(agentSessionID) {
 		return ErrLiveSessionBusy
 	}
@@ -2041,6 +2072,37 @@ func (a *CodexAppServerAdapter) SubmitInteractive(ctx context.Context, session S
 	}, nil
 }
 
+// lockSessionLifecycle serializes lifecycle operations (Start, Resume, Close,
+// ReleaseLiveSession) for one agent session: any interleaving of these calls
+// could otherwise spawn a second app-server process while the first is still
+// live, or close the wrong process. The lock entry is refcounted so the map
+// does not grow with retired session IDs.
+func (a *CodexAppServerAdapter) lockSessionLifecycle(agentSessionID string) func() {
+	if a == nil {
+		return func() {}
+	}
+	key := strings.TrimSpace(agentSessionID)
+	a.lifecycleMu.Lock()
+	lock := a.lifecycleLocks[key]
+	if lock == nil {
+		lock = &codexAppServerSessionLock{}
+		a.lifecycleLocks[key] = lock
+	}
+	lock.refs++
+	a.lifecycleMu.Unlock()
+
+	lock.mu.Lock()
+	return func() {
+		lock.mu.Unlock()
+		a.lifecycleMu.Lock()
+		lock.refs--
+		if lock.refs <= 0 && a.lifecycleLocks[key] == lock {
+			delete(a.lifecycleLocks, key)
+		}
+		a.lifecycleMu.Unlock()
+	}
+}
+
 func (a *CodexAppServerAdapter) storeSession(agentSessionID string, session *codexAppServerSession) {
 	a.mu.Lock()
 	if session != nil {
@@ -2052,8 +2114,20 @@ func (a *CodexAppServerAdapter) storeSession(agentSessionID string, session *cod
 			session.pendingRequests = make(map[string]*pendingACPRequest)
 		}
 	}
-	a.sessions[strings.TrimSpace(agentSessionID)] = session
+	key := strings.TrimSpace(agentSessionID)
+	// Replacing a stored session must never orphan its app-server process:
+	// when the new entry does not carry the existing client forward, that
+	// client (and its OS process) would otherwise leak without an owner.
+	var replacedClient *codexAppServerClient
+	if existing := a.sessions[key]; existing != nil && existing != session && existing.client != nil &&
+		(session == nil || existing.client != session.client) {
+		replacedClient = existing.client
+	}
+	a.sessions[key] = session
 	a.mu.Unlock()
+	if replacedClient != nil {
+		_ = replacedClient.Close()
+	}
 }
 
 func (a *CodexAppServerAdapter) removeSession(agentSessionID string) {

@@ -86,6 +86,7 @@ type scriptedAppServerConnection struct {
 	goalCompletionAfterTurns     int
 	goalCleared                  bool
 	replayTokenUsageOnResume     bool // mirror real codex: emit token usage during thread/resume
+	threadResumeError            bool // fail thread/resume with an RPC error
 	closeOnce                    sync.Once
 	closeCount                   int
 }
@@ -266,12 +267,20 @@ func (c *scriptedAppServerConnection) Send(data []byte) error {
 				},
 			})
 		case appServerMethodThreadStart, appServerMethodThreadResume:
+			c.mu.Lock()
+			threadResumeError := c.threadResumeError && message.Method == appServerMethodThreadResume
+			replayTokenUsage := c.replayTokenUsageOnResume && message.Method == appServerMethodThreadResume
+			c.mu.Unlock()
+			if threadResumeError {
+				c.sendJSON(map[string]any{
+					"id":    message.ID,
+					"error": map[string]any{"code": -32000, "message": "resume rejected by test"},
+				})
+				continue
+			}
 			c.notify(appServerNotifyThreadStarted, map[string]any{
 				"thread": map[string]any{"id": "codex-thread-1"},
 			})
-			c.mu.Lock()
-			replayTokenUsage := c.replayTokenUsageOnResume && message.Method == appServerMethodThreadResume
-			c.mu.Unlock()
 			if replayTokenUsage {
 				// Real codex 0.140.0 replays thread/tokenUsage/updated during
 				// thread/resume so the GUI can show context fill before a new
