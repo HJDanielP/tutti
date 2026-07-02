@@ -388,6 +388,15 @@ func textMessageUpdateFromSessionEvent(
 	// GUI can render dedicated treatments instead of a plain assistant bubble.
 	if messageKind := stringFromPayload(event.Payload.Metadata, "messageKind"); messageKind != "" {
 		update.Payload["messageKind"] = messageKind
+		// Sub-agent lane markers ride hidden ownerThreadId rows; the GUI
+		// settles lane status/identity from these fields.
+		if messageKind == "subAgentLifecycle" || messageKind == "subAgentName" {
+			for _, key := range []string{"subAgentLifecycleStatus", "subAgentName", "detail"} {
+				if value := stringFromPayload(event.Payload.Metadata, key); value != "" {
+					update.Payload[key] = value
+				}
+			}
+		}
 	}
 	update.Semantics = messageSemanticsFromMetadata(event.Payload.Metadata)
 	forwardSystemNoticeMessageMetadata(update.Payload, event.Payload.Metadata)

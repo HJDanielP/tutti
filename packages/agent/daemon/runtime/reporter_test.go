@@ -449,6 +449,38 @@ func TestReportActivityInputForwardsMessageKindToPayload(t *testing.T) {
 	}
 }
 
+func TestReportActivityInputForwardsSubAgentMarkerFieldsToPayload(t *testing.T) {
+	t.Parallel()
+
+	session := reportTestSession()
+	marker := newTurnActivityEventWithID(session, "subagent-lifecycle:child-1:turn-1", EventMessage, "turn-1", "canceled", RoleAssistant, "", map[string]any{
+		"messageId":               "subagent-lifecycle:child-1:turn-1",
+		"contentMode":             messageContentModeSnapshot,
+		"streamState":             "canceled",
+		"messageKind":             "subAgentLifecycle",
+		"subAgentLifecycleStatus": "canceled",
+		"subAgentName":            "Repo smell analyst",
+		"detail":                  "user requested",
+		"ownerThreadId":           "child-1",
+	})
+	marker.OwnerThreadID = "child-1"
+	marker.OccurredAtUnixMS = 120
+
+	report := reportActivityInput(session, []activityshared.Event{marker})
+	if len(report.MessageUpdates) != 1 {
+		t.Fatalf("message updates = %#v, want one marker update", report.MessageUpdates)
+	}
+	payload := report.MessageUpdates[0].Payload
+	// The GUI settles lane status/identity from these fields; the reporter
+	// must not strip them (observed live: markers stored without
+	// subAgentLifecycleStatus left lanes running forever).
+	if payload["subAgentLifecycleStatus"] != "canceled" ||
+		payload["subAgentName"] != "Repo smell analyst" ||
+		payload["detail"] != "user requested" {
+		t.Fatalf("marker payload = %#v, want sub-agent fields forwarded", payload)
+	}
+}
+
 func TestReportActivityInputForwardsSystemNoticeMetadataToPayload(t *testing.T) {
 	t.Parallel()
 

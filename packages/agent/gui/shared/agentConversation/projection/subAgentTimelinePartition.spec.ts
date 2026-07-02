@@ -323,6 +323,54 @@ describe("subAgentTimelinePartition", () => {
       ).toBe("running");
     });
 
+    it("derives a short name from the task's opening self-address", () => {
+      const partition = partitionSubAgentTimelineItems([
+        collabCardItem({
+          id: 10,
+          eventId: "spawn-1-started",
+          callId: "spawn-1",
+          status: "running",
+          occurredAtUnixMs: 100,
+          task: "你是 repo smell reviewer。請在 /Users/asdf/Repo/tutti 做靜態分析。"
+        }),
+        childAssistantItem({
+          id: 11,
+          eventId: "child-msg-1",
+          ownerThreadId: "child-thread-1",
+          text: "working",
+          occurredAtUnixMs: 150
+        })
+      ]);
+
+      const lane = buildSubAgentLanesByCallId(partition).get("spawn-1")?.[0];
+
+      expect(lane?.name).toBe("repo smell reviewer");
+    });
+
+    it("leaves the lane unnamed when the task opening is too long to be a name", () => {
+      const partition = partitionSubAgentTimelineItems([
+        collabCardItem({
+          id: 10,
+          eventId: "spawn-1-started",
+          callId: "spawn-1",
+          status: "running",
+          occurredAtUnixMs: 100,
+          task: `你是${"很長的描述".repeat(10)}。請分析。`
+        }),
+        childAssistantItem({
+          id: 11,
+          eventId: "child-msg-1",
+          ownerThreadId: "child-thread-1",
+          text: "working",
+          occurredAtUnixMs: 150
+        })
+      ]);
+
+      const lane = buildSubAgentLanesByCallId(partition).get("spawn-1")?.[0];
+
+      expect(lane?.name).toBeNull();
+    });
+
     it("titles the lane from the subAgentName marker and hides markers from the log", () => {
       const partition = partitionSubAgentTimelineItems([
         collabCardItem({
@@ -568,7 +616,8 @@ function collabCardItem({
   occurredAtUnixMs,
   itemType = "call.started",
   output,
-  receiverThreadIds
+  receiverThreadIds,
+  task = "inspect the repository"
 }: {
   id: number;
   eventId: string;
@@ -578,6 +627,7 @@ function collabCardItem({
   itemType?: string;
   output?: Record<string, unknown>;
   receiverThreadIds?: readonly string[];
+  task?: string;
 }): WorkspaceAgentActivityTimelineItem {
   return timelineItem({
     id,
@@ -594,7 +644,7 @@ function collabCardItem({
       kind: "execute",
       status,
       input: {
-        task: "inspect the repository",
+        task,
         agentName: "spawnAgent",
         ...(receiverThreadIds ? { receiverThreadIds } : {})
       },

@@ -208,10 +208,11 @@ function subAgentLane(
   return {
     ownerThreadId,
     status,
-    // The sub-agent's identity comes from its own thread name (subAgentName
-    // marker), never from the collab tool name; the view supplies a
-    // localized numbered fallback while unnamed.
-    name: latestNameMarker(sortedItems),
+    // Identity precedence: the child thread's own name (subAgentName marker,
+    // rare in practice) > a short name derived from the task's opening
+    // self-address ("你是 X。…" / "You are X. …") > the view's localized
+    // numbered fallback. Never the collab tool name.
+    name: latestNameMarker(sortedItems) ?? deriveSubAgentNameFromTask(card.task),
     task: card.task,
     laneIndex: 1,
     laneCount: 1,
@@ -225,6 +226,39 @@ function subAgentLane(
       terminalAtUnixMs ?? timelineItemTime(lastItem) ?? null,
     terminalAtUnixMs
   };
+}
+
+const SUB_AGENT_DERIVED_NAME_MAX = 36;
+
+export function deriveSubAgentNameFromTask(task: string | null): string | null {
+  if (!task) {
+    return null;
+  }
+  const firstSentence = task
+    .trim()
+    .split(/[。．.!?！？\n]/, 1)[0]
+    ?.trim();
+  if (!firstSentence) {
+    return null;
+  }
+  // Only a self-address opening ("你是 X" / "You are X" / "Act as X") is a
+  // reliable identity signal; a plain task sentence is not a name.
+  const selfAddress = /^(你现在是|你現在是|你是|you are|act as)\s*/i;
+  if (!selfAddress.test(firstSentence)) {
+    return null;
+  }
+  const stripped = firstSentence
+    .replace(selfAddress, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (stripped.length < 2 || stripped.length > SUB_AGENT_DERIVED_NAME_MAX) {
+    return null;
+  }
+  // A bare restatement of the tool adds nothing.
+  if (/^(spawnagent|agent)$/i.test(stripped)) {
+    return null;
+  }
+  return stripped;
 }
 
 function latestNameMarker(
